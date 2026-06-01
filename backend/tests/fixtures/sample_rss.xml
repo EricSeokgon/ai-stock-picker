@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>한국경제 금융</title>
+    <link>https://www.hankyung.com</link>
+    <description>한국경제신문 금융 뉴스</description>
+    <item>
+      <title>삼성전자, 2분기 실적 예상 상회</title>
+      <link>https://www.hankyung.com/news/article/2026060101</link>
+      <description>삼성전자가 2분기 실적을 발표했다. 반도체 수출 호조로 시장 예상을 크게 상회하는 영업이익을 기록했으며, HBM 메모리 수요 급증이 주요 원인으로 분석된다.</description>
+      <pubDate>Sun, 01 Jun 2026 06:00:00 +0900</pubDate>
+    </item>
+    <item>
+      <title>SK하이닉스 HBM 수출 증가</title>
+      <link>https://www.hankyung.com/news/article/2026060102</link>
+      <description>SK하이닉스의 HBM 메모리 수출이 전년 동기 대비 150% 증가했다. AI 반도체 수요 급증에 따른 HBM3E 공급 확대가 실적 개선을 이끌고 있다.</description>
+      <pubDate>Sun, 01 Jun 2026 07:00:00 +0900</pubDate>
+    </item>
+  </channel>
+</rss>

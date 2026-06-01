@@ -1,0 +1,1 @@
+- [ai-stock-picker 프론트엔드 구현](project_stock_frontend.md) — TASK-017/018 완료, 24개 테스트 통과, React 18 + Vitest + 인라인 CSS

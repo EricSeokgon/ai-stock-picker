@@ -1,6 +1,7 @@
 // RecommendationList 컴포넌트 테스트
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { RecommendationList } from '../components/RecommendationList';
 import type { RecommendationItem } from '../types';
 
@@ -66,5 +67,24 @@ describe('RecommendationList', () => {
   it('섹션 제목을 표시한다', () => {
     render(<RecommendationList recommendations={mockItems} />);
     expect(screen.getByText('오늘의 주식 추천')).toBeInTheDocument();
+  });
+
+  it('onSelect prop이 있을 때 항목 클릭 시 해당 krx_code로 호출된다', async () => {
+    const onSelect = vi.fn();
+    render(<RecommendationList recommendations={mockItems} onSelect={onSelect} />);
+    const list = screen.getByRole('list', { name: '주식 추천 목록' });
+    const items = within(list).getAllByRole('listitem');
+    // 첫 번째 항목(005930) 클릭
+    await userEvent.click(items[0]);
+    expect(onSelect).toHaveBeenCalledWith('005930');
+  });
+
+  it('두 번째 항목 클릭 시 해당 krx_code(000660)로 onSelect가 호출된다', async () => {
+    const onSelect = vi.fn();
+    render(<RecommendationList recommendations={mockItems} onSelect={onSelect} />);
+    const list = screen.getByRole('list', { name: '주식 추천 목록' });
+    const items = within(list).getAllByRole('listitem');
+    await userEvent.click(items[1]);
+    expect(onSelect).toHaveBeenCalledWith('000660');
   });
 });

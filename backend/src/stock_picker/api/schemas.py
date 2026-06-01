@@ -59,3 +59,54 @@ class NewsResponse(BaseModel):
 
     news: list[NewsItem]
     total: int
+
+
+# ---------------------------------------------------------------------------
+# 섹터 트렌드 스키마 (TASK-024)
+# ---------------------------------------------------------------------------
+
+
+class SectorTrendItem(BaseModel):
+    """섹터별 트렌드 집계 항목"""
+
+    sector: str
+    trade_date: date
+    trend_score: float
+    news_volume: int
+    avg_sentiment: float
+
+
+class SectorTrendsResponse(BaseModel):
+    """섹터 트렌드 응답"""
+
+    trends: list[SectorTrendItem]
+    days: int = 7
+
+
+# ---------------------------------------------------------------------------
+# 추천 근거 상세 스키마 (TASK-025)
+# ---------------------------------------------------------------------------
+
+
+class ContributingNewsItem(BaseModel):
+    """추천 근거에 기여한 뉴스 항목"""
+
+    title: str
+    summary: str | None = None
+    sentiment: str
+    published_at: datetime
+
+
+class RecommendationDetailResponse(BaseModel):
+    """종목 추천 근거 상세 응답 (REQ-WEB-002, AC-8)"""
+
+    krx_code: str
+    trade_date: date
+    total_score: float
+    sentiment_score: float
+    volume_score: float
+    momentum_score: float
+    anomaly_score: float
+    reasoning: str
+    contributing_news: list[ContributingNewsItem]
+    disclaimer: str = DISCLAIMER

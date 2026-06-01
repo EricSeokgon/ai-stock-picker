@@ -1,4 +1,6 @@
-# APScheduler 배치 잡 설정 - 일일 파이프라인 스케줄링
+# APScheduler 배치 잡 설정 - 일일 파이프라인 및 장중 30분 증분 스케줄링
+# REQ-NEWS-001: 일 1회(06:00) 전체 수집 배치
+# REQ-NEWS-002: 장중 09:00~15:30 매 30분 증분 수집
 import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -88,17 +90,50 @@ async def run_daily_pipeline() -> None:
         raise
 
 
-def setup_scheduler() -> AsyncIOScheduler:
-    """오전 6시 배치 스케줄 등록 후 스케줄러 인스턴스 반환.
+async def run_intraday_pipeline() -> None:
+    """장중 30분 증분 파이프라인 (REQ-NEWS-002, REQ-REC-006).
 
-    Asia/Seoul 타임존 기준 매일 06:00에 run_daily_pipeline 실행.
+    09:00~15:30 매 30분마다 APScheduler가 호출한다.
+    증분 수집 → 분석 → 추천 재계산 순서로 실행한다.
+    """
+    log.info("장중 증분 파이프라인 시작")
+    try:
+        await collect_all()
+        await run_analysis()
+        await run_recommendation()
+        log.info("장중 증분 파이프라인 완료")
+    except Exception:
+        log.exception("장중 증분 파이프라인 오류 발생")
+        raise
+
+
+def setup_scheduler() -> AsyncIOScheduler:
+    """일 배치 + 장중 30분 증분 스케줄 등록 후 스케줄러 인스턴스 반환.
+
+    # @MX:ANCHOR: [AUTO] 스케줄러 설정 진입점 - app lifespan에서 호출
+    # @MX:REASON: FastAPI 앱 시작 시 단 한번 호출되는 스케줄러 설정 함수
+
+    등록되는 잡:
+    - daily_collection: 매일 06:00 KST 전체 배치 (REQ-NEWS-001)
+    - intraday_collection: 09:00~15:xx 매 30분 증분 (REQ-NEWS-002)
     """
     # 매 호출마다 새 인스턴스를 반환해 테스트 격리를 보장
     _scheduler = AsyncIOScheduler()
+
+    # 일 배치: 매일 06:00 KST
     _scheduler.add_job(
         run_daily_pipeline,
         CronTrigger(hour=6, minute=0, timezone="Asia/Seoul"),
         id="daily_collection",
         replace_existing=True,
     )
+
+    # 장중 30분 증분: 09:00~15:xx 매 30분 (REQ-NEWS-002)
+    _scheduler.add_job(
+        run_intraday_pipeline,
+        CronTrigger(hour="9-15", minute="*/30", timezone="Asia/Seoul"),
+        id="intraday_collection",
+        replace_existing=True,
+    )
+
     return _scheduler

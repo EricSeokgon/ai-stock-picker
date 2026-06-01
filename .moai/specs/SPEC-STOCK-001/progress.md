@@ -1,0 +1,23 @@
+## SPEC-STOCK-001 Progress
+
+- Started: 2026-06-01
+- Harness: standard (auto-detected, 4 domains, 15+ files)
+- UltraThink: activated (user keyword)
+- Execution Mode: Full Pipeline (solo sub-agent)
+- Language: Python (backend) + TypeScript/React (frontend)
+- Phase 0.9 complete: detected Python + TypeScript (greenfield, SPEC-based inference)
+- Phase 0.95 complete: Full Pipeline mode selected (domains: 4, files: 15+, complexity: high)
+- Phase 1 complete: manager-strategy produced 18-task plan (M1/M2/M3 milestones)
+- DP1 complete: user approved (D1=testcontainers, D2=async SQLAlchemy, D3=scoring-first)
+- Phase 1.5 complete: tasks.md with 18 tasks
+- Phase 1.7 complete: directory scaffold + __init__.py stubs
+- Phase 1.8 skip: greenfield (no MX tags to scan)
+- M1 complete: 80/80 unit tests, 96.5% coverage (TASK-001~007)
+- M2 complete: 116/116 unit tests (TASK-008~014)
+- M3 Backend complete: 147/147 tests (TASK-015~016)
+- M3 Frontend complete: 24/24 tests (TASK-017~018)
+- Phase 2.5 TRUST 5: WARNING (가독성 경미한 주석 누락 1건, 보안/테스트/일관성/추적 PASS)
+- Phase 2.75 gate: ruff All checks passed
+- Phase 2.9 MX: 기존 태그 confirmed (recommendations.py, client.py, aggregator.py)
+- Phase 3 git: Initial commit 4674490 (90 files, 10383 insertions)
+- COMPLETED: 2026-06-01

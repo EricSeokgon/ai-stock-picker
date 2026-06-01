@@ -1,0 +1,2 @@
+- [SPEC-STOCK-001 Overview](project_stock_001.md) — Korean stock/ETF recommendation system; greenfield monorepo, TDD, Phase 1 MVP scope
+- [Stock System Library Versions](reference_stock_libs.md) — verified PyPI versions for the FastAPI + Anthropic + FDR backend stack (as of 2026-06)

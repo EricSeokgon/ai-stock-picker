@@ -3,6 +3,8 @@ import type { RecommendationItem } from '../types';
 
 interface RecommendationListProps {
   recommendations: RecommendationItem[];
+  // 종목 클릭 시 호출되는 선택 콜백 (상세 모달 표시용)
+  onSelect?: (krxCode: string) => void;
 }
 
 // 점수를 백분율 바로 시각화
@@ -40,11 +42,20 @@ function ScoreBar({ score, label }: { score: number; label: string }) {
   );
 }
 
-function RecommendationCard({ item }: { item: RecommendationItem }) {
+function RecommendationCard({
+  item,
+  onSelect,
+}: {
+  item: RecommendationItem;
+  onSelect?: (krxCode: string) => void;
+}) {
   const sentimentColor = item.sentiment_score > 0 ? '#2e7d32' : item.sentiment_score < 0 ? '#c62828' : '#555';
+
+  const isClickable = Boolean(onSelect);
 
   return (
     <li
+      onClick={() => onSelect?.(item.krx_code)}
       style={{
         listStyle: 'none',
         border: '1px solid #ddd',
@@ -52,6 +63,8 @@ function RecommendationCard({ item }: { item: RecommendationItem }) {
         padding: '1rem 1.25rem',
         backgroundColor: '#fff',
         boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+        cursor: isClickable ? 'pointer' : 'default',
+        transition: 'box-shadow 0.15s',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
@@ -125,7 +138,9 @@ function RecommendationCard({ item }: { item: RecommendationItem }) {
   );
 }
 
-export function RecommendationList({ recommendations }: RecommendationListProps) {
+// @MX:ANCHOR: [AUTO] RecommendationList - 주식 추천 목록 공개 컴포넌트
+// @MX:REASON: App.tsx, 테스트에서 직접 참조. onSelect 콜백 추가로 modal 연계
+export function RecommendationList({ recommendations, onSelect }: RecommendationListProps) {
   return (
     <section aria-labelledby="recommendation-heading">
       <h2
@@ -139,7 +154,7 @@ export function RecommendationList({ recommendations }: RecommendationListProps)
         aria-label="주식 추천 목록"
       >
         {recommendations.map((item) => (
-          <RecommendationCard key={item.krx_code} item={item} />
+          <RecommendationCard key={item.krx_code} item={item} onSelect={onSelect} />
         ))}
       </ul>
     </section>

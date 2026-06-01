@@ -1,0 +1,10 @@
+[
+  {"etf_code": "091160", "etf_name": "KODEX 반도체", "sectors": ["반도체", "IT"]},
+  {"etf_code": "091180", "etf_name": "KODEX 자동차", "sectors": ["자동차", "2차전지"]},
+  {"etf_code": "102110", "etf_name": "TIGER 200", "sectors": ["코스피"]},
+  {"etf_code": "148020", "etf_name": "KODEX 헬스케어", "sectors": ["바이오", "헬스케어"]},
+  {"etf_code": "244620", "etf_name": "KODEX K-신재생에너지", "sectors": ["신재생에너지", "에너지"]},
+  {"etf_code": "371460", "etf_name": "TIGER 2차전지", "sectors": ["2차전지", "배터리"]},
+  {"etf_code": "228810", "etf_name": "TIGER 200 IT", "sectors": ["IT", "소프트웨어"]},
+  {"etf_code": "139240", "etf_name": "KODEX 금융", "sectors": ["금융", "은행"]}
+]

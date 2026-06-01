@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "defaultMode": "auto"
+  },
+  "enabledMcpjsonServers": [
+    "context7",
+    "sequential-thinking",
+    "moai-lsp"
+  ]
+}

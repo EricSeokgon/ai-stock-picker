@@ -1,13 +1,25 @@
 // 메인 대시보드 컴포넌트
 import { useEffect, useState } from 'react';
-import { fetchRecommendations, fetchNews } from './api/client';
-import type { RecommendationsResponse, NewsResponse } from './types';
+import { fetchRecommendations, fetchNews, fetchSectorTrends } from './api/client';
+import type { RecommendationsResponse, NewsResponse, SectorTrendsResponse, RecommendationItem } from './types';
 import { DataPreparingState } from './components/DataPreparingState';
 import { RecommendationList } from './components/RecommendationList';
 import { NewsFeed } from './components/NewsFeed';
 import { Disclaimer } from './components/Disclaimer';
+import { SectorTrendChart } from './components/SectorTrendChart';
+import { StockDetail } from './components/StockDetail';
+import { EtfRecommendationList } from './components/EtfRecommendationList';
 
 type LoadingState = 'loading' | 'ready' | 'error';
+
+// KRX ETF 코드 패턴: 0으로 시작하는 6자리 숫자 중 ETF로 분류된 코드들
+// Phase 2 MVP: recommendations에서 ETF로 알려진 코드 패턴으로 분류
+// 실제 구분은 백엔드 asset_type 필드 추가 시 교체 예정
+const ETF_PREFIXES = ['069', '102', '114', '148', '152', '229', '251', '261', '278', '292', '305'];
+
+function isEtfCode(krxCode: string): boolean {
+  return ETF_PREFIXES.some((prefix) => krxCode.startsWith(prefix));
+}
 
 // RecommendationsResponse에 recommendations 속성이 있는지 확인
 function isRecommendationsData(
@@ -20,7 +32,10 @@ export default function App() {
   const [loadingState, setLoadingState] = useState<LoadingState>('loading');
   const [recommendations, setRecommendations] = useState<RecommendationsResponse | null>(null);
   const [newsData, setNewsData] = useState<NewsResponse | null>(null);
+  const [sectorTrends, setSectorTrends] = useState<SectorTrendsResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // 선택된 종목 코드 (상세 모달 표시용)
+  const [selectedKrxCode, setSelectedKrxCode] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,10 +43,16 @@ export default function App() {
     async function loadData() {
       try {
         setLoadingState('loading');
-        const [rec, news] = await Promise.all([fetchRecommendations(), fetchNews(20)]);
+        // 세 API를 병렬로 호출
+        const [rec, news, trends] = await Promise.all([
+          fetchRecommendations(),
+          fetchNews(20),
+          fetchSectorTrends(7),
+        ]);
         if (cancelled) return;
         setRecommendations(rec);
         setNewsData(news);
+        setSectorTrends(trends);
         setLoadingState('ready');
       } catch (err) {
         if (cancelled) return;
@@ -51,10 +72,19 @@ export default function App() {
       ? recommendations.disclaimer
       : '이 정보는 투자 참고용입니다. 실제 투자 결정은 본인 책임하에 이루어져야 합니다.';
 
+  // 추천 목록을 일반 주식 / ETF로 분류
+  const allRecommendations: RecommendationItem[] =
+    recommendations && isRecommendationsData(recommendations)
+      ? recommendations.recommendations
+      : [];
+
+  const stockItems = allRecommendations.filter((item) => !isEtfCode(item.krx_code));
+  const etfItems = allRecommendations.filter((item) => isEtfCode(item.krx_code));
+
   return (
     <div
       style={{
-        maxWidth: '900px',
+        maxWidth: '1100px',
         margin: '0 auto',
         padding: '1.5rem',
         fontFamily: "'Segoe UI', 'Apple SD Gothic Neo', sans-serif",
@@ -93,7 +123,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 데이터 준비 중 상태 (AC-10) */}
+      {/* 데이터 준비 중 상태 */}
       {loadingState === 'ready' && recommendations && !isRecommendationsData(recommendations) && (
         <DataPreparingState />
       )}
@@ -106,23 +136,51 @@ export default function App() {
             기준일: <strong>{recommendations.trade_date}</strong>
           </p>
 
-          {/* 메인 콘텐츠: 추천 목록 + 뉴스 */}
+          {/* 섹터 트렌드 차트 */}
+          {sectorTrends && (
+            <div style={{ marginBottom: '2rem' }}>
+              <SectorTrendChart trends={sectorTrends.trends} />
+            </div>
+          )}
+
+          {/* 메인 콘텐츠 그리드 */}
           <div
             style={{
               display: 'grid',
               gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 2fr)',
               gap: '2rem',
               alignItems: 'start',
+              marginBottom: '2rem',
             }}
           >
-            <RecommendationList recommendations={recommendations.recommendations} />
+            {/* 왼쪽: 주식 추천 목록 */}
+            <RecommendationList
+              recommendations={stockItems.length > 0 ? stockItems : recommendations.recommendations}
+              onSelect={setSelectedKrxCode}
+            />
+            {/* 오른쪽: 뉴스 피드 */}
             {newsData && <NewsFeed news={newsData.news} />}
           </div>
+
+          {/* ETF 추천 섹션 */}
+          {etfItems.length > 0 && (
+            <div style={{ marginBottom: '2rem' }}>
+              <EtfRecommendationList etfItems={etfItems} onSelect={setSelectedKrxCode} />
+            </div>
+          )}
         </div>
       )}
 
       {/* 면책 조항: 항상 표시 */}
       <Disclaimer text={disclaimerText} />
+
+      {/* 종목 상세 모달 */}
+      {selectedKrxCode && (
+        <StockDetail
+          krxCode={selectedKrxCode}
+          onClose={() => setSelectedKrxCode(null)}
+        />
+      )}
     </div>
   );
 }

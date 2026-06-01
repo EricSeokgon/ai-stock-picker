@@ -42,22 +42,21 @@ class CollectorService:
         results: dict[str, int] = {}
 
         for source_name, collector in self.collectors.items():
-            count = await self._collect_with_error_isolation(
-                source_name, collector.collect
-            )
-
-            if count > 0:
-                # 수집 성공 시 저장
-                try:
-                    articles = await collector.collect()
+            try:
+                articles = await collector.collect()
+                if articles:
                     saved = await self._save_articles(session, articles)
                     results[source_name] = saved
-                except Exception as e:
-                    log.error("저장 실패", source=source_name, error=str(e))
+                    log.info("수집 완료", source=source_name, saved=saved)
+                else:
                     results[source_name] = 0
-            else:
+            except Exception as e:
+                # 소스별 실패 격리 (REQ-NEWS-005)
+                log.error("수집 실패", source=source_name, error=str(e))
                 results[source_name] = 0
 
+        # 모든 소스 처리 후 일괄 커밋
+        await session.commit()
         return results
 
     async def _collect_with_error_isolation(

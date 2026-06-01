@@ -94,12 +94,12 @@ def _parse_pub_date(date_str: str | None, source: str) -> datetime | None:
 class HankyungCollector(BaseCollector):
     """한국경제신문 RSS 수집기"""
 
-    RSS_URL = "https://rss.hankyung.com/feed/finance.xml"
+    RSS_URL = "https://www.hankyung.com/feed/finance"
 
     async def collect(self) -> list[RawArticle]:
         """한국경제 금융 RSS 수집."""
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(follow_redirects=True) as client:
                 response = await client.get(
                     self.RSS_URL,
                     headers={"User-Agent": self.USER_AGENT},

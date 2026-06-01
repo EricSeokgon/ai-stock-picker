@@ -21,10 +21,11 @@ async def get_news(
 
     분석 완료 기사(analysis_results 존재)만 대상으로 한다 (REQ-WEB-004).
     """
+    # collected 기사도 포함 (analyzed 우선, analyzed 없으면 수집 기사 표시)
     stmt = (
         select(Article)
         .options(selectinload(Article.analysis_results))
-        .where(Article.status == "analyzed")
+        .where(Article.status.in_(["analyzed", "collected"]))
         .order_by(desc(Article.published_at))
         .limit(limit)
     )

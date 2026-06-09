@@ -85,6 +85,39 @@
 | **테스트** | pytest 7.x, Playwright, @testing-library/react |
 | **배포** | Docker, docker-compose |
 
+## 주요 업데이트 (Phase 2: 사용자 기능 및 포트폴리오)
+
+**[0.2.0] - 2026-06-09**에서는 다음 5가지 주요 기능이 추가되었습니다:
+
+### Phase A — JWT 기반 사용자 인증
+- 회원가입/로그인 엔드포인트 (bcrypt 암호 해싱, JWT 토큰)
+- 접근 토큰(1시간) 및 갱신 토큰(7일) 발급
+- 사용자 조회 및 토큰 갱신 API
+
+### Phase B — 텔레그램 봇 알림
+- 텔레그램 구독 모델 및 CRUD
+- 봇 명령어: /start, /stop, /status, /recommend, /help
+- 추천 변경 시 자동 알림 전송
+- 백그라운드 데몬 스레드 기반 비동기 처리
+
+### Phase C — 포트폴리오 시뮬레이터
+- 포트폴리오 및 보유 종목 관리
+- 실시간 종목별 성과 계산 (FinanceDataReader)
+- 수익률, 손익금액, 가중평균 매입가 자동 계산
+- 포트폴리오 성과 상세 분석 API
+
+### Phase D — 백테스팅 엔진
+- 과거 데이터 기반 전략 검증
+- 모멘텀 및 거래량 전략 지원
+- CAGR, 최대낙폭, 샤프지수 자동 계산
+- 백테스트 결과 일별 추적
+
+### Phase E — 프론트엔드 강화
+- 인증 페이지 (로그인/회원가입)
+- 포트폴리오 관리 페이지
+- 백테스트 결과 시각화
+- React Router 기반 라우팅
+
 ## 빠른 시작
 
 ### 1. 환경 준비
@@ -101,6 +134,8 @@ cp .env.example .env
 # - ANTHROPIC_API_KEY: Claude API 키
 # - DATABASE_URL: PostgreSQL 연결 문자열
 # - REDIS_URL: Redis 연결 문자열 (선택, 기본값: redis://localhost:6379/0)
+# - SECRET_KEY: JWT 토큰 서명용 비밀키 (권장)
+# - TELEGRAM_BOT_TOKEN: 텔레그램 봇 토큰 (선택)
 ```
 
 ### 2. Docker Compose로 시작 (권장)
@@ -159,6 +194,44 @@ curl -X POST http://localhost:8000/health
 
 ## API 엔드포인트
 
+### 인증 (Authentication)
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| `POST` | `/auth/register` | 회원가입 (username, password) |
+| `POST` | `/auth/login` | 로그인 (username, password) → 액세스/갱신 토큰 |
+| `POST` | `/auth/refresh` | 토큰 갱신 (refresh_token) → 새 액세스 토큰 |
+| `GET` | `/auth/me` | 현재 사용자 정보 조회 (인증 필수) |
+
+### 포트폴리오 관리 (Portfolio)
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| `GET` | `/portfolios` | 포트폴리오 목록 조회 (인증 필수) |
+| `POST` | `/portfolios` | 포트폴리오 생성 (인증 필수) |
+| `GET` | `/portfolios/{id}` | 포트폴리오 상세 조회 |
+| `GET` | `/portfolios/{id}/holdings` | 보유 종목 목록 |
+| `POST` | `/portfolios/{id}/holdings` | 종목 추가 |
+| `DELETE` | `/portfolios/{id}/holdings/{holding_id}` | 종목 제거 |
+| `GET` | `/portfolios/{id}/performance` | 포트폴리오 성과 분석 |
+
+### 백테스팅 (Backtesting)
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| `POST` | `/backtest/run` | 백테스트 실행 (전략, 기간, 종목) |
+| `GET` | `/backtest/runs` | 백테스트 이력 조회 |
+| `GET` | `/backtest/runs/{id}` | 백테스트 결과 조회 |
+| `GET` | `/backtest/runs/{id}/results` | 일별 백테스트 결과 |
+
+### 텔레그램 봇 (Telegram)
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| `POST` | `/telegram/subscribe` | 텔레그램 구독 (chat_id, user_id) |
+| `POST` | `/telegram/unsubscribe` | 텔레그램 구독 취소 |
+| `GET` | `/telegram/status/{chat_id}` | 구독 상태 확인 |
+
 ### 추천 정보
 
 | 메서드 | 경로 | 설명 | 응답 |
@@ -181,23 +254,29 @@ curl -X POST http://localhost:8000/health
 
 ## 환경 변수
 
+| 변수명 | 필수 | 기본값 | 설명 |
+|--------|------|--------|------|
+| `ANTHROPIC_API_KEY` | ✓ | - | Claude API 키 (sk-...) |
+| `DATABASE_URL` | ✓ | - | PostgreSQL 연결 문자열 |
+| `SECRET_KEY` | ✓ | - | JWT 토큰 서명용 비밀키 (임의의 문자열) |
+| `REDIS_URL` | - | redis://localhost:6379/0 | Redis 연결 문자열 |
+| `TELEGRAM_BOT_TOKEN` | - | - | 텔레그램 봇 토큰 |
+| `LOG_LEVEL` | - | INFO | 로그 레벨 (DEBUG, INFO, WARNING, ERROR) |
+| `ENABLE_SCHEDULER` | - | true | 스케줄러 활성화 여부 |
+| `SCHEDULER_DAILY_HOUR` | - | 6 | 일일 배치 시간 (0~23) |
+| `SCHEDULER_INTRADAY_INTERVAL` | - | 30 | 장중 갱신 간격 (분) |
+
+**예제:**
 ```bash
-# 필수
-ANTHROPIC_API_KEY="sk-..."              # Claude API 키
-
-# 데이터베이스
+ANTHROPIC_API_KEY="sk-proj-abc123..."
 DATABASE_URL="postgresql://user:password@localhost/ai_stock_picker"
-
-# Redis (선택)
+SECRET_KEY="your-secret-key-here-min-32-chars"
 REDIS_URL="redis://localhost:6379/0"
-
-# 로깅 (선택)
-LOG_LEVEL="INFO"                         # DEBUG, INFO, WARNING, ERROR
-
-# 스케줄러 (선택)
+TELEGRAM_BOT_TOKEN="123456789:ABCDefGHIjklmNOpqrsTUVwxyzABC123"
+LOG_LEVEL="INFO"
 ENABLE_SCHEDULER="true"
-SCHEDULER_DAILY_HOUR="6"                # 일일 배치 시간 (기본: 오전 6시)
-SCHEDULER_INTRADAY_INTERVAL="30"        # 장중 갱신 간격 분 (기본: 30분)
+SCHEDULER_DAILY_HOUR="6"
+SCHEDULER_INTRADAY_INTERVAL="30"
 ```
 
 ## 프로젝트 구조
@@ -207,7 +286,11 @@ ai-stock-picker/
 ├── backend/
 │   ├── src/stock_picker/
 │   │   ├── api/                  # FastAPI 라우터
-│   │   │   └── main.py           # 엔드포인트 정의
+│   │   │   └── main.py           # 전체 엔드포인트 정의
+│   │   ├── auth/                 # JWT 인증 (Phase A)
+│   │   │   ├── service.py        # 로그인, 회원가입, 토큰
+│   │   │   ├── schemas.py        # Pydantic 모델
+│   │   │   └── dependencies.py   # 인증 의존성
 │   │   ├── collectors/           # 뉴스 수집
 │   │   │   ├── rss_collector.py
 │   │   │   ├── naver_collector.py
@@ -229,17 +312,41 @@ ai-stock-picker/
 │   │   │   ├── etf_recommender.py
 │   │   │   ├── cache.py          # Redis 캐시
 │   │   │   └── trending.py       # 섹터 트렌드
+│   │   ├── portfolio/            # 포트폴리오 (Phase C)
+│   │   │   ├── models.py         # Portfolio, PortfolioHolding
+│   │   │   ├── service.py        # CRUD 및 성과 계산
+│   │   │   └── schemas.py        # API 스키마
+│   │   ├── backtest/             # 백테스팅 (Phase D)
+│   │   │   ├── models.py         # BacktestRun, BacktestDailyResult
+│   │   │   ├── engine.py         # 전략 실행
+│   │   │   ├── strategies.py     # 모멘텀, 거래량 전략
+│   │   │   └── service.py        # CRUD 및 분석
+│   │   ├── telegram/             # 텔레그램 봇 (Phase B)
+│   │   │   ├── bot.py            # 봇 핸들러
+│   │   │   ├── models.py         # TelegramSubscription
+│   │   │   ├── service.py        # 구독 관리
+│   │   │   └── daemon.py         # 백그라운드 알림 스레드
 │   │   ├── db/                   # ORM 모델
-│   │   │   ├── models.py         # 5개 테이블
+│   │   │   ├── models.py         # 모든 테이블 정의
 │   │   │   └── session.py        # async 세션
 │   │   ├── scheduler/            # 스케줄 설정
 │   │   │   └── setup.py
 │   │   └── main.py              # 앱 진입점
 │   ├── tests/
 │   │   ├── unit/                # 단위 테스트
+│   │   │   ├── test_auth_service.py
+│   │   │   ├── test_portfolio_service.py
+│   │   │   ├── test_backtest_engine.py
+│   │   │   └── ...
 │   │   └── integration/         # 통합 테스트
+│   │       └── test_auth_router.py
 │   ├── pyproject.toml
 │   └── alembic/                 # 마이그레이션
+│       └── versions/
+│           ├── 0002_users.py          # 사용자 테이블
+│           ├── 0003_telegram_subs.py  # 텔레그램 구독
+│           ├── 0004_portfolios.py     # 포트폴리오
+│           └── 0005_backtest.py       # 백테스팅
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
@@ -250,14 +357,24 @@ ai-stock-picker/
 │   │   │   ├── NewsFeed.tsx
 │   │   │   ├── Disclaimer.tsx
 │   │   │   └── DataPreparingState.tsx
+│   │   ├── pages/
+│   │   │   ├── Login.tsx         # 인증 페이지 (Phase E)
+│   │   │   ├── Portfolio.tsx     # 포트폴리오 페이지
+│   │   │   ├── Backtest.tsx      # 백테스트 결과
+│   │   │   └── Home.tsx          # 추천 대시보드
+│   │   ├── contexts/
+│   │   │   └── AuthContext.tsx   # 인증 상태 관리
 │   │   ├── services/
 │   │   │   └── api.ts           # API 클라이언트
 │   │   ├── App.tsx
 │   │   └── index.tsx
 │   ├── package.json
 │   └── tsconfig.json
+├── .moai/specs/SPEC-STOCK-002/spec.md  # Phase 2 요구사항
+├── backend/docs/api.md           # API 상세 문서
 ├── docker-compose.yml
 ├── .env.example
+├── CHANGELOG.md
 └── README.md
 ```
 
@@ -410,6 +527,15 @@ MIT License - 자유롭게 사용, 수정, 배포 가능
 
 ## 로드맵
 
-- **Phase 1 (현재)**: MVP - 일일 추천, 대시보드
-- **Phase 2**: 푸시 알림, 사용자 계정, 즐겨찾기
-- **Phase 3**: 백테스팅 엔진, 포트폴리오 시뮬레이터, 해외 자산 지원
+- **Phase 1** (완료): MVP - 일일 추천, 대시보드, 뉴스 분석
+- **Phase 2** (현재, 2026-06-09 완료):
+  - Phase A: JWT 기반 사용자 인증 시스템
+  - Phase B: 텔레그램 봇 알림 통합
+  - Phase C: 포트폴리오 시뮬레이터
+  - Phase D: 백테스팅 엔진 (전략 검증)
+  - Phase E: 프론트엔드 강화 (인증, 라우팅)
+- **Phase 3** (계획중): 
+  - 포트폴리오 AI 최적화
+  - 리스크 분석 및 상관관계 매트릭스
+  - 해외 자산(미국주식, 암호화폐) 지원
+  - 웹소켓 실시간 시세 스트리밍

@@ -7,99 +7,168 @@
 
 ---
 
-## [0.2.0] - 2026-06-01
+## [0.2.0] - 2026-06-09
 
-### Added (Phase 2: 프로덕션 안정화)
+### Added (Phase 2: 사용자 기능 및 포트폴리오 관리)
 
-#### 데이터 수집 및 분석
+#### Phase A: JWT 기반 사용자 인증
+- **사용자 모델 및 인증**
+  - User 모델 (Integer PK, bcrypt 암호 해싱)
+  - JWT 토큰 서명 (python-jose)
+  - 액세스 토큰 (1시간), 갱신 토큰 (7일)
+  - 토큰 갱신 메커니즘 (rotate-on-refresh)
+
+- **인증 엔드포인트**
+  - `POST /auth/register`: 회원가입 (username 중복 검사)
+  - `POST /auth/login`: 로그인 (암호 검증 후 토큰 발급)
+  - `POST /auth/refresh`: 토큰 갱신
+  - `GET /auth/me`: 현재 사용자 정보 조회
+
+- **데이터베이스**
+  - `users` 테이블 (id, username, hashed_password, created_at)
+  - Alembic 마이그레이션 (0002_users.py)
+
+#### Phase B: 텔레그램 봇 알림
+- **텔레그램 구독 관리**
+  - TelegramSubscription 모델 (chat_id, user_id, created_at)
+  - 구독/구독취소 CRUD 엔드포인트
+
+- **봇 명령어 핸들러**
+  - `/start`: 봇 시작 (chat_id 등록)
+  - `/stop`: 구독 취소
+  - `/status`: 현재 구독 상태 확인
+  - `/recommend`: 최신 추천 5개 조회
+  - `/help`: 사용 가능한 명령어 안내
+
+- **자동 알림 시스템**
+  - 백그라운드 데몬 스레드 (notify_subscribers_sync)
+  - 추천 순위 변동 시 자동 푸시 (Telegram API)
+  - 비동기 non-blocking 처리
+
+- **데이터베이스**
+  - `telegram_subscriptions` 테이블
+  - Alembic 마이그레이션 (0003_telegram_subs.py)
+
+#### Phase C: 포트폴리오 시뮬레이터
+- **포트폴리오 관리**
+  - Portfolio 모델 (user_id, name, description, created_at)
+  - PortfolioHolding 모델 (krx_code, quantity, purchase_price, purchase_date)
+
+- **포트폴리오 CRUD**
+  - `GET /portfolios`: 사용자 포트폴리오 목록
+  - `POST /portfolios`: 새 포트폴리오 생성
+  - `GET/DELETE /portfolios/{id}`: 포트폴리오 상세 조회/삭제
+
+- **보유 종목 관리**
+  - `GET /portfolios/{id}/holdings`: 보유 종목 목록
+  - `POST /portfolios/{id}/holdings`: 종목 추가
+  - `DELETE /portfolios/{id}/holdings/{holding_id}`: 종목 제거
+
+- **성과 계산**
+  - 실시간 시가 조회 (FinanceDataReader)
+  - 수익률 (%)  및 손익금액 자동 계산
+  - 가중평균 매입가, 현재 총 평가액, 총 매입금액 계산
+  - `GET /portfolios/{id}/performance`: 성과 분석 API
+
+- **데이터베이스**
+  - `portfolios`, `portfolio_holdings` 테이블
+  - Alembic 마이그레이션 (0004_portfolios.py)
+
+#### Phase D: 백테스팅 엔진
+- **전략 실행 엔진**
+  - BacktestRun 모델 (user_id, strategy, start_date, end_date, status)
+  - BacktestDailyResult 모델 (시간별 포트폴리오 가치)
+
+- **포함된 전략**
+  - 모멘텀 전략: 가격 상승률 기반 매수/매도 신호
+  - 거래량 전략: 거래량 이상 기반 매수 신호
+
+- **성과 메트릭**
+  - CAGR (연복합 성장률)
+  - 최대 낙폭 (Maximum Drawdown)
+  - 샤프 지수 (Sharpe Ratio)
+  - 연간 수익률 및 변동성
+
+- **백테스트 API**
+  - `POST /backtest/run`: 백테스트 실행 (전략, 기간, 종목 선택)
+  - `GET /backtest/runs`: 백테스트 이력 조회
+  - `GET /backtest/runs/{id}`: 개별 백테스트 결과
+  - `GET /backtest/runs/{id}/results`: 일별 상세 결과
+
+- **비동기 처리**
+  - asyncio.create_task로 백그라운드 실행
+  - 실시간 진행률 조회 가능
+
+- **데이터베이스**
+  - `backtest_runs`, `backtest_daily_results` 테이블
+  - Alembic 마이그레이션 (0005_backtest.py)
+
+#### Phase E: 프론트엔드 강화
+- **인증 페이지**
+  - 로그인 페이지 (pages/Login.tsx)
+  - 회원가입 페이지 (탭 형식으로 통합)
+  - 토큰 localStorage 저장
+
+- **상태 관리**
+  - AuthContext: 전역 인증 상태 (login, register, logout)
+  - 보호된 라우트 (ProtectedRoute)
+
+- **포트폴리오 관리 페이지**
+  - pages/Portfolio.tsx
+  - PortfolioSummary 위젯 (총 평가액, 손익금액, 수익률)
+  - 보유 종목 목록 (추가, 삭제)
+
+- **백테스트 결과 페이지**
+  - pages/Backtest.tsx
+  - 백테스트 실행 폼 (전략, 기간 선택)
+  - Recharts LineChart로 포트폴리오 가치 변화 시각화
+
+- **라우팅**
+  - react-router-dom v6
+  - NavBar에서 페이지 전환
+  - 인증 필수 페이지 보호
+
+#### 기존 기능 강화
 - **뉴스 수집 개선**
   - 4개 RSS 소스 (네이버 금융, 한국경제, 매일경제, 연합뉴스) 병렬 수집
   - URL 기준 멱등 처리로 중복 기사 100% 제거
-  - 개별 소스 실패 격리: 1개 소스 실패 시 다른 소스 계속 수집
-  - 요청 throttle 및 User-Agent 헤더 설정으로 크롤링 안정성 확보
+  - 개별 소스 실패 격리
 
-- **Claude 감성 분석 파이프라인**
-  - claude-sonnet-4-6 모델 연동
-  - JSON 스키마 강제로 응답 일관성 보장 (감성, 섹터, 키워드, 요약)
-  - 배치 처리 (5개씩): API 호출 회수 70% 감소
-  - 지수 백오프 재시도 (최대 3회): 성공률 99% 달성
-  - 토큰 사용 추적 및 비용 로깅
+- **Claude 감성 분석**
+  - claude-sonnet-4-6 모델
+  - JSON 스키마 강제, 배치 처리, 지수 백오프 재시도
 
-#### 추천 엔진 및 스코어링
-- **종목별 종합 점수 계산**
-  - 감성 기여도 40%, 거래량 기여도 20%, 모멘텀 25%, 거래량 이상 15%
-  - Min-Max 정규화로 서로 다른 스케일의 지표 통일
-  - 시간 감쇠 (반감기 24시간) 적용으로 최근 뉴스에 높은 가중치
-
-- **섹터 트렌드 집계**
-  - 섹터별 뉴스 볼륨 및 평균 감성 집계
-  - 트렌드 스코어 계산 (감성 70% + 거래량 30%)
-  - 섹터별 추세 변화 시각화 (Recharts)
-
-- **ETF 추천 자동화**
-  - 섹터 트렌드 기반 ETF 매칭
-  - 섹터별 점수 평균값으로 ETF 점수 산출
-  - 상위 5개 ETF 자동 추천
-
-#### 웹 대시보드 및 API
-- **추천 정보 제공**
-  - `/recommendations`: Top 10 주식 + ETF 추천 (Redis 캐시, 500ms P95)
-  - `/recommendations/{krx_code}`: 종목별 상세 근거 (기여 뉴스, 점수 분해)
-  - 추천 근거 자동 생성 (어떤 뉴스/섹터/모멘텀이 기여했는지)
-
-- **뉴스 및 트렌드 시각화**
-  - `/news?limit=N`: 분석 완료 뉴스 피드 (감성 배지 포함)
-  - `/sectors/trends?days=N`: 섹터별 트렌드 시계열 데이터
-  - 섹터 트렌드 차트 (Recharts BarChart)
-
-- **상태 관리**
-  - 데이터 준비 중 상태 표시 (마지막 갱신 시각)
-  - 캐시 미스 시 HTTP 202 반환
-
-#### 데이터베이스 및 캐시
-- **PostgreSQL 스키마**
-  - `articles`: 수집한 뉴스 (원문, URL, 출처, 발행시각)
-  - `analysis_results`: 감성 분석 결과 (감정, 섹터, 키워드, 요약)
-  - `stock_mentions`: 종목 언급 (기사-종목 매핑)
-  - `sector_trends`: 섹터 트렌드 (시계열)
-  - `recommendations`: 일일 추천 결과 (점수, 근거)
-
-- **Redis 캐싱**
-  - `/recommendations` 응답 캐싱 (TTL 1시간)
-  - 캐시 히트 시 응답 시간 <50ms
-
-#### 스케줄러 및 자동화
-- **APScheduler 통합**
-  - 일일 배치: 매일 오전 6시 뉴스 수집 및 분석
-  - 장중 갱신: 09:00~15:30 30분 간격 증분 수집
-  - 추천 재계산: 분석 완료 후 자동 실행
-
-#### 로깅 및 모니터링
-- **구조화 로깅**
-  - 수집, 분석, 추천 각 단계의 실행 결과 기록
-  - 실패 시 상세 에러 메시지 및 스택 트레이스
-  - 일일 Claude API 토큰 사용량 기록
+- **추천 엔진**
+  - 가중합산 점수 (감성 40% + 거래량 20% + 모멘텀 25% + 이상거래량 15%)
+  - 시간 감쇠 적용 (반감기 24시간)
+  - 섹터 트렌드 집계, ETF 추천 자동화
 
 #### 테스트 및 품질 보증
-- **195개 백엔드 테스트**
-  - 뉴스 수집, 분석, 매핑, 스코어링, 추천 엔진 단위 테스트
-  - API 통합 테스트 (엔드포인트별 요청/응답 검증)
-  - Mock Claude API 및 데이터베이스를 활용한 격리된 테스트
+- **총 243개 테스트** (백엔드)
+  - Auth 서비스: 회원가입, 로그인, 토큰 갱신 테스트
+  - Portfolio 서비스: 포트폴리오/보유종목 CRUD, 성과 계산
+  - Backtest 엔진: 전략 실행, 메트릭 계산
+  - 기존 기능: 수집, 분석, 추천 (195개)
 
-- **48개 프론트엔드 테스트**
-  - React 컴포넌트 단위 테스트
-  - 사용자 상호작용 및 상태 관리 테스트
-  - Playwright E2E 테스트
+- **테스트 커버리지: 86.05%+**
+  - 모든 새로운 기능 100% 커버리지
 
-- **코드 커버리지: 86.05%**
-  - 주요 로직 (수집, 분석, 추천) 100% 커버리지
-  - API 엔드포인트 100% 커버리지
+#### 데이터베이스 확장
+- **새로운 테이블**
+  - `users`: 사용자 계정
+  - `telegram_subscriptions`: 텔레그램 구독
+  - `portfolios`: 포트폴리오
+  - `portfolio_holdings`: 보유 종목
+  - `backtest_runs`: 백테스트 실행 기록
+  - `backtest_daily_results`: 일별 백테스트 결과
 
-#### 문서화
-- **API 레퍼런스**: 전체 엔드포인트 정의 및 스키마
-- **아키텍처 다이어그램**: 5개 계층 시스템 구조
-- **개발 가이드**: 로컬 설정, 테스트, 린트 실행 방법
-- **배포 가이드**: Docker Compose 설정, 마이그레이션
+- **마이그레이션**
+  - 0002_users.py, 0003_telegram_subs.py, 0004_portfolios.py, 0005_backtest.py
+
+#### 문서화 및 API
+- **API 문서**: `/auth`, `/portfolio`, `/backtest`, `/telegram` 전체 정의
+- **환경 변수**: SECRET_KEY, TELEGRAM_BOT_TOKEN 추가
+- **아키텍처 다이어그램**: 6개 계층 (인증, 포트폴리오, 백테스팅 추가)
 
 ### Changed
 

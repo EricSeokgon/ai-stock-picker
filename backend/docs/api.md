@@ -1,17 +1,175 @@
 # API 레퍼런스
 
-한국 주식 & ETF 추천 시스템의 REST API 상세 문서입니다.
+한국 주식 & ETF 추천 시스템의 REST API 상세 문서입니다. (v0.2.0+)
 
 ## 기본 정보
 
 - **기본 URL**: `http://localhost:8000` (로컬) / `https://api.example.com` (프로덕션)
 - **응답 형식**: JSON
-- **인증**: 불필요 (공개 API)
+- **인증**: JWT Bearer Token (인증 필요 엔드포인트 참조)
 - **캐싱**: 모든 응답에 적절한 Cache-Control 헤더 포함
+- **버전**: API v1 (기본)
 
 ---
 
 ## API 엔드포인트
+
+### 0. 인증 (Authentication)
+
+#### 0.1 회원가입
+
+```http
+POST /auth/register
+```
+
+**설명**: 새로운 사용자 계정을 생성합니다.
+
+**요청 본문**:
+```json
+{
+  "username": "myuser",
+  "password": "securepassword123"
+}
+```
+
+**응답 스키마**:
+```json
+{
+  "id": 1,
+  "username": "myuser",
+  "created_at": "2026-06-09T10:30:00Z",
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+```
+
+**상태 코드**:
+- `201 Created`: 회원가입 성공
+- `400 Bad Request`: 이미 존재하는 username 또는 유효하지 않은 입력
+- `500 Internal Server Error`: 서버 오류
+
+**예제**:
+```bash
+curl -X POST http://localhost:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username": "myuser", "password": "securepassword123"}'
+```
+
+---
+
+#### 0.2 로그인
+
+```http
+POST /auth/login
+```
+
+**설명**: 기존 사용자가 로그인하여 토큰을 획득합니다.
+
+**요청 본문**:
+```json
+{
+  "username": "myuser",
+  "password": "securepassword123"
+}
+```
+
+**응답 스키마**:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "expires_in": 3600
+}
+```
+
+**상태 코드**:
+- `200 OK`: 로그인 성공
+- `401 Unauthorized`: 잘못된 username 또는 password
+- `400 Bad Request`: 형식 오류
+
+**예제**:
+```bash
+curl -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "myuser", "password": "securepassword123"}'
+```
+
+---
+
+#### 0.3 토큰 갱신
+
+```http
+POST /auth/refresh
+```
+
+**설명**: 만료된 액세스 토큰을 갱신합니다. 갱신 토큰을 사용합니다.
+
+**요청 본문**:
+```json
+{
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**응답 스키마**:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "expires_in": 3600
+}
+```
+
+**상태 코드**:
+- `200 OK`: 토큰 갱신 성공
+- `401 Unauthorized`: 유효하지 않은 또는 만료된 갱신 토큰
+- `400 Bad Request`: 형식 오류
+
+**예제**:
+```bash
+curl -X POST http://localhost:8000/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token": "eyJ..."}'
+```
+
+---
+
+#### 0.4 현재 사용자 정보
+
+```http
+GET /auth/me
+```
+
+**설명**: 현재 로그인한 사용자의 정보를 조회합니다. (인증 필수)
+
+**요청 헤더**:
+```
+Authorization: Bearer <access_token>
+```
+
+**응답 스키마**:
+```json
+{
+  "id": 1,
+  "username": "myuser",
+  "created_at": "2026-06-09T10:30:00Z"
+}
+```
+
+**상태 코드**:
+- `200 OK`: 정상 응답
+- `401 Unauthorized`: 토큰 없음 또는 유효하지 않음
+- `403 Forbidden`: 토큰 만료됨
+
+**예제**:
+```bash
+curl -X GET http://localhost:8000/auth/me \
+  -H "Authorization: Bearer eyJ..."
+```
+
+---
 
 ### 1. 추천 리스트 조회
 
@@ -200,9 +358,439 @@ curl -X GET http://localhost:8000/recommendations/005930
 
 ---
 
-### 2. 뉴스 정보
+### 2. 포트폴리오 관리 (Portfolio)
 
-#### 2.1 분석 완료 뉴스 피드
+#### 2.1 포트폴리오 목록 조회
+
+```http
+GET /portfolios
+```
+
+**설명**: 현재 사용자의 모든 포트폴리오를 조회합니다. (인증 필수)
+
+**요청 헤더**:
+```
+Authorization: Bearer <access_token>
+```
+
+**응답 스키마**:
+```json
+{
+  "portfolios": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "name": "주식 포트폴리오",
+      "description": "장기 투자용",
+      "total_value": 5000000,
+      "total_investment": 4500000,
+      "return_rate": 11.11,
+      "created_at": "2026-06-09T10:30:00Z"
+    },
+    ...
+  ]
+}
+```
+
+**상태 코드**:
+- `200 OK`: 정상 응답
+- `401 Unauthorized`: 인증 필수
+
+**예제**:
+```bash
+curl -X GET http://localhost:8000/portfolios \
+  -H "Authorization: Bearer eyJ..."
+```
+
+---
+
+#### 2.2 포트폴리오 생성
+
+```http
+POST /portfolios
+```
+
+**설명**: 새로운 포트폴리오를 생성합니다. (인증 필수)
+
+**요청 본문**:
+```json
+{
+  "name": "주식 포트폴리오",
+  "description": "장기 투자용"
+}
+```
+
+**응답 스키마**:
+```json
+{
+  "id": 1,
+  "user_id": 1,
+  "name": "주식 포트폴리오",
+  "description": "장기 투자용",
+  "total_value": 0,
+  "total_investment": 0,
+  "return_rate": 0,
+  "created_at": "2026-06-09T10:30:00Z"
+}
+```
+
+**상태 코드**:
+- `201 Created`: 포트폴리오 생성 성공
+- `400 Bad Request`: 형식 오류
+- `401 Unauthorized`: 인증 필수
+
+**예제**:
+```bash
+curl -X POST http://localhost:8000/portfolios \
+  -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" \
+  -d '{"name": "주식 포트폴리오", "description": "장기 투자용"}'
+```
+
+---
+
+#### 2.3 보유 종목 추가
+
+```http
+POST /portfolios/{portfolio_id}/holdings
+```
+
+**설명**: 포트폴리오에 종목을 추가합니다. (인증 필수)
+
+**경로 파라미터**:
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `portfolio_id` | integer | 포트폴리오 ID |
+
+**요청 본문**:
+```json
+{
+  "krx_code": "005930",
+  "quantity": 10,
+  "purchase_price": 75000,
+  "purchase_date": "2026-06-01"
+}
+```
+
+**응답 스키마**:
+```json
+{
+  "id": 1,
+  "portfolio_id": 1,
+  "krx_code": "005930",
+  "name": "삼성전자",
+  "quantity": 10,
+  "purchase_price": 75000,
+  "current_price": 76000,
+  "current_value": 760000,
+  "return_amount": 10000,
+  "return_rate": 1.33,
+  "purchase_date": "2026-06-01"
+}
+```
+
+**상태 코드**:
+- `201 Created`: 종목 추가 성공
+- `400 Bad Request`: 형식 오류
+- `404 Not Found`: 포트폴리오 없음
+- `401 Unauthorized`: 인증 필수
+
+**예제**:
+```bash
+curl -X POST http://localhost:8000/portfolios/1/holdings \
+  -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" \
+  -d '{"krx_code": "005930", "quantity": 10, "purchase_price": 75000, "purchase_date": "2026-06-01"}'
+```
+
+---
+
+#### 2.4 포트폴리오 성과 분석
+
+```http
+GET /portfolios/{portfolio_id}/performance
+```
+
+**설명**: 포트폴리오의 전체 성과를 분석합니다. (인증 필수)
+
+**경로 파라미터**:
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `portfolio_id` | integer | 포트폴리오 ID |
+
+**응답 스키마**:
+```json
+{
+  "portfolio_id": 1,
+  "total_investment": 750000,
+  "total_value": 760000,
+  "total_return_amount": 10000,
+  "total_return_rate": 1.33,
+  "holdings_count": 1,
+  "holdings": [
+    {
+      "krx_code": "005930",
+      "name": "삼성전자",
+      "quantity": 10,
+      "purchase_price": 75000,
+      "current_price": 76000,
+      "current_value": 760000,
+      "return_amount": 10000,
+      "return_rate": 1.33,
+      "weight": 100.0
+    }
+  ],
+  "last_updated": "2026-06-09T14:30:00Z"
+}
+```
+
+**상태 코드**:
+- `200 OK`: 정상 응답
+- `404 Not Found`: 포트폴리오 없음
+- `401 Unauthorized`: 인증 필수
+
+**예제**:
+```bash
+curl -X GET http://localhost:8000/portfolios/1/performance \
+  -H "Authorization: Bearer eyJ..."
+```
+
+---
+
+### 3. 백테스팅 (Backtesting)
+
+#### 3.1 백테스트 실행
+
+```http
+POST /backtest/run
+```
+
+**설명**: 특정 전략으로 백테스트를 실행합니다. (인증 필수)
+
+**요청 본문**:
+```json
+{
+  "strategy": "momentum",
+  "krx_codes": ["005930", "000660", "035420"],
+  "start_date": "2025-06-01",
+  "end_date": "2026-06-01",
+  "initial_capital": 1000000
+}
+```
+
+**응답 스키마**:
+```json
+{
+  "id": 1,
+  "user_id": 1,
+  "strategy": "momentum",
+  "start_date": "2025-06-01",
+  "end_date": "2026-06-01",
+  "initial_capital": 1000000,
+  "status": "running",
+  "created_at": "2026-06-09T14:30:00Z"
+}
+```
+
+**상태 코드**:
+- `202 Accepted`: 백테스트 시작 (비동기 처리)
+- `400 Bad Request`: 형식 오류 또는 유효하지 않은 전략
+- `401 Unauthorized`: 인증 필수
+
+**예제**:
+```bash
+curl -X POST http://localhost:8000/backtest/run \
+  -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "strategy": "momentum",
+    "krx_codes": ["005930", "000660"],
+    "start_date": "2025-06-01",
+    "end_date": "2026-06-01",
+    "initial_capital": 1000000
+  }'
+```
+
+---
+
+#### 3.2 백테스트 결과 조회
+
+```http
+GET /backtest/runs/{backtest_id}
+```
+
+**설명**: 개별 백테스트의 최종 결과를 조회합니다.
+
+**경로 파라미터**:
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `backtest_id` | integer | 백테스트 ID |
+
+**응답 스키마**:
+```json
+{
+  "id": 1,
+  "user_id": 1,
+  "strategy": "momentum",
+  "start_date": "2025-06-01",
+  "end_date": "2026-06-01",
+  "initial_capital": 1000000,
+  "final_value": 1250000,
+  "total_return": 250000,
+  "return_rate": 25.0,
+  "cagr": 22.5,
+  "max_drawdown": -15.3,
+  "sharpe_ratio": 1.85,
+  "status": "completed",
+  "created_at": "2026-06-09T14:30:00Z",
+  "completed_at": "2026-06-09T14:45:00Z"
+}
+```
+
+**응답 필드**:
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `cagr` | number | 연복합 성장률 (%) |
+| `max_drawdown` | number | 최대 낙폭 (%) |
+| `sharpe_ratio` | number | 샤프 지수 |
+| `status` | string | 상태 (running/completed/failed) |
+
+**상태 코드**:
+- `200 OK`: 정상 응답 (완료됨)
+- `202 Accepted`: 진행 중
+- `404 Not Found`: 백테스트 없음
+
+**예제**:
+```bash
+curl -X GET http://localhost:8000/backtest/runs/1
+```
+
+---
+
+#### 3.3 백테스트 일별 결과
+
+```http
+GET /backtest/runs/{backtest_id}/results
+```
+
+**설명**: 백테스트의 일별 상세 결과를 조회합니다.
+
+**경로 파라미터**:
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `backtest_id` | integer | 백테스트 ID |
+
+**응답 스키마**:
+```json
+{
+  "backtest_id": 1,
+  "daily_results": [
+    {
+      "date": "2025-06-01",
+      "portfolio_value": 1000000,
+      "cash": 100000,
+      "holdings_value": 900000,
+      "return_rate": 0.0,
+      "positions": [
+        {
+          "krx_code": "005930",
+          "quantity": 10,
+          "price": 75000,
+          "value": 750000
+        }
+      ]
+    },
+    {
+      "date": "2025-06-02",
+      "portfolio_value": 1025000,
+      "cash": 100000,
+      "holdings_value": 925000,
+      "return_rate": 2.5,
+      "positions": [...]
+    },
+    ...
+  ],
+  "total_days": 252
+}
+```
+
+**상태 코드**:
+- `200 OK`: 정상 응답
+- `404 Not Found`: 백테스트 없음 또는 결과 없음
+
+**예제**:
+```bash
+curl -X GET http://localhost:8000/backtest/runs/1/results
+```
+
+---
+
+### 4. 텔레그램 알림 (Telegram)
+
+#### 4.1 구독 시작
+
+```http
+POST /telegram/subscribe
+```
+
+**설명**: 텔레그램 봇에서 사용자를 구독합니다.
+
+**요청 본문**:
+```json
+{
+  "chat_id": 123456789,
+  "user_id": 1
+}
+```
+
+**응답 스키마**:
+```json
+{
+  "id": 1,
+  "chat_id": 123456789,
+  "user_id": 1,
+  "is_active": true,
+  "subscribed_at": "2026-06-09T14:30:00Z"
+}
+```
+
+**상태 코드**:
+- `201 Created`: 구독 성공
+- `400 Bad Request`: 이미 구독 중이거나 형식 오류
+
+**예제**:
+```bash
+curl -X POST http://localhost:8000/telegram/subscribe \
+  -H "Content-Type: application/json" \
+  -d '{"chat_id": 123456789, "user_id": 1}'
+```
+
+---
+
+#### 4.2 구독 취소
+
+```http
+POST /telegram/unsubscribe
+```
+
+**설명**: 텔레그램 구독을 취소합니다.
+
+**요청 본문**:
+```json
+{
+  "chat_id": 123456789
+}
+```
+
+**상태 코드**:
+- `200 OK`: 구독 취소 성공
+- `404 Not Found`: 구독 정보 없음
+
+---
+
+### 5. 뉴스 정보
+
+#### 5.1 분석 완료 뉴스 피드
 
 ```http
 GET /news?limit=N&offset=O
@@ -282,9 +870,9 @@ curl -X GET http://localhost:8000/news?sector=전자&limit=10
 
 ---
 
-### 3. 섹터 트렌드
+### 6. 섹터 트렌드
 
-#### 3.1 섹터별 트렌드 시계열
+#### 6.1 섹터별 트렌드 시계열
 
 ```http
 GET /sectors/trends?days=N
@@ -362,9 +950,9 @@ curl -X GET http://localhost:8000/sectors/trends?days=30
 
 ---
 
-### 4. 헬스 체크
+### 7. 헬스 체크
 
-#### 4.1 시스템 상태 확인
+#### 7.1 시스템 상태 확인
 
 ```http
 GET /health
@@ -422,6 +1010,8 @@ GET /health
 ```bash
 curl -X GET http://localhost:8000/health
 ```
+
+---
 
 ---
 

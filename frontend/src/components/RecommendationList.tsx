@@ -1,4 +1,4 @@
-// 주식 추천 목록 컴포넌트
+// 주식 추천 목록 컴포넌트 — 모바일 반응형 카드 레이아웃 지원
 import type { RecommendationItem } from '../types';
 
 interface RecommendationListProps {
@@ -139,7 +139,7 @@ function RecommendationCard({
 }
 
 // @MX:ANCHOR: [AUTO] RecommendationList - 주식 추천 목록 공개 컴포넌트
-// @MX:REASON: App.tsx, 테스트에서 직접 참조. onSelect 콜백 추가로 modal 연계
+// @MX:REASON: App.tsx, Dashboard, 테스트에서 직접 참조. onSelect 콜백 추가로 modal 연계
 export function RecommendationList({ recommendations, onSelect }: RecommendationListProps) {
   return (
     <section aria-labelledby="recommendation-heading">
@@ -150,6 +150,7 @@ export function RecommendationList({ recommendations, onSelect }: Recommendation
         오늘의 주식 추천
       </h2>
       <ul
+        className="recommendation-list"
         style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: 0, margin: 0 }}
         aria-label="주식 추천 목록"
       >
@@ -157,6 +158,19 @@ export function RecommendationList({ recommendations, onSelect }: Recommendation
           <RecommendationCard key={item.krx_code} item={item} onSelect={onSelect} />
         ))}
       </ul>
+
+      {/* 모바일 반응형 — 카드 레이아웃 조정 */}
+      <style>{`
+        @media (max-width: 767px) {
+          .recommendation-list li {
+            padding: 0.75rem 1rem !important;
+          }
+          .recommendation-list li > div:first-child {
+            flex-wrap: wrap;
+            gap: 0.5rem;
+          }
+        }
+      `}</style>
     </section>
   );
 }

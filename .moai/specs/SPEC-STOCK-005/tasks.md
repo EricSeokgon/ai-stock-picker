@@ -24,13 +24,13 @@ SPEC: SPEC-STOCK-005
 
 | ID | 설명 | Feature | 주요 파일 | 상태 |
 |----|------|---------|----------|------|
-| TASK-001 | RecommendationCache 일반화: 파생 키 get/set·`invalidate_derived()`·손상 데이터 미스 처리, 기존 `recommendations:{date}` 동작 보존 | Redis 캐싱 | recommendation/cache.py | pending |
-| TASK-002 | 현재가 Redis 캐시 레이어: `price:{krx_code}` TTL 60s, 동기 Redis 클라이언트, 미스 시 FinanceDataReader 조회·적재, 실패 시 폴백 | Redis 캐싱 | realtime/price_feed.py | pending |
-| TASK-003 | 스케줄러 기준 추천 갱신 직후 파생 키(`recommendations:top:*`·`recommendations:sector:*`) 무효화 + 섹터 파생 적재(방안 A) | Redis 캐싱 | scheduler/jobs.py, recommendation/cache.py | pending |
-| TASK-004 | [HARD] Redis 미가용/손상 폴백 테스트·캐시 히트/미스·무효화 구조화 로그(시크릿 제외) | Redis 캐싱 | recommendation/cache.py, realtime/price_feed.py | pending |
-| TASK-005 | `GET /recommendations` 쿼리 파라미터 추가(limit/sector/sort/min_score), 캐시 키 구성→조회→미스 시 기준 추천 가공·적재→반환 | 필터·정렬 | api/routes/recommendations.py | pending |
-| TASK-006 | 필터·정렬 로직: sort 내림차순(score/sentiment/volume), sector 필터, min_score 필터, 조합 적용, 기본 호출 하위 호환 | 필터·정렬 | api/routes/recommendations.py, recommendation/cache.py | pending |
-| TASK-007 | 파라미터 유효성: sort 허용값 외·음수 limit/min_score 422 또는 기본값 처리(500 금지), 빈 결과 정상 응답 | 필터·정렬 | api/routes/recommendations.py, api/schemas.py | pending |
-| TASK-008 | 프론트: RecommendationFilterBar(섹터 드롭다운 동적 구성·정렬 select·최소 점수·초기화) + Dashboard 필터 상태·재조회·실패 시 상태 유지 + API 클라이언트 쿼리 전달 | Frontend | components/RecommendationFilterBar.tsx, App.tsx, frontend API 클라이언트 | pending |
-| TASK-009 | 반응형 CSS: NavBar 햄버거(<768px) + 추천 목록 카드 레이아웃 + 미디어 쿼리만 사용 | Frontend | App.tsx, components/RecommendationList.tsx, CSS | pending |
-| TASK-010 | 반응형 CSS: 포트폴리오 표(가로 스크롤/카드) + 관심 목록 컴팩트 카드 + >=768px 데스크톱 동작 불변 검증 | Frontend | pages/Portfolio.tsx, pages/Watchlist.tsx, CSS | pending |
+| TASK-001 | RecommendationCache 일반화: 파생 키 get/set·`invalidate_derived()`·손상 데이터 미스 처리, 기존 `recommendations:{date}` 동작 보존 | Redis 캐싱 | recommendation/cache.py | done |
+| TASK-002 | 현재가 Redis 캐시 레이어: `price:{krx_code}` TTL 60s, 동기 Redis 클라이언트, 미스 시 FinanceDataReader 조회·적재, 실패 시 폴백 | Redis 캐싱 | realtime/price_feed.py | done |
+| TASK-003 | 스케줄러 기준 추천 갱신 직후 파생 키(`recommendations:top:*`·`recommendations:sector:*`) 무효화 + 섹터 파생 적재(방안 A) | Redis 캐싱 | scheduler/jobs.py, recommendation/cache.py | done |
+| TASK-004 | [HARD] Redis 미가용/손상 폴백 테스트·캐시 히트/미스·무효화 구조화 로그(시크릿 제외) | Redis 캐싱 | recommendation/cache.py, realtime/price_feed.py | done |
+| TASK-005 | `GET /recommendations` 쿼리 파라미터 추가(limit/sector/sort/min_score), 캐시 키 구성→조회→미스 시 기준 추천 가공·적재→반환 | 필터·정렬 | api/routes/recommendations.py | done |
+| TASK-006 | 필터·정렬 로직: sort 내림차순(score/sentiment/volume), sector 필터, min_score 필터, 조합 적용, 기본 호출 하위 호환 | 필터·정렬 | api/routes/recommendations.py, recommendation/cache.py | done |
+| TASK-007 | 파라미터 유효성: sort 허용값 외·음수 limit/min_score 422 또는 기본값 처리(500 금지), 빈 결과 정상 응답 | 필터·정렬 | api/routes/recommendations.py, api/schemas.py | done |
+| TASK-008 | 프론트: RecommendationFilterBar(섹터 드롭다운 동적 구성·정렬 select·최소 점수·초기화) + Dashboard 필터 상태·재조회·실패 시 상태 유지 + API 클라이언트 쿼리 전달 | Frontend | components/RecommendationFilterBar.tsx, App.tsx, frontend API 클라이언트 | done |
+| TASK-009 | 반응형 CSS: NavBar 햄버거(<768px) + 추천 목록 카드 레이아웃 + 미디어 쿼리만 사용 | Frontend | App.tsx, components/RecommendationList.tsx, CSS | done |
+| TASK-010 | 반응형 CSS: 포트폴리오 표(가로 스크롤/카드) + 관심 목록 컴팩트 카드 + >=768px 데스크톱 동작 불변 검증 | Frontend | pages/Portfolio.tsx, pages/Watchlist.tsx, CSS | done |

@@ -137,7 +137,8 @@ export default function Watchlist() {
     justifyContent: 'space-between',
     padding: '0.6rem 0.8rem',
     borderBottom: '1px solid #eee',
-    gap: '1rem',
+    gap: '0.75rem',
+    flexWrap: 'wrap',
   };
 
   const btnStyle: React.CSSProperties = {
@@ -197,7 +198,7 @@ export default function Watchlist() {
                 </div>
               </div>
 
-              {/* 인라인 알림 추가 폼 */}
+              {/* 인라인 알림 추가 폼 — 모바일에서 전체 폭 */}
               {openAlertForm === item.krx_code && (
                 <form
                   onSubmit={(e) => void handleAlertSubmit(e)}
@@ -216,7 +217,7 @@ export default function Watchlist() {
                     placeholder="목표가"
                     value={alertForm.targetPrice}
                     onChange={(e) => setAlertForm((prev) => ({ ...prev, targetPrice: e.target.value }))}
-                    style={{ width: '120px', padding: '0.25rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px' }}
+                    style={{ flex: '1 1 100px', minWidth: '80px', padding: '0.25rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px' }}
                     aria-label="목표가 입력"
                     min="0"
                     step="any"
@@ -266,7 +267,7 @@ export default function Watchlist() {
           <div style={{ border: '1px solid #ddd', borderRadius: '6px', overflow: 'hidden' }}>
             {activeAlerts.map((alert) => (
               <div key={alert.id} style={rowStyle}>
-                <span style={{ fontSize: '0.9rem' }}>
+                <span style={{ fontSize: '0.9rem', flex: '1 1 auto', wordBreak: 'break-word' }}>
                   <strong>{alert.krx_code}</strong>{' '}
                   {alert.direction === 'above' ? '이상' : '이하'}{' '}
                   {alert.target_price.toLocaleString()}원

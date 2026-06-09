@@ -1,11 +1,14 @@
 // 메인 앱 — 라우팅 및 네비게이션 포함
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { fetchRecommendations, fetchNews, fetchSectorTrends } from './api/client';
 import type { RecommendationsResponse, NewsResponse, SectorTrendsResponse, RecommendationItem } from './types';
 import { DataPreparingState } from './components/DataPreparingState';
 import { RecommendationList } from './components/RecommendationList';
+import { RecommendationFilterBar } from './components/RecommendationFilterBar';
+import type { FilterState } from './components/RecommendationFilterBar';
+import { DEFAULT_FILTERS } from './components/RecommendationFilterBar';
 import { NewsFeed } from './components/NewsFeed';
 import { Disclaimer } from './components/Disclaimer';
 import { SectorTrendChart } from './components/SectorTrendChart';
@@ -18,6 +21,8 @@ import Portfolio from './pages/Portfolio';
 import Backtest from './pages/Backtest';
 import Watchlist from './pages/Watchlist';
 import Settings from './pages/Settings';
+
+const API_BASE_DASHBOARD = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
 type LoadingState = 'loading' | 'ready' | 'error';
 
@@ -44,25 +49,21 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-// 상단 네비게이션 바
+// 모바일 반응형 NavBar — 768px 미만에서 햄버거 메뉴 표시
 function NavBar() {
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   function handleLogout() {
     logout();
+    setMobileMenuOpen(false);
     void navigate('/');
   }
 
-  const navStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '1rem',
-    marginBottom: '1.5rem',
-    paddingBottom: '0.75rem',
-    borderBottom: '2px solid #1976d2',
-    flexWrap: 'wrap',
-  };
+  function handleLinkClick() {
+    setMobileMenuOpen(false);
+  }
 
   const linkStyle: React.CSSProperties = {
     color: '#1976d2',
@@ -72,35 +73,83 @@ function NavBar() {
   };
 
   return (
-    <nav style={navStyle} aria-label="주 메뉴">
-      <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#0d47a1', marginRight: '0.5rem' }}>
-        한국 주식 추천
-      </span>
-      <Link to="/" style={linkStyle}>홈</Link>
-      <Link to="/portfolio" style={linkStyle}>포트폴리오</Link>
-      <Link to="/backtest" style={linkStyle}>백테스트</Link>
-      {isAuthenticated && <Link to="/watchlist" style={linkStyle}>관심 목록</Link>}
-      {isAuthenticated && <Link to="/settings" style={linkStyle}>설정</Link>}
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-        {isAuthenticated ? (
-          <>
-            <span style={{ fontSize: '0.8rem', color: '#666' }}>{user?.email}</span>
-            <button
-              onClick={handleLogout}
-              style={{
-                padding: '0.3rem 0.7rem', border: '1px solid #ccc', borderRadius: '4px',
-                background: '#fff', cursor: 'pointer', fontSize: '0.8rem',
-              }}
-            >
-              로그아웃
-            </button>
-          </>
-        ) : (
-          <Link to="/login" style={{ ...linkStyle, padding: '0.3rem 0.7rem', border: '1px solid #1976d2', borderRadius: '4px' }}>
-            로그인
-          </Link>
-        )}
+    <nav
+      style={{
+        marginBottom: '1.5rem',
+        paddingBottom: '0.75rem',
+        borderBottom: '2px solid #1976d2',
+      }}
+      aria-label="주 메뉴"
+    >
+      {/* 상단 행: 브랜드 + 햄버거 버튼(모바일) */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#0d47a1' }}>
+          한국 주식 추천
+        </span>
+
+        {/* 햄버거 버튼 — 모바일에서만 표시 */}
+        <button
+          className="nav-hamburger"
+          onClick={() => setMobileMenuOpen((v) => !v)}
+          aria-label={mobileMenuOpen ? '메뉴 닫기' : '메뉴 열기'}
+          aria-expanded={mobileMenuOpen}
+          style={{
+            display: 'none', // CSS로 모바일 표시 처리
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '1.4rem',
+            lineHeight: 1,
+            color: '#1976d2',
+            padding: '0.25rem',
+          }}
+        >
+          {mobileMenuOpen ? '✕' : '☰'}
+        </button>
       </div>
+
+      {/* 네비게이션 링크 영역 */}
+      <div
+        className={`nav-links${mobileMenuOpen ? ' nav-links--open' : ''}`}
+        style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}
+      >
+        <Link to="/" style={linkStyle} onClick={handleLinkClick}>홈</Link>
+        <Link to="/portfolio" style={linkStyle} onClick={handleLinkClick}>포트폴리오</Link>
+        <Link to="/backtest" style={linkStyle} onClick={handleLinkClick}>백테스트</Link>
+        {isAuthenticated && <Link to="/watchlist" style={linkStyle} onClick={handleLinkClick}>관심 목록</Link>}
+        {isAuthenticated && <Link to="/settings" style={linkStyle} onClick={handleLinkClick}>설정</Link>}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {isAuthenticated ? (
+            <>
+              <span style={{ fontSize: '0.8rem', color: '#666' }}>{user?.email}</span>
+              <button
+                onClick={handleLogout}
+                style={{
+                  padding: '0.3rem 0.7rem', border: '1px solid #ccc', borderRadius: '4px',
+                  background: '#fff', cursor: 'pointer', fontSize: '0.8rem',
+                }}
+              >
+                로그아웃
+              </button>
+            </>
+          ) : (
+            <Link to="/login" onClick={handleLinkClick} style={{ ...linkStyle, padding: '0.3rem 0.7rem', border: '1px solid #1976d2', borderRadius: '4px' }}>
+              로그인
+            </Link>
+          )}
+        </div>
+      </div>
+
+      {/* 반응형 CSS — style 태그로 인라인 삽입 */}
+      <style>{`
+        @media (max-width: 767px) {
+          .nav-hamburger { display: block !important; }
+          .nav-links { display: none !important; flex-direction: column; align-items: flex-start; }
+          .nav-links--open { display: flex !important; }
+          .nav-links > a { padding: 0.4rem 0; width: 100%; }
+          .nav-links > div { margin-left: 0 !important; width: 100%; }
+        }
+      `}</style>
     </nav>
   );
 }
@@ -108,20 +157,33 @@ function NavBar() {
 // 메인 대시보드 컴포넌트
 function Dashboard() {
   const [loadingState, setLoadingState] = useState<LoadingState>('loading');
+  const [filterLoading, setFilterLoading] = useState(false);
   const [recommendations, setRecommendations] = useState<RecommendationsResponse | null>(null);
   const [newsData, setNewsData] = useState<NewsResponse | null>(null);
   const [sectorTrends, setSectorTrends] = useState<SectorTrendsResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FilterState>({ ...DEFAULT_FILTERS });
   // 선택된 종목 코드 (상세 모달 표시용)
   const [selectedKrxCode, setSelectedKrxCode] = useState<string | null>(null);
 
+  // 필터 파라미터를 URL 쿼리스트링으로 조합
+  function buildRecommendationsUrl(f: FilterState): string {
+    const params = new URLSearchParams();
+    params.set('limit', '10');
+    if (f.sort !== 'score') params.set('sort', f.sort);
+    if (f.sector !== '') params.set('sector', f.sector);
+    if (f.minScore > 0) params.set('min_score', String(f.minScore));
+    return `${API_BASE_DASHBOARD}/recommendations?${params.toString()}`;
+  }
+
+  // 초기 로드 — 뉴스·섹터는 최초 1회만 조회
   useEffect(() => {
     let cancelled = false;
 
     async function loadData() {
       try {
         setLoadingState('loading');
-        // 세 API를 병렬로 호출
+        // 초기 로드는 기존 fetchRecommendations 사용 (테스트 mock 호환)
         const [rec, news, trends] = await Promise.all([
           fetchRecommendations(),
           fetchNews(20),
@@ -140,10 +202,28 @@ function Dashboard() {
     }
 
     void loadData();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // @MX:WARN: [AUTO] 필터 변경 시 추천 재조회 — 이전 recommendations는 유지하여 UX 보호
+  // @MX:REASON: 네트워크 실패 시 목록 소멸을 방지; 로딩 상태는 filterLoading으로 구분
+  const handleFilterChange = useCallback(async (newFilters: FilterState) => {
+    setFilters(newFilters);
+    setFilterLoading(true);
+    try {
+      const url = buildRecommendationsUrl(newFilters);
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`API 오류: ${res.status}`);
+      const data = await res.json() as RecommendationsResponse;
+      setRecommendations(data);
+      setErrorMessage(null);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : '필터 적용 중 오류가 발생했습니다.');
+      // 이전 추천 목록 유지 — 목록 클리어 없음
+    } finally {
+      setFilterLoading(false);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const disclaimerText =
     recommendations && 'disclaimer' in recommendations
@@ -158,6 +238,15 @@ function Dashboard() {
 
   const stockItems = allRecommendations.filter((item) => !isEtfCode(item.krx_code));
   const etfItems = allRecommendations.filter((item) => isEtfCode(item.krx_code));
+
+  // 현재 추천 목록에서 고유 섹터 추출 (RecommendationItem에 sector 필드가 있을 경우)
+  const availableSectors: string[] = Array.from(
+    new Set(
+      allRecommendations
+        .map((item) => (item as RecommendationItem & { sector?: string }).sector)
+        .filter((s): s is string => Boolean(s)),
+    ),
+  );
 
   return (
     <div>
@@ -198,9 +287,35 @@ function Dashboard() {
       {loadingState === 'ready' && recommendations && isRecommendationsData(recommendations) && (
         <div>
           {/* 거래일 표시 */}
-          <p style={{ fontSize: '0.875rem', color: '#666', marginBottom: '1.5rem' }}>
+          <p style={{ fontSize: '0.875rem', color: '#666', marginBottom: '1rem' }}>
             기준일: <strong>{recommendations.trade_date}</strong>
           </p>
+
+          {/* 추천 필터 바 */}
+          <RecommendationFilterBar
+            sectors={availableSectors}
+            filters={filters}
+            onFilterChange={(f) => { void handleFilterChange(f); }}
+            isLoading={filterLoading}
+          />
+
+          {/* 필터 오류 — 목록은 유지하되 오류 메시지 표시 */}
+          {errorMessage && loadingState === 'ready' && (
+            <div
+              role="alert"
+              style={{
+                padding: '0.6rem 1rem',
+                backgroundColor: '#fff3e0',
+                border: '1px solid #ffcc02',
+                borderRadius: '4px',
+                color: '#e65100',
+                fontSize: '0.875rem',
+                marginBottom: '1rem',
+              }}
+            >
+              필터 적용 오류: {errorMessage}
+            </div>
+          )}
 
           {/* 섹터 트렌드 차트 */}
           {sectorTrends && (
@@ -211,6 +326,7 @@ function Dashboard() {
 
           {/* 메인 콘텐츠 그리드 */}
           <div
+            className="dashboard-grid"
             style={{
               display: 'grid',
               gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 2fr)',
@@ -234,6 +350,15 @@ function Dashboard() {
               <EtfRecommendationList etfItems={etfItems} onSelect={setSelectedKrxCode} />
             </div>
           )}
+
+          {/* 모바일 반응형 — 그리드 단일 컬럼 전환 */}
+          <style>{`
+            @media (max-width: 767px) {
+              .dashboard-grid {
+                grid-template-columns: 1fr !important;
+              }
+            }
+          `}</style>
         </div>
       )}
 

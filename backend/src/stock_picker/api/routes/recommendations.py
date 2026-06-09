@@ -3,7 +3,7 @@ import json
 from datetime import date, datetime, timezone
 from typing import Union
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,20 +24,70 @@ router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 # @MX:ANCHOR: [AUTO] 추천 조회 API - 프론트엔드 주요 진입점
 # @MX:REASON: React 대시보드에서 폴링하는 핵심 엔드포인트 (AC-7, AC-10)
 
+# 정렬 필드 → RecommendationItem dict 키 매핑
+_SORT_FIELD_MAP = {
+    "score": "total_score",
+    "sentiment": "sentiment_score",
+    "volume": "volume_score",
+}
+
 
 @router.get("", response_model=Union[RecommendationsResponse, PreparingResponse])
 async def get_recommendations(
+    limit: int = Query(default=10, gt=0, description="반환할 최대 추천 수"),
+    sector: str | None = Query(default=None, description="섹터 필터 (sector 필드 일치)"),
+    sort: str = Query(
+        default="score",
+        pattern="^(score|sentiment|volume)$",
+        description="정렬 기준: score(총점), sentiment(감성점수), volume(거래량점수)",
+    ),
+    min_score: float | None = Query(default=None, ge=0.0, description="최소 총점 필터"),
     cache: RecommendationCache = Depends(get_cache),
 ) -> Union[RecommendationsResponse, PreparingResponse]:
-    """당일 추천 리스트 반환.
+    """당일 추천 리스트 반환 (필터/정렬 지원).
 
-    Redis 캐시가 존재하면 즉시 반환 (AC-7).
-    데이터가 없으면 preparing 상태 반환 (AC-10).
+    파라미터 없이 호출 시 기존 동작과 동일 (하위 호환성 보장, AC-7, AC-10).
+
+    필터/정렬 적용 순서:
+    1. 파생 캐시 조회 (limit, sector 기반 키)
+    2. 기본 캐시에서 데이터 로드
+    3. sector 필터 적용
+    4. min_score 필터 적용
+    5. sort 기준 내림차순 정렬
+    6. limit 적용
+    7. 파생 캐시 저장 후 반환
+
+    Args:
+        limit: 반환할 최대 항목 수 (기본 10, 1 이상)
+        sector: 섹터 문자열 필터 (해당 sector 필드 값과 정확히 일치해야 함)
+        sort: 정렬 기준 — score(total_score), sentiment(sentiment_score), volume(volume_score)
+        min_score: total_score 하한 필터
+        cache: Redis 캐시 의존성
+
+    Returns:
+        RecommendationsResponse: 추천 목록
+        PreparingResponse: 데이터 미준비 상태 (AC-10)
     """
     today = date.today()
-    cache_key = f"recommendations:{today.isoformat()}"
+    base_cache_key = f"recommendations:{today.isoformat()}"
 
-    raw = await cache.get(cache_key)
+    # 기본 파라미터 여부 판단 (파생 캐시 적용 범위)
+    is_default_params = (limit == 10 and sector is None and sort == "score" and min_score is None)
+
+    # 1. 파생 캐시 조회 (기본 파라미터면 파생 캐시 생략 — 기존 동작과 동일 경로 유지)
+    if not is_default_params:
+        derived_key = cache.build_derived_key(limit=limit, sector=sector)
+        derived_cached = await cache.get_derived(derived_key)
+        if derived_cached is not None:
+            items = [RecommendationItem(**item) for item in derived_cached]
+            return RecommendationsResponse(
+                trade_date=today,
+                recommendations=items,
+                last_updated=datetime.now(tz=timezone.utc),
+            )
+
+    # 2. 기본 캐시 조회
+    raw = await cache.get(base_cache_key)
 
     if raw is None:
         # 데이터 아직 준비 안 됨
@@ -49,13 +99,50 @@ async def get_recommendations(
     else:
         items_data = raw
 
-    items = [RecommendationItem(**item) for item in items_data]
-    last_updated = datetime.now(tz=timezone.utc)
+    # 기본 파라미터: 기존 동작 그대로 반환
+    if is_default_params:
+        items = [RecommendationItem(**item) for item in items_data]
+        last_updated = datetime.now(tz=timezone.utc)
+        return RecommendationsResponse(
+            trade_date=today,
+            recommendations=items,
+            last_updated=last_updated,
+        )
 
+    # 3. 필터 적용 — sector
+    if sector is not None:
+        items_data = [
+            item for item in items_data
+            if item.get("sector") == sector
+        ]
+
+    # 4. 필터 적용 — min_score
+    if min_score is not None:
+        items_data = [
+            item for item in items_data
+            if float(item.get("total_score", 0.0)) >= min_score
+        ]
+
+    # 5. 정렬 (내림차순)
+    sort_field = _SORT_FIELD_MAP[sort]
+    items_data = sorted(
+        items_data,
+        key=lambda x: float(x.get(sort_field, 0.0)),
+        reverse=True,
+    )
+
+    # 6. limit 적용
+    items_data = items_data[:limit]
+
+    # 7. 파생 캐시 저장
+    derived_key = cache.build_derived_key(limit=limit, sector=sector)
+    await cache.set_derived(derived_key, items_data)
+
+    items = [RecommendationItem(**item) for item in items_data]
     return RecommendationsResponse(
         trade_date=today,
         recommendations=items,
-        last_updated=last_updated,
+        last_updated=datetime.now(tz=timezone.utc),
     )
 
 

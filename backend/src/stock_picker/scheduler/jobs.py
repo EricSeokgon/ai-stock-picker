@@ -51,6 +51,7 @@ async def run_recommendation() -> None:
     """추천 파이프라인 실행.
 
     스코어 계산 후 Redis에 결과를 캐시한다.
+    새 추천 데이터 저장 후 파생 캐시(필터/정렬 결과)를 무효화한다.
     """
     import os
 
@@ -69,6 +70,9 @@ async def run_recommendation() -> None:
         svc = RecommendationService(cache=cache)
         result = await svc.run(session)
         await session.commit()
+
+    # 파생 캐시 무효화: 새 추천 데이터 반영을 위해 필터/정렬 결과 캐시 삭제
+    await cache.invalidate_derived()
 
     await redis_client.aclose()
     log.info("추천 파이프라인 완료", count=len(result))

@@ -248,48 +248,62 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
 
   return (
     <div style={{ padding: '1rem', background: '#f8f9fa', borderRadius: '4px', marginTop: '0.5rem' }}>
-      {/* 성과 요약 */}
+      {/* 성과 요약 카드 — 모바일에서 세로 스택 */}
       {performance && (
-        <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-          <div><span style={{ fontSize: '0.75rem', color: '#666' }}>총 투자금</span><br />
+        <div
+          className="portfolio-summary-cards"
+          style={{ display: 'flex', gap: '1.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}
+        >
+          <div style={{ minWidth: '80px' }}>
+            <span style={{ fontSize: '0.75rem', color: '#666' }}>총 투자금</span><br />
             <strong>₩{performance.total_invested.toLocaleString()}</strong>
           </div>
-          <div><span style={{ fontSize: '0.75rem', color: '#666' }}>현재 평가금</span><br />
+          <div style={{ minWidth: '80px' }}>
+            <span style={{ fontSize: '0.75rem', color: '#666' }}>현재 평가금</span><br />
             <strong>{performance.current_value !== null ? `₩${performance.current_value.toLocaleString()}` : '-'}</strong>
           </div>
-          <div><span style={{ fontSize: '0.75rem', color: '#666' }}>수익률</span><br />
+          <div style={{ minWidth: '80px' }}>
+            <span style={{ fontSize: '0.75rem', color: '#666' }}>수익률</span><br />
             <strong style={{ color: returnColor(performance.total_return_pct) }}>
               {formatPct(performance.total_return_pct)}
             </strong>
           </div>
-          <div><span style={{ fontSize: '0.75rem', color: '#666' }}>종목 수</span><br />
+          <div style={{ minWidth: '80px' }}>
+            <span style={{ fontSize: '0.75rem', color: '#666' }}>종목 수</span><br />
             <strong>{performance.holdings_count}</strong>
           </div>
+          <style>{`
+            @media (max-width: 767px) {
+              .portfolio-summary-cards { flex-direction: column !important; gap: 0.75rem !important; }
+            }
+          `}</style>
         </div>
       )}
 
-      {/* 보유 종목 테이블 */}
+      {/* 보유 종목 테이블 — 모바일에서 overflow-x: auto로 가로 스크롤 */}
       {holdings.length > 0 ? (
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem', fontSize: '0.875rem' }}>
-          <thead>
-            <tr style={{ background: '#e3f2fd' }}>
-              <th style={cellStyle}>종목코드</th>
-              <th style={cellStyle}>수량</th>
-              <th style={cellStyle}>평균단가</th>
-              <th style={cellStyle}>현재 시세</th>
-            </tr>
-          </thead>
-          <tbody>
-            {holdings.map((h) => (
-              <tr key={h.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={cellStyle}>{h.krx_code}</td>
-                <td style={cellStyle}>{h.quantity.toLocaleString()}</td>
-                <td style={cellStyle}>₩{h.avg_buy_price.toLocaleString()}</td>
-                <td style={cellStyle}><LivePriceBadge krxCode={h.krx_code} /></td>
+        <div style={{ overflowX: 'auto', marginBottom: '1rem', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', minWidth: '360px' }}>
+            <thead>
+              <tr style={{ background: '#e3f2fd' }}>
+                <th style={cellStyle}>종목코드</th>
+                <th style={cellStyle}>수량</th>
+                <th style={cellStyle}>평균단가</th>
+                <th style={cellStyle}>현재 시세</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {holdings.map((h) => (
+                <tr key={h.id} style={{ borderBottom: '1px solid #eee' }}>
+                  <td style={cellStyle}>{h.krx_code}</td>
+                  <td style={cellStyle}>{h.quantity.toLocaleString()}</td>
+                  <td style={cellStyle}>₩{h.avg_buy_price.toLocaleString()}</td>
+                  <td style={cellStyle}><LivePriceBadge krxCode={h.krx_code} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <p style={{ fontSize: '0.875rem', color: '#666', marginBottom: '1rem' }}>보유 종목이 없습니다.</p>
       )}

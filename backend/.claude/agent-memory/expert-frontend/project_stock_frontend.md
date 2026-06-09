@@ -1,34 +1,50 @@
 ---
 name: project-stock-frontend
-description: ai-stock-picker 프로젝트 프론트엔드 구현 현황 - React 18, TypeScript, Vitest 스택
+description: ai-stock-picker 프론트엔드 구현 현황 - React 18, TypeScript, react-router-dom, Vitest 스택 (Phase E 완료)
 metadata:
   type: project
 ---
 
-프론트엔드 구현 완료 (TASK-017, TASK-018).
+프론트엔드 구현 완료 (TASK-013~015, Phase E).
 
-**Why:** SPEC-STOCK-001 한국 주식 ETF 추천 시스템 MVP 대시보드 구현
-**How to apply:** 추가 컴포넌트 작업 시 기존 파일 구조와 인라인 CSS 패턴을 유지할 것
+**Why:** SPEC-STOCK-002 인증/포트폴리오/백테스트 기능 추가
+**How to apply:** 추가 컴포넌트 작업 시 기존 인라인 CSS 패턴 + AuthContext useAuth() 훅 사용
 
-## 구현된 파일 목록
+## 핵심 패턴
 
-- `/home/sklee/moai/ai-stock-picker/frontend/package.json` - React 18, Vitest 2, Testing Library 설정
-- `/home/sklee/moai/ai-stock-picker/frontend/vite.config.ts` - jsdom 환경, setupFiles 포함
-- `/home/sklee/moai/ai-stock-picker/frontend/tsconfig.json` - bundler moduleResolution
-- `/home/sklee/moai/ai-stock-picker/frontend/index.html` - lang="ko"
-- `/home/sklee/moai/ai-stock-picker/frontend/src/types.ts` - 도메인 타입 (RecommendationItem, RecommendationsData, PreparingData, NewsItem 등)
-- `/home/sklee/moai/ai-stock-picker/frontend/src/api/client.ts` - fetch 래퍼, VITE_API_BASE_URL 지원
-- `/home/sklee/moai/ai-stock-picker/frontend/src/components/Disclaimer.tsx`
-- `/home/sklee/moai/ai-stock-picker/frontend/src/components/DataPreparingState.tsx` - AC-10 구현
-- `/home/sklee/moai/ai-stock-picker/frontend/src/components/RecommendationList.tsx` - 점수 바 시각화
-- `/home/sklee/moai/ai-stock-picker/frontend/src/components/NewsFeed.tsx` - 감성 배지
-- `/home/sklee/moai/ai-stock-picker/frontend/src/App.tsx` - Promise.all fetch, 4가지 상태 처리
-- `/home/sklee/moai/ai-stock-picker/frontend/src/main.tsx`
-- `/home/sklee/moai/ai-stock-picker/frontend/src/test-setup.ts`
-- 테스트 5개 파일 (24 테스트 모두 통과)
+- 인증: `useAuth()` 훅 → `src/auth/AuthContext.tsx` (localStorage 'stock_picker_token')
+- 라우팅: react-router-dom v6, `MemoryRouter`로 감싸서 테스트
+- 테스트: `vi.mock('../auth/AuthContext', ...)` + `vi.mock('../components/PortfolioSummary', ...)` 패턴 필수
+- vitest include: `src/**/*.test.ts`, `src/**/*.test.tsx` 만 (`.js` 제외)
+- tsconfig exclude: test 파일 + `src/test-setup.ts` 제외 (skipLibCheck: true)
+
+## 주요 파일
+
+### Phase A-D (기존)
+- `src/api/client.ts` - 공개 API fetch 래퍼
+- `src/App.tsx` - 라우팅 포함 메인 앱 (NavBar + Routes)
+- `src/main.tsx` - BrowserRouter + AuthProvider 래핑
+- `src/types.ts` - 도메인 타입
+
+### Phase E (신규)
+- `src/auth/AuthContext.tsx` - AuthProvider, useAuth 훅
+- `src/api/auth.ts` - register/login/me API
+- `src/api/portfolio.ts` - 포트폴리오 CRUD API
+- `src/api/backtest.ts` - 백테스트 실행/조회 API
+- `src/pages/Login.tsx` - 탭 전환 로그인/회원가입 폼
+- `src/pages/Portfolio.tsx` - 포트폴리오 관리 + 보유종목 추가
+- `src/pages/Backtest.tsx` - 백테스트 실행 + LineChart (recharts)
+- `src/components/PortfolioSummary.tsx` - 대시보드 위젯
+
+## 테스트 현황
+
+- 총 48개 테스트 통과 (9개 파일)
+- 빌드: TypeScript 에러 0개, `npm run build` 성공
 
 ## API 계약
 
-- GET /recommendations → RecommendationsData | PreparingData
-- GET /news?limit=N → NewsResponse
-- Base URL: VITE_API_BASE_URL env 또는 http://localhost:8000
+- POST /auth/register, /auth/login → { access_token, token_type }
+- GET /auth/me → UserInfo (Bearer 필요)
+- GET/POST /portfolios → Portfolio[]
+- POST /portfolios/{id}/holdings, GET /portfolios/{id}/performance
+- POST /backtest/run, GET /backtest/runs, GET /backtest/runs/{id}/results

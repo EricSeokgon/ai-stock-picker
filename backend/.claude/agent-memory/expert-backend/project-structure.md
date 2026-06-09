@@ -29,3 +29,20 @@ M2 완료 모듈 (TASK-008~014):
 픽스처: tests/fixtures/sample_rss.xml, claude_response.json, krx_master.csv
 
 가중치: sentiment=0.40, volume=0.20, momentum=0.25, anomaly=0.15
+
+SPEC-STOCK-002 Phase B~D 완료 (2026-06-09):
+- db/models.py: TelegramSubscription, Portfolio, PortfolioHolding, BacktestRun, BacktestDailyResult 추가
+- alembic/versions/0003~0005: 마이그레이션 파일 생성
+- telegram/: handlers.py, bot.py (별도 스레드 폴링), notifier.py
+- portfolio/: service.py (동기 Session), router.py, schemas.py
+- backtest/: metrics.py (CAGR/MDD/Sharpe), runner.py (asyncio.create_task), router.py, schemas.py
+- api/main.py: portfolio_router, backtest_router 등록, TELEGRAM_BOT_TOKEN 조건부 봇 시작
+
+**핵심 설계 결정:**
+- auth와 동일하게 동기 Session 사용 (TestClient 호환, BigInteger → Integer 주의)
+- 텔레그램 봇은 threading.Thread(daemon=True)로 FastAPI 이벤트 루프와 격리
+- FinanceDataReader 호출은 run_in_executor로 래핑 (동기 블로킹 함수)
+- backtest runner: run_in_executor(None, _fetch_price_data, ...) 패턴
+
+테스트 결과: 유닛 31 + 통합 24 = 55개 신규 테스트 모두 통과
+기존 auth 테스트 31개 회귀 없음

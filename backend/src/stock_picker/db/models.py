@@ -12,6 +12,7 @@ from sqlalchemy import (
     Numeric,
     ForeignKey,
     Index,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, TIMESTAMP as TIMESTAMPTZ
@@ -253,6 +254,29 @@ class PortfolioHolding(Base):
 
     # 연관 관계
     portfolio: Mapped["Portfolio"] = relationship("Portfolio", back_populates="holdings")
+
+
+# ── Phase E: 관심종목 위시리스트 ───────────────────────────────────────────────
+
+class WatchlistItem(Base):
+    """관심종목 위시리스트 테이블 — 사용자별 즐겨찾기 종목"""
+
+    __tablename__ = "watchlist_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    krx_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    # added_at: 추가 시각 (서버 기본값)
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    # 동일 사용자가 같은 종목을 중복 추가 방지
+    __table_args__ = (UniqueConstraint("user_id", "krx_code", name="uq_watchlist_user_krx"),)
 
 
 # ── Phase D: 백테스팅 ──────────────────────────────────────────────────────────

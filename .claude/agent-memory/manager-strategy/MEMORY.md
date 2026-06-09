@@ -1,2 +1,4 @@
 - [SPEC-STOCK-001 Overview](project_stock_001.md) — Korean stock/ETF recommendation system; greenfield monorepo, TDD, Phase 1 MVP scope
+- [SPEC-STOCK-002 Overview](project_stock_002.md) — Phase 3: JWT auth, Telegram bot, portfolio sim, backtest; reuse hooks + dep risks
 - [Stock System Library Versions](reference_stock_libs.md) — verified PyPI versions for the FastAPI + Anthropic + FDR backend stack (as of 2026-06)
+- [SPEC-STOCK-002 New Library Versions](reference_stock_002_libs.md) — python-telegram-bot, python-jose, passlib versions + passlib/bcrypt risk (2026-06)

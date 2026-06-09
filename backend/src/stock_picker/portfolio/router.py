@@ -13,6 +13,8 @@ from stock_picker.portfolio.schemas import (
     PortfolioResponse,
 )
 
+from stock_picker.portfolio.ai_analysis import analyze_portfolio
+
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
 
@@ -96,6 +98,16 @@ def remove_holding(
             detail="보유 종목을 찾을 수 없습니다",
         )
     service.remove_holding(db, holding_id=holding_id)
+
+
+@router.post("/{portfolio_id}/ai-analysis")
+def ai_analysis(
+    portfolio_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """포트폴리오 AI 분석 — Claude API로 분산투자/리스크/개선 제안 제공"""
+    return analyze_portfolio(portfolio_id=portfolio_id, user_id=current_user.id, db=db)
 
 
 @router.get("/{portfolio_id}/performance", response_model=PortfolioPerformance)

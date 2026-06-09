@@ -10,3 +10,11 @@
 {"ts":"2026-06-01T09:32:49.01398966+09:00","event":"PreToolUse","handler":"*hook.preToolHandler","tool":"Bash","duration_ms":0,"decision":"allow","session_id":"4d6d55e7-b905-4acc-aa20-f01d1bf3d4c0"}
 {"ts":"2026-06-01T13:31:26.840364216+09:00","event":"PreToolUse","handler":"*hook.preToolHandler","tool":"Write","duration_ms":24,"decision":"allow","session_id":"4d6d55e7-b905-4acc-aa20-f01d1bf3d4c0"}
 {"ts":"2026-06-01T13:41:01.135970371+09:00","event":"PreToolUse","handler":"*hook.preToolHandler","tool":"Write","duration_ms":7,"decision":"allow","session_id":"4d6d55e7-b905-4acc-aa20-f01d1bf3d4c0"}
+{"ts":"2026-06-01T14:17:12.116379886+09:00","event":"PreToolUse","handler":"*hook.preToolHandler","tool":"Bash","duration_ms":1,"decision":"allow","session_id":"4d6d55e7-b905-4acc-aa20-f01d1bf3d4c0"}
+{"ts":"2026-06-01T16:04:38.513778128+09:00","event":"CwdChanged","handler":"*hook.cwdChangedHandler","duration_ms":0,"session_id":"4d6d55e7-b905-4acc-aa20-f01d1bf3d4c0"}
+{"ts":"2026-06-01T16:05:51.107684916+09:00","event":"Notification","handler":"*hook.notificationHandler","duration_ms":0,"session_id":"4d6d55e7-b905-4acc-aa20-f01d1bf3d4c0"}
+{"ts":"2026-06-01T16:07:55.300037324+09:00","event":"SubagentStop","handler":"*hook.subagentStopHandler","duration_ms":0,"session_id":"4d6d55e7-b905-4acc-aa20-f01d1bf3d4c0"}
+{"ts":"2026-06-01T17:35:37.375991137+09:00","event":"SubagentStop","handler":"*hook.subagentStopHandler","duration_ms":0,"session_id":"4d6d55e7-b905-4acc-aa20-f01d1bf3d4c0"}
+{"ts":"2026-06-02T08:15:17.559986346+09:00","event":"PreToolUse","handler":"*hook.preToolHandler","tool":"Edit","duration_ms":0,"decision":"allow","session_id":"4d6d55e7-b905-4acc-aa20-f01d1bf3d4c0"}
+{"ts":"2026-06-02T08:18:57.73061894+09:00","event":"PreToolUse","handler":"*hook.preToolHandler","tool":"Edit","duration_ms":0,"decision":"allow","session_id":"4d6d55e7-b905-4acc-aa20-f01d1bf3d4c0"}
+{"ts":"2026-06-02T08:23:05.173616007+09:00","event":"PreToolUse","handler":"*hook.preToolHandler","tool":"Bash","duration_ms":6,"decision":"allow","session_id":"4d6d55e7-b905-4acc-aa20-f01d1bf3d4c0"}

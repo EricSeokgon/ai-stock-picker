@@ -1,0 +1,1 @@
+- [Stock Picker SPEC Conventions](stock-picker-spec-conventions.md) — SPEC-STOCK-NNN numbering, Korean spec body, permanent auto-trading exclusion

@@ -11,6 +11,9 @@ import {
   type Holding,
   type PortfolioPerformance,
 } from '../api/portfolio';
+import { LivePriceBadge } from '../components/LivePriceBadge';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
 // 색상 유틸리티
 function returnColor(pct: number | null): string {
@@ -96,6 +99,104 @@ function CreatePortfolioModal({
   );
 }
 
+// AI 분석 결과 타입
+interface AiAnalysisResult {
+  diversification: string;
+  risk: string;
+  suggestions: string[];
+}
+
+// AI 분석 섹션 컴포넌트 (REQ-FE-005)
+function AiAnalysisSection({ portfolioId, token }: { portfolioId: number; token: string }) {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<AiAnalysisResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+
+  async function handleRunAnalysis() {
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/ai-analysis`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`AI 분석 실패: ${res.status}`);
+      const data = await res.json() as AiAnalysisResult;
+      setResult(data);
+      setExpanded(true);
+    } catch {
+      setError('AI 분석을 일시적으로 사용할 수 없습니다.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const sectionStyle: React.CSSProperties = {
+    marginTop: '1rem',
+    padding: '0.75rem',
+    border: '1px solid #e3f2fd',
+    borderRadius: '4px',
+    background: '#fafcff',
+  };
+
+  return (
+    <div style={sectionStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+        <strong style={{ fontSize: '0.875rem' }}>AI 분석</strong>
+        <button
+          onClick={() => void handleRunAnalysis()}
+          disabled={loading}
+          style={{
+            padding: '0.3rem 0.7rem', background: '#1976d2', color: '#fff',
+            border: 'none', borderRadius: '4px', cursor: loading ? 'default' : 'pointer',
+            fontSize: '0.8rem', opacity: loading ? 0.7 : 1,
+          }}
+        >
+          {loading ? '분석 중...' : 'AI 분석 실행'}
+        </button>
+        {result && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem', color: '#666' }}
+          >
+            {expanded ? '▲ 접기' : '▼ 펼치기'}
+          </button>
+        )}
+      </div>
+
+      {error && (
+        <p style={{ color: '#c62828', fontSize: '0.8rem', margin: '0.25rem 0' }}>{error}</p>
+      )}
+
+      {result && expanded && (
+        <div style={{ fontSize: '0.875rem' }}>
+          <div style={{ marginBottom: '0.5rem' }}>
+            <strong>분산도:</strong> <span>{result.diversification}</span>
+          </div>
+          <div style={{ marginBottom: '0.5rem' }}>
+            <strong>리스크:</strong> <span>{result.risk}</span>
+          </div>
+          {result.suggestions && result.suggestions.length > 0 && (
+            <div style={{ marginBottom: '0.5rem' }}>
+              <strong>개선 제안:</strong>
+              <ul style={{ margin: '0.25rem 0 0 1rem', padding: 0 }}>
+                {result.suggestions.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <p style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.5rem', marginBottom: 0 }}>
+            본 분석은 AI가 생성한 참고 정보입니다. 실제 투자 결정은 본인 책임하에 이루어져야 합니다.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // 포트폴리오 상세 패널 (보유 종목 + 성과)
 function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: string }) {
   const [holdings, setHoldings] = useState<Holding[]>([]);
@@ -175,6 +276,7 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
               <th style={cellStyle}>종목코드</th>
               <th style={cellStyle}>수량</th>
               <th style={cellStyle}>평균단가</th>
+              <th style={cellStyle}>현재 시세</th>
             </tr>
           </thead>
           <tbody>
@@ -183,6 +285,7 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
                 <td style={cellStyle}>{h.krx_code}</td>
                 <td style={cellStyle}>{h.quantity.toLocaleString()}</td>
                 <td style={cellStyle}>₩{h.avg_buy_price.toLocaleString()}</td>
+                <td style={cellStyle}><LivePriceBadge krxCode={h.krx_code} /></td>
               </tr>
             ))}
           </tbody>
@@ -208,6 +311,9 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
           </button>
         </form>
       </div>
+
+      {/* AI 분석 섹션 (REQ-FE-005) */}
+      <AiAnalysisSection portfolioId={portfolioId} token={token} />
     </div>
   );
 }

@@ -265,7 +265,230 @@ ws.onclose = () => {
 
 ---
 
-### 1. 관심 목록 (Watchlist)
+### 1. 알림 관리 (Notifications) — Phase 5 신규
+
+#### 1.1 가격 알림 생성
+
+```http
+POST /watchlist/alerts
+```
+
+**설명**: 관심 목록의 종목에 대해 가격 알림을 생성합니다. 목표가에 도달하면 텔레그램으로 1회 통지됩니다. (인증 필수)
+
+**요청 본문**:
+```json
+{
+  "krx_code": "005930",
+  "target_price": 80000,
+  "direction": "above"
+}
+```
+
+**응답 스키마**:
+```json
+{
+  "id": 1,
+  "krx_code": "005930",
+  "name": "삼성전자",
+  "target_price": 80000,
+  "direction": "above",
+  "is_active": true,
+  "triggered_at": null,
+  "created_at": "2026-06-09T14:30:00Z"
+}
+```
+
+**응답 필드**:
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `id` | integer | 알림 ID |
+| `krx_code` | string | KRX 종목 코드 |
+| `name` | string | 종목명 |
+| `target_price` | number | 목표가 (원) |
+| `direction` | string | 방향 (above: 이상, below: 이하) |
+| `is_active` | boolean | 활성 상태 |
+| `triggered_at` | string or null | 알림 발생 시간 (ISO 8601) |
+
+**상태 코드**:
+- `201 Created`: 알림 생성 성공
+- `400 Bad Request`: 형식 오류 (예: 유효하지 않은 방향)
+- `404 Not Found`: 종목 코드 없음
+- `401 Unauthorized`: 인증 필수
+
+**예제**:
+```bash
+curl -X POST http://localhost:8000/watchlist/alerts \
+  -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" \
+  -d '{"krx_code": "005930", "target_price": 80000, "direction": "above"}'
+```
+
+---
+
+#### 1.2 가격 알림 목록 조회
+
+```http
+GET /watchlist/alerts
+```
+
+**설명**: 현재 사용자의 모든 활성/비활성 가격 알림을 조회합니다. (인증 필수)
+
+**요청 헤더**:
+```
+Authorization: Bearer <access_token>
+```
+
+**응답 스키마**:
+```json
+{
+  "alerts": [
+    {
+      "id": 1,
+      "krx_code": "005930",
+      "name": "삼성전자",
+      "target_price": 80000,
+      "direction": "above",
+      "is_active": true,
+      "triggered_at": null,
+      "created_at": "2026-06-09T14:30:00Z"
+    },
+    {
+      "id": 2,
+      "krx_code": "000660",
+      "name": "SK하이닉스",
+      "target_price": 100000,
+      "direction": "below",
+      "is_active": false,
+      "triggered_at": "2026-06-09T15:00:00Z",
+      "created_at": "2026-06-08T10:00:00Z"
+    }
+  ],
+  "count": 2
+}
+```
+
+**상태 코드**:
+- `200 OK`: 정상 응답
+- `401 Unauthorized`: 인증 필수
+
+**예제**:
+```bash
+curl -X GET http://localhost:8000/watchlist/alerts \
+  -H "Authorization: Bearer eyJ..."
+```
+
+---
+
+#### 1.3 가격 알림 삭제
+
+```http
+DELETE /watchlist/alerts/{id}
+```
+
+**설명**: 가격 알림을 삭제합니다. (인증 필수)
+
+**경로 파라미터**:
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `id` | integer | 알림 ID |
+
+**상태 코드**:
+- `204 No Content`: 삭제 성공
+- `404 Not Found`: 알림 없음 또는 다른 사용자의 알림
+- `401 Unauthorized`: 인증 필수
+
+**예제**:
+```bash
+curl -X DELETE http://localhost:8000/watchlist/alerts/1 \
+  -H "Authorization: Bearer eyJ..."
+```
+
+---
+
+#### 1.4 이메일 구독 신청
+
+```http
+POST /notifications/email
+```
+
+**설명**: 사용자의 이메일 주소를 등록하여 알림을 구독합니다. SMTP를 통해 가격 알림 및 주간 요약을 받습니다. (인증 필수)
+
+**요청 본문**:
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**응답 스키마**:
+```json
+{
+  "id": 1,
+  "email": "user@example.com",
+  "is_active": true,
+  "created_at": "2026-06-09T14:30:00Z"
+}
+```
+
+**응답 필드**:
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `id` | integer | 구독 ID |
+| `email` | string | 이메일 주소 |
+| `is_active` | boolean | 구독 활성 상태 |
+| `created_at` | string | 구독 생성 시간 (ISO 8601) |
+
+**상태 코드**:
+- `201 Created`: 구독 성공
+- `422 Unprocessable Entity`: 유효하지 않은 이메일 형식
+- `400 Bad Request`: 이미 구독 중 또는 형식 오류
+- `401 Unauthorized`: 인증 필수
+
+**예제**:
+```bash
+curl -X POST http://localhost:8000/notifications/email \
+  -H "Authorization: Bearer eyJ..." \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com"}'
+```
+
+---
+
+#### 1.5 이메일 구독 해지
+
+```http
+DELETE /notifications/email
+```
+
+**설명**: 이메일 구독을 해지합니다. (인증 필수)
+
+**요청 헤더**:
+```
+Authorization: Bearer <access_token>
+```
+
+**응답 스키마**:
+```json
+{
+  "message": "구독이 해지되었습니다.",
+  "email": "user@example.com"
+}
+```
+
+**상태 코드**:
+- `200 OK`: 구독 해지 성공
+- `404 Not Found`: 구독 정보 없음
+- `401 Unauthorized`: 인증 필수
+
+**예제**:
+```bash
+curl -X DELETE http://localhost:8000/notifications/email \
+  -H "Authorization: Bearer eyJ..."
+```
+
+---
+
+### 2. 관심 목록 (Watchlist)
 
 #### 1.1 관심 목록 조회
 
@@ -386,9 +609,9 @@ curl -X DELETE http://localhost:8000/watchlist/005930 \
 
 ---
 
-### 2. 추천 리스트 조회
+### 3. 추천 리스트 조회
 
-#### 2.1 Top 10 주식 추천
+#### 3.1 Top 10 주식 추천
 
 ```http
 GET /recommendations
@@ -467,7 +690,7 @@ curl -X GET http://localhost:8000/recommendations
 
 ---
 
-#### 2.2 종목별 상세 추천 근거
+#### 3.2 종목별 상세 추천 근거
 
 ```http
 GET /recommendations/{krx_code}
@@ -573,9 +796,9 @@ curl -X GET http://localhost:8000/recommendations/005930
 
 ---
 
-### 3. 포트폴리오 관리 (Portfolio)
+### 4. 포트폴리오 관리 (Portfolio)
 
-#### 3.1 포트폴리오 목록 조회
+#### 4.1 포트폴리오 목록 조회
 
 ```http
 GET /portfolios
@@ -619,7 +842,7 @@ curl -X GET http://localhost:8000/portfolios \
 
 ---
 
-#### 3.2 포트폴리오 생성
+#### 4.2 포트폴리오 생성
 
 ```http
 POST /portfolios
@@ -664,7 +887,7 @@ curl -X POST http://localhost:8000/portfolios \
 
 ---
 
-#### 3.3 보유 종목 추가
+#### 4.3 보유 종목 추가
 
 ```http
 POST /portfolios/{portfolio_id}/holdings
@@ -720,7 +943,7 @@ curl -X POST http://localhost:8000/portfolios/1/holdings \
 
 ---
 
-#### 3.4 포트폴리오 성과 분석
+#### 4.4 포트폴리오 성과 분석
 
 ```http
 GET /portfolios/{portfolio_id}/performance
@@ -770,7 +993,7 @@ curl -X GET http://localhost:8000/portfolios/1/performance \
   -H "Authorization: Bearer eyJ..."
 ```
 
-#### 3.5 포트폴리오 AI 분석 (신규)
+#### 4.5 포트폴리오 AI 분석
 
 ```http
 POST /portfolios/{portfolio_id}/ai-analysis
@@ -845,9 +1068,9 @@ curl -X POST http://localhost:8000/portfolios/1/ai-analysis \
 
 ---
 
-### 4. 백테스팅 (Backtesting)
+### 5. 백테스팅 (Backtesting)
 
-#### 4.1 백테스트 실행
+#### 5.1 백테스트 실행
 
 ```http
 POST /backtest/run
@@ -901,7 +1124,7 @@ curl -X POST http://localhost:8000/backtest/run \
 
 ---
 
-#### 4.2 백테스트 결과 조회
+#### 5.2 백테스트 결과 조회
 
 ```http
 GET /backtest/runs/{backtest_id}
@@ -955,7 +1178,7 @@ curl -X GET http://localhost:8000/backtest/runs/1
 
 ---
 
-#### 4.3 백테스트 일별 결과
+#### 5.3 백테스트 일별 결과
 
 ```http
 GET /backtest/runs/{backtest_id}/results
@@ -1013,9 +1236,9 @@ curl -X GET http://localhost:8000/backtest/runs/1/results
 
 ---
 
-### 5. 텔레그램 알림 (Telegram)
+### 6. 텔레그램 알림 (Telegram)
 
-#### 5.1 구독 시작
+#### 6.1 구독 시작
 
 ```http
 POST /telegram/subscribe
@@ -1055,7 +1278,7 @@ curl -X POST http://localhost:8000/telegram/subscribe \
 
 ---
 
-#### 5.2 구독 취소
+#### 6.2 구독 취소
 
 ```http
 POST /telegram/unsubscribe
@@ -1076,9 +1299,9 @@ POST /telegram/unsubscribe
 
 ---
 
-### 6. 뉴스 정보
+### 7. 뉴스 정보
 
-#### 6.1 분석 완료 뉴스 피드
+#### 7.1 분석 완료 뉴스 피드
 
 ```http
 GET /news?limit=N&offset=O
@@ -1158,9 +1381,9 @@ curl -X GET http://localhost:8000/news?sector=전자&limit=10
 
 ---
 
-### 7. 섹터 트렌드
+### 8. 섹터 트렌드
 
-#### 7.1 섹터별 트렌드 시계열
+#### 8.1 섹터별 트렌드 시계열
 
 ```http
 GET /sectors/trends?days=N
@@ -1238,9 +1461,9 @@ curl -X GET http://localhost:8000/sectors/trends?days=30
 
 ---
 
-### 8. 헬스 체크
+### 9. 헬스 체크
 
-#### 8.1 시스템 상태 확인
+#### 9.1 시스템 상태 확인
 
 ```http
 GET /health

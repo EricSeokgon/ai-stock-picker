@@ -39,6 +39,18 @@
 - **면책 고지 포함**: 분석 결과와 함께 투자 책임 고지 제공
 - **1회성 응답**: 분석 요청 시마다 최신 AI 분석 수행
 
+### 관심 목록 가격 알림 (Phase 5 신규)
+- **목표가 설정**: 이상(≥) / 이하(≤) 두 가지 방향 지원
+- **자동 알림**: 목표가 도달 시 텔레그램으로 1회 통지
+- **활성 알림 관리**: 알림별 상태 추적 및 삭제 기능
+- **스케줄러**: 5분 주기 가격 모니터링
+
+### 이메일 알림 (Phase 5 신규)
+- **SMTP 기반**: 이메일 구독 관리 (추가/해지)
+- **가격 도달 알림**: 목표가 달성 시 이메일 발송
+- **주간 요약**: 매주 월요일 07:00 KST 추천 요약 발송
+- **구독 상태**: 구독 활성화/해제 토글
+
 ### 웹 대시보드
 - **실시간 추천**: Top 10 주식 및 ETF 추천 리스트
 - **실시간 시세**: 관심 목록 및 포트폴리오 종목의 실시간 가격 표시 (색상 표기: 상승=빨강, 하락=파랑)
@@ -299,6 +311,11 @@ curl -X POST http://localhost:8000/health
 | `ENABLE_SCHEDULER` | - | true | 스케줄러 활성화 여부 |
 | `SCHEDULER_DAILY_HOUR` | - | 6 | 일일 배치 시간 (0~23) |
 | `SCHEDULER_INTRADAY_INTERVAL` | - | 30 | 장중 갱신 간격 (분) |
+| `SMTP_HOST` | - | - | SMTP 서버 호스트 (예: smtp.gmail.com) |
+| `SMTP_PORT` | - | 587 | SMTP 포트 (보통 587 for TLS, 465 for SSL) |
+| `SMTP_USER` | - | - | SMTP 사용자명 (이메일 주소) |
+| `SMTP_PASSWORD` | - | - | SMTP 비밀번호 (앱 비밀번호 권장) |
+| `SMTP_FROM` | - | - | 발신 이메일 주소 |
 
 **예제:**
 ```bash
@@ -353,6 +370,12 @@ ai-stock-picker/
 │   │   │   ├── models.py         # WatchlistItem ORM
 │   │   │   ├── service.py        # CRUD 및 중복 방지
 │   │   │   └── schemas.py        # API 스키마
+│   │   ├── notifications/        # 알림 기능 (Phase 5 신규)
+│   │   │   ├── alert_service.py  # WatchlistAlert CRUD
+│   │   │   ├── alert_router.py   # /watchlist/alerts 라우터
+│   │   │   ├── email_service.py  # SMTP 이메일 발송
+│   │   │   ├── email_router.py   # /notifications/email 라우터
+│   │   │   └── schemas.py        # 알림 Pydantic 모델
 │   │   ├── portfolio/            # 포트폴리오 (Phase C)
 │   │   │   ├── models.py         # Portfolio, PortfolioHolding
 │   │   │   ├── service.py        # CRUD 및 성과 계산
@@ -388,7 +411,10 @@ ai-stock-picker/
 │           ├── 0002_users.py          # 사용자 테이블
 │           ├── 0003_telegram_subs.py  # 텔레그램 구독
 │           ├── 0004_portfolios.py     # 포트폴리오
-│           └── 0005_backtest.py       # 백테스팅
+│           ├── 0005_backtest.py       # 백테스팅
+│           ├── 0006_watchlist.py      # 관심 목록 (Phase 4)
+│           ├── 0007_watchlist_alerts.py     # 가격 알림 (Phase 5)
+│           └── 0008_email_subscriptions.py  # 이메일 구독 (Phase 5)
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
@@ -585,8 +611,13 @@ MIT License - 자유롭게 사용, 수정, 배포 가능
   - 포트폴리오 AI 최적화
   - 리스크 분석 및 상관관계 매트릭스
   - 해외 자산(미국주식, 암호화폐) 지원
-- **Phase 4** (현재, 2026-06-09 완료):
+- **Phase 4** (완료, 2026-06-09):
   - Phase A: WebSocket 기반 실시간 시세 스트리밍
   - Phase B: 종목 관심 목록 (관심 종목 저장 기능)
   - Phase C: 포트폴리오 AI 분석 (Claude haiku-4-5)
   - Phase D: 프론트엔드 강화 (실시간 시세 표시, 관심 목록 관리)
+- **Phase 5** (현재, 2026-06-09 완료):
+  - Phase A: 관심 목록 가격 알림 (목표가 설정, 텔레그램 통지)
+  - Phase B: 이메일 알림 (SMTP 기반, 주간 요약)
+  - Phase C: 알림 관리 API (활성 알림 조회, 삭제)
+  - Phase D: 스케줄러 강화 (5분 주기 가격 모니터링)

@@ -7,6 +7,107 @@
 
 ---
 
+## [0.4.0] - 2026-06-09
+
+### Added (Phase 5: 가격 알림 및 이메일 알림)
+
+#### Phase A: 관심 목록 가격 알림
+- **WatchlistAlert 모델**
+  - krx_code, target_price, direction(above/below), is_active, triggered_at
+  - 사용자별 독립적인 알림 관리
+
+- **가격 알림 엔드포인트**
+  - `POST /watchlist/alerts`: 알림 생성 (목표가, 방향 설정)
+  - `GET /watchlist/alerts`: 활성 알림 목록 조회 (인증 필수)
+  - `DELETE /watchlist/alerts/{id}`: 알림 삭제
+
+- **스케줄러 통합**
+  - check_price_alerts(): 5분 주기 가격 모니터링
+  - 목표가 도달 시 텔레그램 1회 통지
+  - triggered_at 자동 갱신
+
+- **데이터베이스**
+  - `watchlist_alerts` 테이블
+  - Alembic 마이그레이션 (0007_watchlist_alerts.py)
+
+#### Phase B: 이메일 알림
+- **EmailSubscription 모델**
+  - user_id, email, is_active, created_at
+  - 사용자별 이메일 구독 관리
+
+- **이메일 구독 엔드포인트**
+  - `POST /notifications/email`: 이메일 구독 (이메일 입력, 유효성 검증)
+  - `DELETE /notifications/email`: 구독 해지 (인증 필수)
+
+- **이메일 발송 서비스**
+  - SMTP 기반 메일 전송 (smtp.py)
+  - 텍스트 + HTML 하이브리드 포맷
+  - 예외 처리 및 재시도 메커니즘
+
+- **주간 요약**
+  - send_weekly_email_summary(): 매주 월요일 07:00 KST
+  - CronTrigger 사용
+  - Top 5 주식 추천 + 섹터 트렌드 요약 포함
+
+- **데이터베이스**
+  - `email_subscriptions` 테이블
+  - Alembic 마이그레이션 (0008_email_subscriptions.py)
+
+#### Phase C: 알림 관리 기능
+- **활성 알림 조회**
+  - 사용자별 모든 활성 알림 표시
+  - 목표가, 방향, 생성 시간 포함
+
+- **알림 삭제**
+  - 개별 알림 제거
+  - triggered_at 확인으로 이미 발생한 알림 관리
+
+#### Phase D: 프론트엔드 강화
+- **Settings 페이지 (신규)**
+  - pages/Settings.tsx: 이메일 구독 토글
+  - 구독 상태 표시 및 변경 기능
+  - 오류 처리 및 로딩 상태
+
+- **Watchlist 페이지 강화**
+  - 목표가 알림 추가 폼 (krx_code, target_price, direction)
+  - 활성 알림 목록 표시
+  - 알림별 삭제 버튼
+
+- **라우팅**
+  - /settings 보호된 라우트 추가
+  - App.tsx 네비게이션 업데이트
+
+#### 테스트 및 품질 보증
+- **백엔드 테스트**: 346/351 pass
+  - WatchlistAlert CRUD: 10+ 테스트
+  - EmailSubscription CRUD: 8+ 테스트
+  - Scheduler 통합: check_price_alerts, send_weekly_email_summary
+  - 5개 사전 존재하는 collector mock 실패 (무시)
+
+- **프론트엔드 테스트**: 76/76 pass
+  - Settings 페이지: 통합 테스트
+  - Watchlist 알림 폼: 컴포넌트 테스트
+
+- **전체 테스트 커버리지: 88%+**
+
+#### 스케줄러 업데이트
+- **APScheduler 작업**
+  - check_price_alerts: IntervalTrigger(minutes=5)
+  - send_weekly_email_summary: CronTrigger(day_of_week=0, hour=7, minute=0)
+
+### Changed
+
+- 관심 목록: 알림 기능 추가로 기능 확장
+- 스케줄러: 5분 주기 가격 모니터링 작업 추가
+- API 응답: 알림 관련 엔드포인트 추가
+
+### Fixed
+
+- 이메일 유효성 검증: regex 기반 검증
+- 텔레그램 중복 알림: 이미 발생한 알림은 재발송 방지
+
+---
+
 ## [0.3.0] - 2026-06-09
 
 ### Added (Phase 4: 실시간 시세·관심 목록·포트폴리오 AI 분석)

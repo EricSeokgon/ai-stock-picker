@@ -39,11 +39,17 @@ async def get_news(
         sentiment = analysis.sentiment if analysis else None
         summary = analysis.summary if analysis else None
 
+        # sentiment_label: analysis_results에 저장된 5단계 라벨 (TASK-009)
+        # getattr 사용 — 구 스키마 호환성 보장 (sentiment_label 컬럼 없는 경우 None)
+        _label_raw = getattr(analysis, "sentiment_label", None) if analysis else None
+        sentiment_label = str(_label_raw) if isinstance(_label_raw, str) else None
+
         news_items.append(
             NewsItem(
                 title=article.title,
                 summary=summary,
                 sentiment=sentiment,
+                sentiment_label=sentiment_label,
                 source=article.source,
                 url=article.url,
                 published_at=article.published_at,

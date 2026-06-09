@@ -5,7 +5,25 @@ interface NewsFeedProps {
   news: NewsItem[];
 }
 
-// 감성 배지 색상
+// 5단계 한국어 감성 레이블 배지 스타일 매핑
+function getSentimentLabelStyle(label: string): { backgroundColor: string; color: string } {
+  switch (label) {
+    case '매우긍정':
+      return { backgroundColor: '#1b5e20', color: '#fff' };
+    case '긍정':
+      return { backgroundColor: '#e8f5e9', color: '#2e7d32' };
+    case '중립':
+      return { backgroundColor: '#f5f5f5', color: '#616161' };
+    case '부정':
+      return { backgroundColor: '#fff3e0', color: '#e65100' };
+    case '매우부정':
+      return { backgroundColor: '#ffebee', color: '#c62828' };
+    default:
+      return { backgroundColor: '#f5f5f5', color: '#616161' };
+  }
+}
+
+// 기존 영문 sentiment 배지 색상 (하위 호환)
 function getSentimentStyle(sentiment: string | null): { backgroundColor: string; color: string; label: string } {
   switch (sentiment) {
     case 'positive':
@@ -33,7 +51,20 @@ function formatDate(iso: string): string {
 }
 
 function NewsCard({ item }: { item: NewsItem }) {
-  const sentiment = getSentimentStyle(item.sentiment);
+  // sentiment_label이 있으면 5단계 한국어 배지 사용, 없으면 기존 영문 배지 사용
+  const hasSentimentLabel = item.sentiment_label != null && item.sentiment_label !== '';
+  const sentimentLabelStyle = hasSentimentLabel
+    ? getSentimentLabelStyle(item.sentiment_label as string)
+    : null;
+  const sentimentFallback = getSentimentStyle(item.sentiment);
+
+  const badgeStyle = sentimentLabelStyle ?? {
+    backgroundColor: sentimentFallback.backgroundColor,
+    color: sentimentFallback.color,
+  };
+  const badgeLabel = hasSentimentLabel
+    ? (item.sentiment_label as string)
+    : sentimentFallback.label;
 
   return (
     <li
@@ -47,7 +78,7 @@ function NewsCard({ item }: { item: NewsItem }) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '0.5rem' }}>
-        {/* 감성 배지 */}
+        {/* 감성 배지: sentiment_label 우선, 없으면 sentiment 폴백 */}
         <span
           style={{
             display: 'inline-block',
@@ -55,13 +86,13 @@ function NewsCard({ item }: { item: NewsItem }) {
             borderRadius: '12px',
             fontSize: '0.75rem',
             fontWeight: 600,
-            backgroundColor: sentiment.backgroundColor,
-            color: sentiment.color,
+            backgroundColor: badgeStyle.backgroundColor,
+            color: badgeStyle.color,
             flexShrink: 0,
           }}
-          aria-label={`감성: ${sentiment.label}`}
+          aria-label={`감성: ${badgeLabel}`}
         >
-          {sentiment.label}
+          {badgeLabel}
         </span>
 
         {/* 제목 링크 */}

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .client import ClaudeAnalysisClient
 from .schema import ClaudeAnalysisOutput
+from .sentiment_label import score_to_label
 from ..db.models import AnalysisResult, Article
 
 log = structlog.get_logger()
@@ -160,6 +161,8 @@ class AnalysisWorker:
             article_id=article.id,
             sentiment=output.sentiment,
             sentiment_score=float(output.sentiment_score),
+            # 감성 점수 → 5단계 라벨 변환 (TASK-008)
+            sentiment_label=score_to_label(float(output.sentiment_score)),
             sector_tags=output.sector_tags,
             keywords=output.keywords,
             summary=output.summary,

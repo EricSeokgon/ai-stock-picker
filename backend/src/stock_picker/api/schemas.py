@@ -24,6 +24,8 @@ class RecommendationItem(BaseModel):
     momentum_score: float
     anomaly_score: float
     reasoning: str
+    # Claude Haiku가 생성한 한국어 추천 근거 (TASK-004, nullable — 하위 호환성 유지)
+    explanation: str | None = None
 
 
 class RecommendationsResponse(BaseModel):
@@ -49,6 +51,8 @@ class NewsItem(BaseModel):
     title: str
     summary: str | None = None
     sentiment: str | None = None
+    # 감성 5단계 라벨 (TASK-009, nullable — 하위 호환성 유지)
+    sentiment_label: str | None = None
     source: str
     url: str
     published_at: datetime
@@ -108,5 +112,26 @@ class RecommendationDetailResponse(BaseModel):
     momentum_score: float
     anomaly_score: float
     reasoning: str
+    # Claude Haiku가 생성한 한국어 추천 근거 (TASK-004, nullable — 하위 호환성 유지)
+    explanation: str | None = None
     contributing_news: list[ContributingNewsItem]
     disclaimer: str = DISCLAIMER
+
+
+# ---------------------------------------------------------------------------
+# 추천 히스토리 스키마 (TASK-005+006)
+# ---------------------------------------------------------------------------
+
+
+class DailyRecommendations(BaseModel):
+    """날짜별 추천 그룹"""
+
+    date: str  # YYYY-MM-DD
+    recommendations: list[RecommendationItem]
+
+
+class RecommendationHistoryResponse(BaseModel):
+    """추천 히스토리 응답 (days일간 날짜별 그룹)"""
+
+    days: int
+    groups: list[DailyRecommendations]

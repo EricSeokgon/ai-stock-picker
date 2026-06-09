@@ -12,6 +12,7 @@ from ..scoring.engine import calculate_stock_score, rank_stocks
 from ..scoring.reasoning import generate_reasoning
 from .aggregator import StockAggregator
 from .cache import RecommendationCache
+from .explanation import generate_explanation
 
 log = structlog.get_logger()
 
@@ -128,6 +129,25 @@ class RecommendationService:
                 top_article_summary=detail.get("top_summary"),
             )
 
+            # 설명 생성 (실패해도 파이프라인 중단 없음 — TASK-003)
+            score_breakdown = {
+                "sentiment_score": detail["sentiment_score"],
+                "volume_score": detail["volume_score"],
+                "momentum_score": detail["momentum_score"],
+                "anomaly_score": detail["anomaly_score"],
+            }
+            explanation = await generate_explanation(
+                krx_code=krx_code,
+                score_breakdown=score_breakdown,
+                top_summary=detail.get("top_summary", ""),
+            )
+            if explanation is not None:
+                log.info("설명 생성 완료 — krx_code=%s", krx_code)
+            else:
+                # 폴백: reasoning 텍스트를 explanation으로 사용
+                explanation = reasoning
+                log.warning("설명 생성 실패, 폴백 적용 — krx_code=%s", krx_code)
+
             rec = {
                 "rank": rank,
                 "krx_code": krx_code,
@@ -137,6 +157,7 @@ class RecommendationService:
                 "momentum_score": round(detail["momentum_score"], 3),
                 "anomaly_score": round(detail["anomaly_score"], 3),
                 "reasoning": reasoning,
+                "explanation": explanation,
                 "trade_date": today.isoformat(),
             }
             recommendations.append(rec)
@@ -177,6 +198,7 @@ class RecommendationService:
                 momentum_score=rec["momentum_score"],
                 anomaly_score=rec["anomaly_score"],
                 reasoning=rec.get("reasoning"),
+                explanation=rec.get("explanation"),
             )
             session.add(db_rec)
 

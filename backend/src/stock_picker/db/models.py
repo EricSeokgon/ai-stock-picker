@@ -98,6 +98,8 @@ class AnalysisResult(Base):
     sentiment: Mapped[str] = mapped_column(String(20), nullable=False)
     # 감성 점수: -1.0 ~ 1.0 범위 (정밀도 4, 소수점 3자리)
     sentiment_score: Mapped[float] = mapped_column(Numeric(4, 3), nullable=False)
+    # 감성 5단계 라벨: 매우긍정/긍정/중립/부정/매우부정 (TASK-008, 마이그레이션 0009)
+    sentiment_label: Mapped[str | None] = mapped_column(String(20), nullable=True)
     # 섹터 태그: PostgreSQL TEXT 배열
     sector_tags: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
     keywords: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
@@ -171,6 +173,8 @@ class Recommendation(Base):
     momentum_score: Mapped[float] = mapped_column(Numeric(6, 3), nullable=False, default=0)
     anomaly_score: Mapped[float] = mapped_column(Numeric(6, 3), nullable=False, default=0)
     reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Claude Haiku가 생성한 한국어 추천 근거 텍스트 (TASK-002, 마이그레이션 0009)
+    explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
     computed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

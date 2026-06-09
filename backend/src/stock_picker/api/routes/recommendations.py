@@ -1,6 +1,6 @@
-# 추천 엔드포인트 - 당일 Top 10 추천 리스트 반환 + 종목 추천 근거 상세
+# 추천 엔드포인트 - 당일 Top 10 추천 리스트 반환 + 종목 추천 근거 상세 + 히스토리
 import json
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,8 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from stock_picker.api.deps import get_cache, get_session
 from stock_picker.api.schemas import (
     ContributingNewsItem,
+    DailyRecommendations,
     PreparingResponse,
     RecommendationDetailResponse,
+    RecommendationHistoryResponse,
     RecommendationItem,
     RecommendationsResponse,
 )
@@ -146,6 +148,65 @@ async def get_recommendations(
     )
 
 
+@router.get("/history", response_model=RecommendationHistoryResponse)
+async def get_recommendation_history(
+    days: int = Query(default=7, ge=1, le=90, description="조회할 기간 (1~90일)"),
+    session: AsyncSession = Depends(get_session),
+) -> RecommendationHistoryResponse:
+    """추천 히스토리 조회 — 최근 N일간 날짜별 그룹.
+
+    # @MX:NOTE: [AUTO] /history는 /{krx_code} 보다 먼저 등록해야 경로 충돌 없음
+
+    공개 엔드포인트 (인증 불필요).
+
+    Args:
+        days: 조회 기간 (기본 7, 최대 90일)
+        session: DB 세션 의존성
+
+    Returns:
+        RecommendationHistoryResponse: 날짜별 추천 그룹 목록
+    """
+    since_dt = datetime.now(tz=timezone.utc) - timedelta(days=days)
+
+    stmt = (
+        select(Recommendation)
+        .where(Recommendation.trade_date >= since_dt)
+        .order_by(Recommendation.trade_date.desc(), Recommendation.rank.asc())
+    )
+    result = await session.execute(stmt)
+    recs = result.scalars().all()
+
+    # 날짜별 그룹화 (YYYY-MM-DD 키)
+    groups_map: dict[str, list[RecommendationItem]] = {}
+    for rec in recs:
+        trade_date_val = rec.trade_date
+        if hasattr(trade_date_val, "date"):
+            date_str = trade_date_val.date().isoformat()
+        else:
+            date_str = str(trade_date_val)[:10]
+
+        item = RecommendationItem(
+            rank=rec.rank,
+            krx_code=rec.krx_code,
+            total_score=float(rec.total_score),
+            sentiment_score=float(rec.sentiment_score),
+            volume_score=float(rec.volume_score),
+            momentum_score=float(rec.momentum_score),
+            anomaly_score=float(rec.anomaly_score),
+            reasoning=rec.reasoning or "",
+            explanation=rec.explanation,
+        )
+        groups_map.setdefault(date_str, []).append(item)
+
+    # 날짜 내림차순 정렬된 그룹 목록 구성
+    groups = [
+        DailyRecommendations(date=date_str, recommendations=items)
+        for date_str, items in sorted(groups_map.items(), reverse=True)
+    ]
+
+    return RecommendationHistoryResponse(days=days, groups=groups)
+
+
 @router.get("/{krx_code}", response_model=RecommendationDetailResponse)
 async def get_recommendation_detail(
     krx_code: str,
@@ -210,6 +271,10 @@ async def get_recommendation_detail(
         else rec.trade_date
     )
 
+    # explanation: 구 데이터에 없을 수 있으므로 getattr로 안전하게 접근
+    _expl_raw = getattr(rec, "explanation", None)
+    explanation_val = _expl_raw if isinstance(_expl_raw, str) else None
+
     return RecommendationDetailResponse(
         krx_code=rec.krx_code,
         trade_date=trade_date,
@@ -219,5 +284,6 @@ async def get_recommendation_detail(
         momentum_score=float(rec.momentum_score),
         anomaly_score=float(rec.anomaly_score),
         reasoning=rec.reasoning or "",
+        explanation=explanation_val,
         contributing_news=contributing_news,
     )

@@ -65,4 +65,26 @@ describe('NewsFeed', () => {
     render(<NewsFeed news={neutralNews} />);
     expect(screen.getByLabelText('감성: 중립')).toBeInTheDocument();
   });
+
+  it('sentiment_label이 있을 때 5단계 한국어 배지를 표시한다', () => {
+    const labelledNews: NewsItem[] = [
+      { ...mockNews[0], sentiment_label: '매우긍정', url: 'https://example.com/4' },
+      { ...mockNews[1], sentiment_label: '매우부정', url: 'https://example.com/5' },
+    ];
+    render(<NewsFeed news={labelledNews} />);
+    expect(screen.getByLabelText('감성: 매우긍정')).toBeInTheDocument();
+    expect(screen.getByText('매우긍정')).toBeInTheDocument();
+    expect(screen.getByLabelText('감성: 매우부정')).toBeInTheDocument();
+    expect(screen.getByText('매우부정')).toBeInTheDocument();
+  });
+
+  it('sentiment_label이 null일 때 기존 sentiment 배지로 폴백한다', () => {
+    const fallbackNews: NewsItem[] = [
+      { ...mockNews[0], sentiment: 'positive', sentiment_label: null, url: 'https://example.com/6' },
+    ];
+    render(<NewsFeed news={fallbackNews} />);
+    // sentiment_label null이므로 기존 긍정 배지가 표시되어야 함
+    expect(screen.getByLabelText('감성: 긍정')).toBeInTheDocument();
+    expect(screen.getByText('긍정')).toBeInTheDocument();
+  });
 });

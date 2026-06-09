@@ -21,6 +21,7 @@ import Portfolio from './pages/Portfolio';
 import Backtest from './pages/Backtest';
 import Watchlist from './pages/Watchlist';
 import Settings from './pages/Settings';
+import History from './pages/History';
 
 const API_BASE_DASHBOARD = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
@@ -114,6 +115,7 @@ function NavBar() {
         style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}
       >
         <Link to="/" style={linkStyle} onClick={handleLinkClick}>홈</Link>
+        <Link to="/history" style={linkStyle} onClick={handleLinkClick}>히스토리</Link>
         <Link to="/portfolio" style={linkStyle} onClick={handleLinkClick}>포트폴리오</Link>
         <Link to="/backtest" style={linkStyle} onClick={handleLinkClick}>백테스트</Link>
         {isAuthenticated && <Link to="/watchlist" style={linkStyle} onClick={handleLinkClick}>관심 목록</Link>}
@@ -403,6 +405,7 @@ export default function App() {
         <Route path="/settings" element={
           <ProtectedRoute><Settings /></ProtectedRoute>
         } />
+        <Route path="/history" element={<History />} />
       </Routes>
     </div>
   );

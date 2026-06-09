@@ -67,6 +67,8 @@ export interface NewsItem {
   title: string;
   summary: string | null;
   sentiment: string | null;
+  // 5단계 한국어 감성 레이블 (백엔드 Phase 2+에서 제공)
+  sentiment_label?: string | null;
   source: string;
   url: string;
   published_at: string;

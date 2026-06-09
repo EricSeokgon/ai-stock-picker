@@ -16,6 +16,10 @@ dependencies = [
     "atoma>=0.0.17",
     "pydantic-settings>=2.0,<3.0",
     "structlog>=24.0",
+    "python-jose[cryptography]>=3.3",
+    "bcrypt>=4.0",
+    "python-telegram-bot>=21.0",
+    "pydantic[email]>=2.13.4",
 ]
 
 [project.optional-dependencies]

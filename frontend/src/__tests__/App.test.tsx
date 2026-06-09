@@ -2,7 +2,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import App from '../App';
+import { MemoryRouter } from 'react-router-dom';
+
+// AuthContext mock — JSX 없이 순수 함수로 작성 (hoisting 안전)
+vi.mock('../auth/AuthContext', () => ({
+  AuthProvider: ({ children }: { children: unknown }) => children,
+  useAuth: () => ({
+    user: null,
+    token: null,
+    isAuthenticated: false,
+    login: vi.fn(),
+    register: vi.fn(),
+    logout: vi.fn(),
+  }),
+}));
+
+// PortfolioSummary mock (인증 필요 없는 테스트 환경)
+vi.mock('../components/PortfolioSummary', () => ({
+  PortfolioSummary: () => null,
+}));
 
 // API 클라이언트 전체 mock
 vi.mock('../api/client', () => ({
@@ -12,6 +30,7 @@ vi.mock('../api/client', () => ({
   fetchRecommendationDetail: vi.fn(),
 }));
 
+import App from '../App';
 import {
   fetchRecommendations,
   fetchNews,
@@ -94,6 +113,15 @@ const mockDetail = {
   disclaimer: '이 정보는 투자 참고용입니다.',
 };
 
+// App은 Routes를 사용하므로 MemoryRouter로 감싸야 함
+function renderApp() {
+  return render(
+    <MemoryRouter initialEntries={['/']}>
+      <App />
+    </MemoryRouter>
+  );
+}
+
 describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -108,26 +136,26 @@ describe('App', () => {
     (fetchRecommendations as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
     (fetchNews as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
     (fetchSectorTrends as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
-    render(<App />);
+    renderApp();
     expect(screen.getByText('데이터를 불러오는 중...')).toBeInTheDocument();
   });
 
-  it('데이터 로드 후 대시보드 제목을 표시한다', async () => {
-    render(<App />);
+  it('데이터 로드 후 네비게이션이 표시된다', async () => {
+    renderApp();
     await waitFor(() => {
-      expect(screen.getByText('한국 주식 추천 대시보드')).toBeInTheDocument();
+      expect(screen.getByText(/한국 주식 추천/)).toBeInTheDocument();
     });
   });
 
   it('데이터 로드 후 섹터 트렌드 섹션이 표시된다', async () => {
-    render(<App />);
+    renderApp();
     await waitFor(() => {
       expect(screen.getByText('섹터 트렌드')).toBeInTheDocument();
     });
   });
 
   it('추천 종목 목록을 표시한다', async () => {
-    render(<App />);
+    renderApp();
     await waitFor(() => {
       expect(screen.getByText('005930')).toBeInTheDocument();
       expect(screen.getByText('000660')).toBeInTheDocument();
@@ -135,7 +163,7 @@ describe('App', () => {
   });
 
   it('종목 클릭 시 StockDetail 모달이 표시된다', async () => {
-    render(<App />);
+    renderApp();
     // 데이터 로드 완료 후 목록 탐색
     let firstItem: Element | null = null;
     await waitFor(() => {
@@ -151,7 +179,7 @@ describe('App', () => {
   });
 
   it('모달 닫기 후 모달이 사라진다', async () => {
-    render(<App />);
+    renderApp();
     let firstItem: Element | null = null;
     await waitFor(() => {
       const list = screen.getByRole('list', { name: '주식 추천 목록' });
@@ -174,7 +202,7 @@ describe('App', () => {
     (fetchRecommendations as ReturnType<typeof vi.fn>).mockRejectedValue(
       new Error('서버에 연결할 수 없습니다'),
     );
-    render(<App />);
+    renderApp();
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
     });

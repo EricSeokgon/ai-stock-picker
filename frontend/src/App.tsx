@@ -1,5 +1,7 @@
-// 메인 대시보드 컴포넌트
+// 메인 앱 — 라우팅 및 네비게이션 포함
 import { useEffect, useState } from 'react';
+import { Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { fetchRecommendations, fetchNews, fetchSectorTrends } from './api/client';
 import type { RecommendationsResponse, NewsResponse, SectorTrendsResponse, RecommendationItem } from './types';
 import { DataPreparingState } from './components/DataPreparingState';
@@ -9,6 +11,11 @@ import { Disclaimer } from './components/Disclaimer';
 import { SectorTrendChart } from './components/SectorTrendChart';
 import { StockDetail } from './components/StockDetail';
 import { EtfRecommendationList } from './components/EtfRecommendationList';
+import { PortfolioSummary } from './components/PortfolioSummary';
+import { useAuth } from './auth/AuthContext';
+import Login from './pages/Login';
+import Portfolio from './pages/Portfolio';
+import Backtest from './pages/Backtest';
 
 type LoadingState = 'loading' | 'ready' | 'error';
 
@@ -28,7 +35,74 @@ function isRecommendationsData(
   return 'recommendations' in data;
 }
 
-export default function App() {
+// 인증이 필요한 라우트 — 미로그인 시 /login으로 이동
+function ProtectedRoute({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+// 상단 네비게이션 바
+function NavBar() {
+  const { isAuthenticated, user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    logout();
+    void navigate('/');
+  }
+
+  const navStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1rem',
+    marginBottom: '1.5rem',
+    paddingBottom: '0.75rem',
+    borderBottom: '2px solid #1976d2',
+    flexWrap: 'wrap',
+  };
+
+  const linkStyle: React.CSSProperties = {
+    color: '#1976d2',
+    textDecoration: 'none',
+    fontWeight: 500,
+    fontSize: '0.9rem',
+  };
+
+  return (
+    <nav style={navStyle} aria-label="주 메뉴">
+      <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#0d47a1', marginRight: '0.5rem' }}>
+        한국 주식 추천
+      </span>
+      <Link to="/" style={linkStyle}>홈</Link>
+      <Link to="/portfolio" style={linkStyle}>포트폴리오</Link>
+      <Link to="/backtest" style={linkStyle}>백테스트</Link>
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {isAuthenticated ? (
+          <>
+            <span style={{ fontSize: '0.8rem', color: '#666' }}>{user?.email}</span>
+            <button
+              onClick={handleLogout}
+              style={{
+                padding: '0.3rem 0.7rem', border: '1px solid #ccc', borderRadius: '4px',
+                background: '#fff', cursor: 'pointer', fontSize: '0.8rem',
+              }}
+            >
+              로그아웃
+            </button>
+          </>
+        ) : (
+          <Link to="/login" style={{ ...linkStyle, padding: '0.3rem 0.7rem', border: '1px solid #1976d2', borderRadius: '4px' }}>
+            로그인
+          </Link>
+        )}
+      </div>
+    </nav>
+  );
+}
+
+// 메인 대시보드 컴포넌트
+function Dashboard() {
   const [loadingState, setLoadingState] = useState<LoadingState>('loading');
   const [recommendations, setRecommendations] = useState<RecommendationsResponse | null>(null);
   const [newsData, setNewsData] = useState<NewsResponse | null>(null);
@@ -82,23 +156,11 @@ export default function App() {
   const etfItems = allRecommendations.filter((item) => isEtfCode(item.krx_code));
 
   return (
-    <div
-      style={{
-        maxWidth: '1100px',
-        margin: '0 auto',
-        padding: '1.5rem',
-        fontFamily: "'Segoe UI', 'Apple SD Gothic Neo', sans-serif",
-      }}
-    >
-      {/* 헤더 */}
-      <header style={{ marginBottom: '2rem', borderBottom: '2px solid #1976d2', paddingBottom: '1rem' }}>
-        <h1 style={{ margin: 0, fontSize: '1.75rem', color: '#0d47a1', fontWeight: 800 }}>
-          한국 주식 추천 대시보드
-        </h1>
-        <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: '#666' }}>
-          AI 기반 한국 주식 및 ETF 추천 시스템
-        </p>
-      </header>
+    <div>
+      {/* 포트폴리오 요약 위젯 */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <PortfolioSummary />
+      </div>
 
       {/* 로딩 상태 */}
       {loadingState === 'loading' && (
@@ -181,6 +243,32 @@ export default function App() {
           onClose={() => setSelectedKrxCode(null)}
         />
       )}
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <div
+      style={{
+        maxWidth: '1100px',
+        margin: '0 auto',
+        padding: '1.5rem',
+        fontFamily: "'Segoe UI', 'Apple SD Gothic Neo', sans-serif",
+      }}
+    >
+      <NavBar />
+
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/portfolio" element={
+          <ProtectedRoute><Portfolio /></ProtectedRoute>
+        } />
+        <Route path="/backtest" element={
+          <ProtectedRoute><Backtest /></ProtectedRoute>
+        } />
+      </Routes>
     </div>
   );
 }

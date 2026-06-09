@@ -23,11 +23,30 @@
 - **ETF 추천**: 섹터 트렌드 기반 자동 ETF 매칭
 - **근거 기반 설명**: 각 추천에 대한 상세 근거 제시
 
+### 실시간 시세 스트리밍 (Phase 4 신규)
+- **WebSocket 기반**: 웹소켓으로 종목별 실시간 시세 스트림 (10초 주기)
+- **자동 재연결**: 네트워크 단절 시 자동 재연결 기능
+- **자원 회수**: 구독 해지 시 즉시 리소스 정리
+
+### 종목 관심 목록 (Phase 4 신규)
+- **보관 기능**: 관심 있는 종목을 즐겨찾기로 저장
+- **관리 기능**: 추가/삭제 기능 및 중복 방지
+- **JWT 인증**: 사용자별 독립적인 관심 목록 관리
+
+### 포트폴리오 AI 분석 (Phase 4 신규)
+- **Claude AI 분석**: claude-haiku-4-5 모델로 포트폴리오 상세 분석
+- **한국어 응답**: 투자 전략, 리스크 요인, 개선 제안 제시
+- **면책 고지 포함**: 분석 결과와 함께 투자 책임 고지 제공
+- **1회성 응답**: 분석 요청 시마다 최신 AI 분석 수행
+
 ### 웹 대시보드
 - **실시간 추천**: Top 10 주식 및 ETF 추천 리스트
+- **실시간 시세**: 관심 목록 및 포트폴리오 종목의 실시간 가격 표시 (색상 표기: 상승=빨강, 하락=파랑)
 - **상세 분석**: 종목별 추천 근거, 기여 뉴스, 점수 분해
 - **섹터 트렌드**: Recharts 시계열 차트로 섹터별 뉴스 흐름 시각화
 - **뉴스 피드**: 감성 배지가 포함된 최신 기사 피드
+- **포트폴리오 관리**: 실시간 종목 시세 포함 포트폴리오 성과 분석
+- **AI 분석**: 포트폴리오의 AI 기반 상세 분석 결과 표시
 - **투명한 면책 고지**: 모든 화면에 투자 책임 면책 고지 표시
 
 ## 아키텍처
@@ -203,6 +222,20 @@ curl -X POST http://localhost:8000/health
 | `POST` | `/auth/refresh` | 토큰 갱신 (refresh_token) → 새 액세스 토큰 |
 | `GET` | `/auth/me` | 현재 사용자 정보 조회 (인증 필수) |
 
+### 실시간 시세 (Real-time Price)
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| `WS` | `/ws/prices/{krx_code}` | 실시간 시세 스트림 (10초 주기) |
+
+### 관심 목록 (Watchlist)
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| `GET` | `/watchlist` | 관심 목록 조회 (인증 필수) |
+| `POST` | `/watchlist` | 종목 추가 (krx_code) (인증 필수) |
+| `DELETE` | `/watchlist/{krx_code}` | 종목 삭제 (인증 필수) |
+
 ### 포트폴리오 관리 (Portfolio)
 
 | 메서드 | 경로 | 설명 |
@@ -214,6 +247,7 @@ curl -X POST http://localhost:8000/health
 | `POST` | `/portfolios/{id}/holdings` | 종목 추가 |
 | `DELETE` | `/portfolios/{id}/holdings/{holding_id}` | 종목 제거 |
 | `GET` | `/portfolios/{id}/performance` | 포트폴리오 성과 분석 |
+| `POST` | `/portfolios/{id}/ai-analysis` | 포트폴리오 AI 분석 (claude-haiku-4-5) (Phase 4 신규) |
 
 ### 백테스팅 (Backtesting)
 
@@ -312,9 +346,17 @@ ai-stock-picker/
 │   │   │   ├── etf_recommender.py
 │   │   │   ├── cache.py          # Redis 캐시
 │   │   │   └── trending.py       # 섹터 트렌드
+│   │   ├── realtime/             # 실시간 시세 스트리밍 (Phase 4 신규)
+│   │   │   ├── price_feed.py     # FinanceDataReader 가격 조회
+│   │   │   └── ws_router.py      # WebSocket 라우터
+│   │   ├── watchlist/            # 관심 목록 (Phase 4 신규)
+│   │   │   ├── models.py         # WatchlistItem ORM
+│   │   │   ├── service.py        # CRUD 및 중복 방지
+│   │   │   └── schemas.py        # API 스키마
 │   │   ├── portfolio/            # 포트폴리오 (Phase C)
 │   │   │   ├── models.py         # Portfolio, PortfolioHolding
 │   │   │   ├── service.py        # CRUD 및 성과 계산
+│   │   │   ├── ai_analysis.py    # AI 분석 (Phase 4 신규)
 │   │   │   └── schemas.py        # API 스키마
 │   │   ├── backtest/             # 백테스팅 (Phase D)
 │   │   │   ├── models.py         # BacktestRun, BacktestDailyResult
@@ -356,10 +398,15 @@ ai-stock-picker/
 │   │   │   ├── EtfRecommendationList.tsx
 │   │   │   ├── NewsFeed.tsx
 │   │   │   ├── Disclaimer.tsx
-│   │   │   └── DataPreparingState.tsx
+│   │   │   ├── DataPreparingState.tsx
+│   │   │   ├── LivePriceBadge.tsx     # 실시간 시세 배지 (Phase 4 신규)
+│   │   │   └── WatchlistStar.tsx      # 관심 목록 토글 (Phase 4 신규)
+│   │   ├── hooks/
+│   │   │   └── useLivePrice.ts       # WebSocket 시세 구독 훅 (Phase 4 신규)
 │   │   ├── pages/
 │   │   │   ├── Login.tsx         # 인증 페이지 (Phase E)
-│   │   │   ├── Portfolio.tsx     # 포트폴리오 페이지
+│   │   │   ├── Portfolio.tsx     # 포트폴리오 페이지 + 실시간 시세 + AI 분석 (Phase 4 강화)
+│   │   │   ├── Watchlist.tsx     # 관심 목록 페이지 (Phase 4 신규)
 │   │   │   ├── Backtest.tsx      # 백테스트 결과
 │   │   │   └── Home.tsx          # 추천 대시보드
 │   │   ├── contexts/
@@ -528,7 +575,7 @@ MIT License - 자유롭게 사용, 수정, 배포 가능
 ## 로드맵
 
 - **Phase 1** (완료): MVP - 일일 추천, 대시보드, 뉴스 분석
-- **Phase 2** (현재, 2026-06-09 완료):
+- **Phase 2** (완료, 2026-06-09):
   - Phase A: JWT 기반 사용자 인증 시스템
   - Phase B: 텔레그램 봇 알림 통합
   - Phase C: 포트폴리오 시뮬레이터
@@ -538,4 +585,8 @@ MIT License - 자유롭게 사용, 수정, 배포 가능
   - 포트폴리오 AI 최적화
   - 리스크 분석 및 상관관계 매트릭스
   - 해외 자산(미국주식, 암호화폐) 지원
-  - 웹소켓 실시간 시세 스트리밍
+- **Phase 4** (현재, 2026-06-09 완료):
+  - Phase A: WebSocket 기반 실시간 시세 스트리밍
+  - Phase B: 종목 관심 목록 (관심 종목 저장 기능)
+  - Phase C: 포트폴리오 AI 분석 (Claude haiku-4-5)
+  - Phase D: 프론트엔드 강화 (실시간 시세 표시, 관심 목록 관리)

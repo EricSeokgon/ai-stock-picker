@@ -48,3 +48,57 @@ export async function removeFromWatchlist(token: string, krxCode: string): Promi
   });
   if (!res.ok) throw new Error(`관심 목록 삭제 실패: ${res.status}`);
 }
+
+// 목표가 알림 타입 정의
+export interface WatchlistAlertCreate {
+  krx_code: string;
+  target_price: number;
+  direction: 'above' | 'below';
+}
+
+export interface WatchlistAlert {
+  id: number;
+  krx_code: string;
+  target_price: number;
+  direction: 'above' | 'below';
+  is_active: boolean;
+  triggered_at: string | null;
+}
+
+// @MX:ANCHOR: [AUTO] 목표가 알림 API 진입점 — Watchlist 페이지에서 사용
+// @MX:REASON: 알림 CRUD가 Watchlist 페이지와 테스트에서 공유됨
+
+// 활성 알림 목록 조회
+export async function getAlerts(token: string): Promise<WatchlistAlert[]> {
+  const res = await fetch(`${API_BASE}/watchlist/alerts`, {
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error(`알림 목록 조회 실패: ${res.status}`);
+  return res.json() as Promise<WatchlistAlert[]>;
+}
+
+// 알림 생성
+export async function createAlert(
+  token: string,
+  data: WatchlistAlertCreate,
+): Promise<WatchlistAlert> {
+  const res = await fetch(`${API_BASE}/watchlist/alerts`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { detail?: string };
+    throw new Error(err.detail ?? `알림 생성 실패: ${res.status}`);
+  }
+  return res.json() as Promise<WatchlistAlert>;
+}
+
+// 알림 삭제
+export async function deleteAlert(token: string, alertId: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/watchlist/alerts/${alertId}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error(`알림 삭제 실패: ${res.status}`);
+}

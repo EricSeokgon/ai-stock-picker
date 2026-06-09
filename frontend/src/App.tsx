@@ -17,6 +17,7 @@ import Login from './pages/Login';
 import Portfolio from './pages/Portfolio';
 import Backtest from './pages/Backtest';
 import Watchlist from './pages/Watchlist';
+import Settings from './pages/Settings';
 
 type LoadingState = 'loading' | 'ready' | 'error';
 
@@ -79,6 +80,7 @@ function NavBar() {
       <Link to="/portfolio" style={linkStyle}>포트폴리오</Link>
       <Link to="/backtest" style={linkStyle}>백테스트</Link>
       {isAuthenticated && <Link to="/watchlist" style={linkStyle}>관심 목록</Link>}
+      {isAuthenticated && <Link to="/settings" style={linkStyle}>설정</Link>}
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
         {isAuthenticated ? (
           <>
@@ -272,6 +274,9 @@ export default function App() {
         } />
         <Route path="/watchlist" element={
           <ProtectedRoute><Watchlist /></ProtectedRoute>
+        } />
+        <Route path="/settings" element={
+          <ProtectedRoute><Settings /></ProtectedRoute>
         } />
       </Routes>
     </div>

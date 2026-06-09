@@ -5,6 +5,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     Date,
+    Float,
     String,
     Text,
     Integer,
@@ -277,6 +278,52 @@ class WatchlistItem(Base):
 
     # 동일 사용자가 같은 종목을 중복 추가 방지
     __table_args__ = (UniqueConstraint("user_id", "krx_code", name="uq_watchlist_user_krx"),)
+
+
+# ── Phase F: 알림 시스템 ───────────────────────────────────────────────────────
+
+class WatchlistAlert(Base):
+    """관심종목 가격 알림 테이블 — 목표가 도달 시 알림 발송"""
+
+    # @MX:ANCHOR: [AUTO] 가격 알림 핵심 엔티티 — 알림 서비스/스케줄러에서 참조
+    # @MX:REASON: alert_service.py, jobs.py(check_price_alerts), alert_router.py 등 3개 이상에서 사용
+
+    __tablename__ = "watchlist_alerts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    krx_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    # 목표가: 알림 발동 기준 가격
+    target_price: Mapped[float] = mapped_column(Float, nullable=False)
+    # direction: "above" (이상) 또는 "below" (이하)
+    direction: Mapped[str] = mapped_column(String(5), nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    # triggered_at: 알림 발동 시각 (발동 전 NULL)
+    triggered_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class EmailSubscription(Base):
+    """이메일 구독 테이블 — 주간 요약 및 가격 알림 메일 수신"""
+
+    __tablename__ = "email_subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    # 사용자당 이메일 구독 1개 제한
+    __table_args__ = (UniqueConstraint("user_id", name="uq_email_sub_user"),)
 
 
 # ── Phase D: 백테스팅 ──────────────────────────────────────────────────────────

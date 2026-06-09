@@ -8,13 +8,16 @@ import pytest
 class TestSchedulerIntradayJob:
     """장중 30분 증분 잡 등록 테스트"""
 
-    def test_setup_scheduler_registers_two_jobs(self):
-        """setup_scheduler()는 정확히 2개의 잡을 등록해야 한다"""
+    def test_setup_scheduler_registers_core_jobs(self):
+        """setup_scheduler()는 핵심 잡(daily, intraday, 가격알림, 주간메일)을 등록해야 한다"""
         from stock_picker.scheduler.jobs import setup_scheduler
 
         scheduler = setup_scheduler()
-        jobs = scheduler.get_jobs()
-        assert len(jobs) == 2
+        job_ids = {job.id for job in scheduler.get_jobs()}
+        assert "daily_collection" in job_ids
+        assert "intraday_collection" in job_ids
+        assert "check_price_alerts" in job_ids
+        assert "weekly_email_summary" in job_ids
 
     def test_daily_collection_job_still_registered(self):
         """기존 일 배치 잡(daily_collection)이 유지되어야 한다"""

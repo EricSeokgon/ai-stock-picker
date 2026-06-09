@@ -11,11 +11,15 @@ vi.mock('../auth/AuthContext', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-// getWatchlist 모킹
+// getWatchlist, getAlerts 모킹
 const mockGetWatchlist = vi.fn<[], Promise<WatchlistItem[]>>();
+const mockGetAlerts = vi.fn<[], Promise<unknown[]>>();
 vi.mock('../api/watchlist', () => ({
   getWatchlist: () => mockGetWatchlist(),
   removeFromWatchlist: vi.fn(),
+  getAlerts: () => mockGetAlerts(),
+  createAlert: vi.fn(),
+  deleteAlert: vi.fn(),
 }));
 
 // LivePriceBadge 모킹 (WebSocket 방지)
@@ -41,6 +45,7 @@ describe('Watchlist', () => {
       token: 'test-token',
     });
     mockGetWatchlist.mockResolvedValue([]);
+    mockGetAlerts.mockResolvedValue([]);
   });
 
   it('미인증 상태면 /login으로 리다이렉트한다', () => {

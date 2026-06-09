@@ -23,13 +23,13 @@ SPEC: SPEC-STOCK-004
 
 | ID | 설명 | Feature | 주요 파일 | 상태 |
 |----|------|---------|----------|------|
-| TASK-001 | watchlist_alerts 테이블(direction/target_price/is_active/triggered_at) + Alembic 마이그레이션 (0007) | 가격 알림 | db/models.py, alembic/versions/0007_watchlist_alerts.py | todo |
-| TASK-002 | 가격 알림 서비스(생성/조회/삭제, 소유권 검증) | 가격 알림 | notifications/alert_service.py, notifications/schemas.py | todo |
-| TASK-003 | 가격 알림 라우터 POST/GET/DELETE /watchlist/alerts + 인증·401/403/404 처리 | 가격 알림 | notifications/alert_router.py, api/main.py | todo |
-| TASK-004 | 가격 점검 작업: 활성 알림 above/below 조건 평가 + 알림 단위 예외 격리 | 가격 알림 | scheduler/jobs.py, notifications/alert_service.py | todo |
-| TASK-005 | 조건 충족 시 텔레그램 1회 전송 + is_active=false + triggered_at 기록 + 텔레그램 미구독 안전 스킵 | 가격 알림 | scheduler/jobs.py, telegram/notifier.py(재사용) | todo |
-| TASK-006 | email_subscriptions 테이블(UNIQUE(user_id)) + Alembic 마이그레이션 (0008) | 이메일 | db/models.py, alembic/versions/0008_email_subscriptions.py | todo |
-| TASK-007 | SMTP 발송 모듈(smtplib+email) + plain text 한국어 템플릿(가격 도달·주간 요약) + 면책/해지 안내 + 실패 격리 | 이메일 | notifications/email_service.py | todo |
-| TASK-008 | 이메일 구독 라우터 POST/DELETE /notifications/email + 유효성(422)/인증(401) + 가격 도달 메일 트리거 연동 | 이메일 | notifications/email_router.py, scheduler/jobs.py | todo |
-| TASK-009 | 주간 요약 작업: 월요일 07:00 KST CronTrigger, 활성 구독자에게 상위 5개 추천 메일 발송 | 이메일 | scheduler/jobs.py, notifications/email_service.py | todo |
-| TASK-010 | 프론트: Watchlist 목표가 알림 추가·목록·삭제 UI + /settings 이메일 구독 토글 페이지 + 라우트·인증 가드 + 실패 롤백 | Frontend | pages/Watchlist.tsx, pages/Settings.tsx, 라우팅, API 클라이언트 | todo |
+| TASK-001 | watchlist_alerts 테이블(direction/target_price/is_active/triggered_at) + Alembic 마이그레이션 (0007) | 가격 알림 | db/models.py, alembic/versions/0007_watchlist_alerts.py | done |
+| TASK-002 | 가격 알림 서비스(생성/조회/삭제, 소유권 검증) | 가격 알림 | notifications/alert_service.py, notifications/schemas.py | done |
+| TASK-003 | 가격 알림 라우터 POST/GET/DELETE /watchlist/alerts + 인증·401/403/404 처리 | 가격 알림 | notifications/alert_router.py, api/main.py | done |
+| TASK-004 | 가격 점검 작업: 활성 알림 above/below 조건 평가 + 알림 단위 예외 격리 | 가격 알림 | scheduler/jobs.py, notifications/alert_service.py | done |
+| TASK-005 | 조건 충족 시 텔레그램 1회 전송 + is_active=false + triggered_at 기록 + 텔레그램 미구독 안전 스킵 | 가격 알림 | scheduler/jobs.py, telegram/notifier.py(재사용) | done |
+| TASK-006 | email_subscriptions 테이블(UNIQUE(user_id)) + Alembic 마이그레이션 (0008) | 이메일 | db/models.py, alembic/versions/0008_email_subscriptions.py | done |
+| TASK-007 | SMTP 발송 모듈(smtplib+email) + plain text 한국어 템플릿(가격 도달·주간 요약) + 면책/해지 안내 + 실패 격리 | 이메일 | notifications/email_service.py | done |
+| TASK-008 | 이메일 구독 라우터 POST/DELETE /notifications/email + 유효성(422)/인증(401) + 가격 도달 메일 트리거 연동 | 이메일 | notifications/email_router.py, scheduler/jobs.py | done |
+| TASK-009 | 주간 요약 작업: 월요일 07:00 KST CronTrigger, 활성 구독자에게 상위 5개 추천 메일 발송 | 이메일 | scheduler/jobs.py, notifications/email_service.py | done |
+| TASK-010 | 프론트: Watchlist 목표가 알림 추가·목록·삭제 UI + /settings 이메일 구독 토글 페이지 + 라우트·인증 가드 + 실패 롤백 | Frontend | pages/Watchlist.tsx, pages/Settings.tsx, 라우팅, API 클라이언트 | done |

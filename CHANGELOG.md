@@ -7,6 +7,94 @@
 
 ---
 
+## [0.7.0] - 2026-06-10
+
+### Added (Phase 7: AI 분석 고도화 및 추천 근거 투명성 — SPEC-STOCK-006)
+
+#### Phase A: Claude 추천 근거 설명
+- **자동 설명 생성**
+  - 추천 산출 시 Claude Haiku로 한국어 2~3문장 근거 자동 생성
+  - `recommendations.explanation` 컬럼 추가 (Text, nullable)
+  - 기존 규칙 기반 `reasoning` 필드와 별개로 관리
+
+- **설명 생성 안정성**
+  - Claude API 실패 시 자동 폴백 (파이프라인 중단 없음)
+  - 투자 권유/수익 보장 표현 프롬프트 제외
+
+#### Phase B: 추천 히스토리 조회
+- **히스토리 API**
+  - `GET /recommendations/history?days=N` (기본 7일, 범위 1~90일)
+  - 날짜별 그룹화된 과거 추천 목록 반환
+  - 공개 엔드포인트 (인증 불필요)
+  - 입력값 검증 및 오류 안전 처리
+
+- **DB 쿼리 최적화**
+  - `recommendations` 테이블 직접 조회
+  - `trade_date >= today - days` 필터링
+  - 최신 날짜 우선 정렬
+
+#### Phase C: 뉴스 감성 5단계 라벨
+- **감성 라벨 추가**
+  - `analysis_results.sentiment_label` 컬럼 추가 (String(20), nullable)
+  - 5단계 라벨: 매우긍정(≥0.6)/긍정(≥0.2)/중립(>-0.2)/부정(>-0.6)/매우부정(else)
+  - `sentiment_score` 기반 자동 매핑
+
+- **기존 필드 보존**
+  - `sentiment`(positive/negative/neutral) 필드 유지
+  - `sentiment_label`은 보완 필드로 작동
+
+#### Phase D: 히스토리 페이지
+- **History.tsx (신규)**
+  - 7/14/30일 기간 선택 탭
+  - 날짜별 그룹화된 추천 카드
+  - 종목·순위·점수·설명(explanation) 표시
+  - 로딩·오류 상태 처리
+
+#### Phase E: 뉴스 피드 한국어 배지
+- **NewsFeed.tsx 강화**
+  - `sentiment_label` 기반 한국어 배지 표시
+  - 5단계 색상 코딩 (매우긍정: 진한 녹색 ~ 매우부정: 진한 빨강)
+  - 기존 `sentiment` 배지 폴백 (label이 null일 때)
+
+### Technical Details
+
+#### 마이그레이션
+- **Alembic 0009**: 신규 컬럼 추가
+  - `recommendations.explanation` (Text, nullable)
+  - `analysis_results.sentiment_label` (String(20), nullable)
+
+#### 백엔드 코드 변경
+- `recommendation/explanation.py` (신규): Claude 설명 생성 로직
+- `analysis/sentiment_label.py` (신규): 감성 라벨 매핑 로직
+- `api/routes/recommendations.py`: 히스토리 엔드포인트 추가
+- `api/schemas.py`: 신규 필드 추가 (Optional)
+  - `RecommendationItem.explanation`
+  - `NewsItem.sentiment_label`
+  - `RecommendationHistoryResponse`(신규 스키마)
+
+#### 프론트엔드 코드 변경
+- `pages/History.tsx` (신규): 추천 히스토리 페이지
+- `components/RecommendationList.tsx`: `explanation` 필드 표시
+- `components/StockDetail.tsx`: `explanation` 표시
+- `components/NewsFeed.tsx`: 한국어 5단계 배지 추가
+
+#### 응답 스키마 호환성
+- 신규 필드는 모두 Optional (`= None`)
+- 기존 응답 구조 유지
+- 클라이언트는 선택적으로 처리 가능
+
+### 테스트
+- 백엔드 테스트 44건 추가 (설명 생성·히스토리·감성 라벨)
+- 프론트엔드 테스트 9건 추가 (히스토리 페이지·배지 렌더링)
+- **총 테스트**: 327건 (커버리지 90.2%)
+
+### 면책 및 안전
+- 모든 추천·히스토리 화면에 기존 투자 면책 고지 유지
+- 자동 매매·주문 기능 제외 (영구)
+- Claude 설명 실패 시 파이프라인 중단 금지
+
+---
+
 ## [0.6.0] - 2026-06-09
 
 ### Added (Phase 6: 성능 최적화 & UX 고도화 — SPEC-STOCK-005)

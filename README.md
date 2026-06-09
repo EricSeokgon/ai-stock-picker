@@ -4,7 +4,14 @@
 
 ## 핵심 기능
 
-### 성능 최적화 & UX 고도화 (Phase 6 신규 — SPEC-STOCK-005)
+### 추천 근거 설명 & 히스토리 & 감성 라벨 (Phase 7 신규 — SPEC-STOCK-006)
+- **Claude 자동 설명 생성**: 각 추천에 대해 Claude Haiku로 한국어 2~3문장 근거 자동 생성
+- **추천 히스토리 조회**: `GET /recommendations/history?days=N` (기본 7일, 범위 1~90일)로 날짜별 추천 기록 조회
+- **감성 5단계 라벨**: 뉴스 분석 결과에 매우긍정/긍정/중립/부정/매우부정 5단계 라벨 추가 (`sentiment_label`)
+- **히스토리 페이지**: 7/14/30일 기간 선택, 날짜별 그룹화된 과거 추천 목록 표시
+- **뉴스 감성 배지**: NewsFeed에 한국어 5단계 배지 표시, 기존 감성 배지 폴백 유지
+
+### 성능 최적화 & UX 고도화 (Phase 6 — SPEC-STOCK-005)
 - **Redis 파생 캐시**: 추천 결과 캐싱 (`recommendations:top:{limit}`, `recommendations:sector:{sector}`)
 - **가격 Redis 캐시**: 실시간 시세 캐싱 (`price:{krx_code}`, TTL 60s)
 - **필터링 & 정렬**: `GET /recommendations` with `limit`, `sector`, `sort`, `min_score` 파라미터
@@ -290,8 +297,9 @@ curl -X POST http://localhost:8000/health
 
 | 메서드 | 경로 | 설명 | 응답 |
 |--------|------|------|------|
-| `GET` | `/recommendations` | Top 10 주식 추천 (필터 지원) | `{ stocks: [ { krx_code, name, score, reason, ... } ], timestamp }` |
-| `GET` | `/recommendations/{krx_code}` | 종목별 추천 근거 상세 | `{ krx_code, analysis, contributing_news, ... }` |
+| `GET` | `/recommendations` | Top 10 주식 추천 (필터 지원) | `{ stocks: [ { krx_code, name, score, reason, explanation, ... } ], timestamp }` |
+| `GET` | `/recommendations/{krx_code}` | 종목별 추천 근거 상세 | `{ krx_code, analysis, contributing_news, explanation, ... }` |
+| `GET` | `/recommendations/history?days=N` | 추천 히스토리 조회 (기본 7일) | `{ history: [ { trade_date, recommendations: [...] } ] }` |
 
 **필터 파라미터** (SPEC-STOCK-005):
 | 파라미터 | 타입 | 설명 |
@@ -305,7 +313,7 @@ curl -X POST http://localhost:8000/health
 
 | 메서드 | 경로 | 설명 | 응답 |
 |--------|------|------|------|
-| `GET` | `/news?limit=N` | 분석 완료 뉴스 피드 | `{ news: [ { title, summary, sentiment, source, ... } ], total }` |
+| `GET` | `/news?limit=N` | 분석 완료 뉴스 피드 | `{ news: [ { title, summary, sentiment, sentiment_label, source, ... } ], total }` |
 | `GET` | `/sectors/trends?days=N` | 섹터별 트렌드 시계열 | `{ trends: [ { sector, volume, sentiment, timestamp } ] }` |
 
 ### 헬스 체크
@@ -547,8 +555,8 @@ ETF_점수 = avg(관련_섹터의_트렌드_점수들)
 | 지표 | 목표 | 현황 |
 |------|------|------|
 | **API 응답 시간** | <500ms (P95) | 실시간 측정 |
-| **테스트 커버리지** | >85% | 86.05% |
-| **테스트 성공률** | 100% | 243/243 (100%) |
+| **테스트 커버리지** | >85% | 90.2% |
+| **테스트 성공률** | 100% | 327/327 (100%) |
 | **일일 뉴스 수집** | 100~300건 | 동적 |
 | **Claude API 처리** | 배치 단위 5개 | 최적화됨 |
 | **캐시 히트율** | >70% | Redis 활성화 |
@@ -637,9 +645,15 @@ MIT License - 자유롭게 사용, 수정, 배포 가능
   - Phase B: 이메일 알림 (SMTP 기반, 주간 요약)
   - Phase C: 알림 관리 API (활성 알림 조회, 삭제)
   - Phase D: 스케줄러 강화 (5분 주기 가격 모니터링)
-- **Phase 6** (현재, 2026-06-09 완료 — SPEC-STOCK-005):
+- **Phase 6** (완료, 2026-06-09 — SPEC-STOCK-005):
   - Phase A: Redis 파생 캐시 (추천, 섹터별)
   - Phase B: 가격 데이터 Redis 캐시 (60s TTL)
   - Phase C: 추천 필터링 & 정렬 API (limit, sector, sort, min_score)
   - Phase D: 프론트엔드 필터바 (섹터, 정렬, 최소 점수)
   - Phase E: 모바일 반응형 레이아웃 (햄버거 메뉴, 카드 레이아웃)
+- **Phase 7** (완료, 2026-06-10 — SPEC-STOCK-006):
+  - Phase A: Claude 추천 근거 설명 (한국어 2~3문장)
+  - Phase B: 추천 히스토리 조회 API (`GET /recommendations/history?days=N`)
+  - Phase C: 뉴스 감성 5단계 라벨 (매우긍정/긍정/중립/부정/매우부정)
+  - Phase D: 히스토리 페이지 (7/14/30일 탭, 날짜별 그룹)
+  - Phase E: 뉴스 피드 한국어 배지 (5단계, 폴백 유지)

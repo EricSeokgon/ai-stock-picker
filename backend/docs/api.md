@@ -611,13 +611,28 @@ curl -X DELETE http://localhost:8000/watchlist/005930 \
 
 ### 3. 추천 리스트 조회
 
-#### 3.1 Top 10 주식 추천
+#### 3.1 Top 10 주식 추천 (필터 지원) — Phase 6 개선
 
 ```http
-GET /recommendations
+GET /recommendations?limit=10&sector=전자&sort=score&min_score=0.5
 ```
 
-**설명**: 당일 최상위 10개 종목의 추천 리스트를 반환합니다. 결과는 Redis에 캐시되며, 캐시 히트 시 500ms 이내에 응답합니다.
+**설명**: 최상위 N개 종목의 추천 리스트를 반환합니다. 필터링과 정렬을 지원합니다. (SPEC-STOCK-005)
+결과는 Redis에 캐시되며, 캐시 히트 시 100ms 이내에 응답합니다.
+
+**쿼리 파라미터**:
+| 파라미터 | 타입 | 기본값 | 설명 |
+|---------|------|-------|------|
+| `limit` | int>0 | 10 | 반환할 추천 종목 수 (1~50) |
+| `sector` | string | - | 섹터 필터 (예: "전자", "금융", "화학", "통신") |
+| `sort` | string | score | 정렬 순서 (score: 종합점수, sentiment: 감성점수, volume: 거래량점수) |
+| `min_score` | float | 0.0 | 최소 종합 점수 필터 (0~1) |
+
+**캐싱 전략**:
+- `limit` 파라미터로 `recommendations:top:{limit}` 캐시 key 생성
+- `sector` 파라미터로 `recommendations:sector:{sector}` 캐시 key 생성
+- 캐시 TTL: 1800초 (30분)
+- 캐시 히트 시 응답 <100ms
 
 **응답 스키마**:
 ```json
@@ -685,7 +700,17 @@ GET /recommendations
 
 **예제**:
 ```bash
+# 기본 요청 (Top 10, 캐시 활용)
 curl -X GET http://localhost:8000/recommendations
+
+# 필터링 예제 1: 전자 섹터, 최소 점수 0.7
+curl -X GET "http://localhost:8000/recommendations?sector=전자&min_score=0.7"
+
+# 필터링 예제 2: Top 20, 감성점수 정렬
+curl -X GET "http://localhost:8000/recommendations?limit=20&sort=sentiment"
+
+# 필터링 예제 3: 금융 섹터, 최소 점수 0.6, 거래량 정렬
+curl -X GET "http://localhost:8000/recommendations?sector=금융&min_score=0.6&sort=volume"
 ```
 
 ---

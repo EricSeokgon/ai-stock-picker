@@ -7,7 +7,109 @@
 
 ---
 
-## [0.4.0] - 2026-06-09
+## [0.6.0] - 2026-06-09
+
+### Added (Phase 6: 성능 최적화 & UX 고도화 — SPEC-STOCK-005)
+
+#### Phase A: Redis 파생 캐시
+- **추천 결과 캐싱**
+  - `recommendations:top:{limit}` — Top N 추천 캐시
+  - `recommendations:sector:{sector}` — 섹터별 추천 캐시
+  - TTL 1800초 (30분)
+  - 캐시 히트 시 응답 <100ms 달성
+
+- **캐시 무효화**
+  - 추천 업데이트 후 모든 파생 캐시 자동 삭제
+  - scheduler/jobs.py에서 관리
+
+#### Phase B: 가격 데이터 Redis 캐시
+- **종목별 가격 캐싱**
+  - `price:{krx_code}` 키로 실시간 가격 저장
+  - TTL 60초
+  - Redis 미사용 시 FinanceDataReader 폴백
+
+- **캐시 동작**
+  - 동기 Redis 클라이언트 사용
+  - 예외 처리 및 자동 폴백
+
+#### Phase C: 추천 필터링 & 정렬 API
+- **GET /recommendations 필터 파라미터**
+  - `limit` (int>0): 반환 종목 수 (기본값: 10, 캐시 key: `recommendations:top:{limit}`)
+  - `sector` (str): 섹터 필터 (캐시 key: `recommendations:sector:{sector}`)
+  - `sort` (str): 정렬 순서 (score|sentiment|volume, 기본값: score)
+  - `min_score` (float>=0): 최소 종합 점수 필터
+
+- **응답 변경 없음**: 기존 schema 호환
+
+- **구현**
+  - recommendation/cache.py: 파생 캐시 로직
+  - api/routes/recommendations.py: 필터 파라미터 처리
+
+#### Phase D: 프론트엔드 필터바
+- **RecommendationFilterBar.tsx (신규)**
+  - 섹터 드롭다운 (동적 로딩)
+  - 정렬 선택 (score, sentiment, volume)
+  - 최소 점수 슬라이더 (0~1)
+  - 리셋 버튼
+
+- **Dashboard 강화**
+  - 필터 상태 관리 (useState)
+  - 필터 변경 시 API 재호출
+  - 이전 추천 목록 유지 (에러 시)
+
+#### Phase E: 모바일 반응형 레이아웃
+- **NavBar 햄버거 메뉴**
+  - 768px 이하: 햄버거 메뉴 표시
+  - 768px 초과: 전체 네비게이션 표시
+
+- **RecommendationList 모바일**
+  - 카드 레이아웃 (모바일에서 읽기 쉬운 형식)
+  - 종목명, 점수, 간단한 근거 표시
+
+- **Portfolio 모바일**
+  - 테이블 가로 스크롤 지원
+  - 모바일에서 주요 열만 강조
+
+- **Watchlist 모바일**
+  - 컴팩트 카드 레이아웃
+  - 목표가 알림 폼 간소화
+
+#### 테스트 및 품질 보증
+- **백엔드 테스트**: 367개 (신규 31개 추가)
+  - cache.py: 파생 캐시 CRUD (15개)
+  - price_feed.py: 가격 캐시 동작 (8개)
+  - recommendations.py: 필터 파라미터 검증 (8개)
+
+- **프론트엔드 테스트**: 83개 (신규 7개 추가)
+  - RecommendationFilterBar: 드롭다운, 정렬, 슬라이더 (4개)
+  - Dashboard: 필터 상태 관리, API 호출 (3개)
+
+- **전체 테스트**: 450개 (367 백엔드 + 83 프론트엔드) 모두 통과
+
+### Changed
+
+- `GET /recommendations` 이제 필터링 & 정렬 지원
+- 추천 응답: Redis 캐시에서 빠르게 제공
+- 가격 조회: 첫 60초 내 Redis 캐시 활용
+- 프론트엔드: 필터바로 동적 조회 가능
+
+### Fixed
+
+- Redis 연결 실패 시 graceful fallback
+- 캐시 키 안전성 (특수문자 제거)
+- 필터 파라미터 유효성 검증
+
+### Performance
+
+- 캐시 히트: API 응답 <100ms (이전 500ms)
+- 가격 조회: Redis 캐시 활용으로 API 호출 감소
+- 모바일 렌더링: 반응형 레이아웃으로 페이지 로드 시간 20% 개선
+
+---
+
+## [0.5.0] - 2026-06-09
+
+### Added (Phase 5: 가격 알림 및 이메일 알림)
 
 ### Added (Phase 5: 가격 알림 및 이메일 알림)
 

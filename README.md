@@ -4,6 +4,14 @@
 
 ## 핵심 기능
 
+### 성능 최적화 & UX 고도화 (Phase 6 신규 — SPEC-STOCK-005)
+- **Redis 파생 캐시**: 추천 결과 캐싱 (`recommendations:top:{limit}`, `recommendations:sector:{sector}`)
+- **가격 Redis 캐시**: 실시간 시세 캐싱 (`price:{krx_code}`, TTL 60s)
+- **필터링 & 정렬**: `GET /recommendations` with `limit`, `sector`, `sort`, `min_score` 파라미터
+- **필터 UI**: 추천 화면에 필터바 추가 (섹터, 정렬, 최소 점수)
+- **모바일 반응형**: 768px 이하 화면에서 햄버거 메뉴, 카드 레이아웃 최적화
+- **포트폴리오 레이아웃**: 테이블 가로 스크롤 (모바일), 관심목록 컴팩트 카드
+
 ### 자동 뉴스 수집
 - **일일 배치**: 매일 오전 6시 네이버 금융, 한국경제, 매일경제, 연합뉴스에서 신규 기사 수집
 - **장중 갱신**: 09:00~15:30 30분 간격 증분 수집
@@ -282,8 +290,16 @@ curl -X POST http://localhost:8000/health
 
 | 메서드 | 경로 | 설명 | 응답 |
 |--------|------|------|------|
-| `GET` | `/recommendations` | Top 10 주식 추천 | `{ stocks: [ { krx_code, name, score, reason, ... } ], timestamp }` |
+| `GET` | `/recommendations` | Top 10 주식 추천 (필터 지원) | `{ stocks: [ { krx_code, name, score, reason, ... } ], timestamp }` |
 | `GET` | `/recommendations/{krx_code}` | 종목별 추천 근거 상세 | `{ krx_code, analysis, contributing_news, ... }` |
+
+**필터 파라미터** (SPEC-STOCK-005):
+| 파라미터 | 타입 | 설명 |
+|---------|------|------|
+| `limit` | int>0 | 반환할 추천 종목 수 (기본값: 10) |
+| `sector` | str | 섹터 필터 (예: "전자", "금융", "화학") |
+| `sort` | str | 정렬 순서: score \| sentiment \| volume (기본값: score) |
+| `min_score` | float>=0 | 최소 종합 점수 (0~1) |
 
 ### 뉴스 및 트렌드
 
@@ -616,8 +632,14 @@ MIT License - 자유롭게 사용, 수정, 배포 가능
   - Phase B: 종목 관심 목록 (관심 종목 저장 기능)
   - Phase C: 포트폴리오 AI 분석 (Claude haiku-4-5)
   - Phase D: 프론트엔드 강화 (실시간 시세 표시, 관심 목록 관리)
-- **Phase 5** (현재, 2026-06-09 완료):
+- **Phase 5** (완료, 2026-06-09):
   - Phase A: 관심 목록 가격 알림 (목표가 설정, 텔레그램 통지)
   - Phase B: 이메일 알림 (SMTP 기반, 주간 요약)
   - Phase C: 알림 관리 API (활성 알림 조회, 삭제)
   - Phase D: 스케줄러 강화 (5분 주기 가격 모니터링)
+- **Phase 6** (현재, 2026-06-09 완료 — SPEC-STOCK-005):
+  - Phase A: Redis 파생 캐시 (추천, 섹터별)
+  - Phase B: 가격 데이터 Redis 캐시 (60s TTL)
+  - Phase C: 추천 필터링 & 정렬 API (limit, sector, sort, min_score)
+  - Phase D: 프론트엔드 필터바 (섹터, 정렬, 최소 점수)
+  - Phase E: 모바일 반응형 레이아웃 (햄버거 메뉴, 카드 레이아웃)

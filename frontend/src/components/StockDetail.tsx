@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react';
 import { fetchRecommendationDetail } from '../api/client';
 import type { RecommendationDetail, ContributingNewsItem } from '../types';
+import { PriceChart } from './PriceChart';
+import { FeedbackButtons } from './FeedbackButtons';
 
 interface StockDetailProps {
   krxCode: string;
@@ -209,6 +211,19 @@ export function StockDetail({ krxCode, onClose }: StockDetailProps) {
                 <ScoreRow label="거래량" score={detail.volume_score} />
                 <ScoreRow label="모멘텀" score={detail.momentum_score} />
                 <ScoreRow label="이상감지" score={detail.anomaly_score} />
+              </div>
+
+              {/* 가격 차트 — 실패해도 나머지 컨텐츠 영향 없음 */}
+              <div style={{ marginBottom: '1rem' }}>
+                <PriceChart krxCode={krxCode} />
+              </div>
+
+              {/* 피드백 버튼 */}
+              <div style={{ marginBottom: '1rem' }}>
+                <p style={{ margin: '0 0 0.4rem', fontSize: '0.85rem', fontWeight: 600, color: '#333' }}>
+                  이 추천이 도움이 됐나요?
+                </p>
+                <FeedbackButtons krxCode={krxCode} />
               </div>
 
               {/* 추천 이유 */}

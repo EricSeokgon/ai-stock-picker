@@ -383,3 +383,25 @@ class BacktestDailyResult(Base):
 
     # 연관 관계
     run: Mapped["BacktestRun"] = relationship("BacktestRun", back_populates="daily_results")
+
+
+# ── Phase G: 추천 피드백 ────────────────────────────────────────────────────────
+
+class RecommendationFeedback(Base):
+    """추천 종목 사용자 피드백 테이블 — 좋아요/싫어요 투표"""
+
+    # @MX:ANCHOR: [AUTO] 피드백 서비스 핵심 엔티티
+    # @MX:REASON: feedback/service.py, recommendations 라우터, 피드백 집계 등 3개 이상에서 사용
+
+    __tablename__ = "recommendation_feedback"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # 투표 대상 종목코드 (KRX)
+    krx_code: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    # 투표: "up" 또는 "down"
+    vote: Mapped[str] = mapped_column(String(4), nullable=False)
+    # 비로그인 사용자도 투표 가능 (nullable)
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

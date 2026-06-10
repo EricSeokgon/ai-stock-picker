@@ -135,3 +135,65 @@ class RecommendationHistoryResponse(BaseModel):
 
     days: int
     groups: list[DailyRecommendations]
+
+
+# ---------------------------------------------------------------------------
+# 종목 검색 스키마 (SPEC-STOCK-007 TASK-003)
+# ---------------------------------------------------------------------------
+
+
+class StockSearchItem(BaseModel):
+    """검색 결과 개별 종목 항목"""
+
+    krx_code: str
+    name: str
+    in_recommendations: bool = False
+
+
+class StockSearchResponse(BaseModel):
+    """종목 검색 응답"""
+
+    query: str
+    results: list[StockSearchItem]
+    total: int
+
+
+# ---------------------------------------------------------------------------
+# 주가 히스토리 스키마 (SPEC-STOCK-007 TASK-005)
+# ---------------------------------------------------------------------------
+
+
+class PricePoint(BaseModel):
+    """단일 날짜 종가 데이터 포인트"""
+
+    date: str  # YYYY-MM-DD
+    close: float
+
+
+class StockPricesResponse(BaseModel):
+    """주가 히스토리 응답"""
+
+    krx_code: str
+    days: int
+    prices: list[PricePoint]
+    # FinanceDataReader 조회 실패 시 False
+    available: bool
+
+
+# ---------------------------------------------------------------------------
+# 피드백 스키마 (SPEC-STOCK-007 TASK-007)
+# ---------------------------------------------------------------------------
+
+
+class FeedbackVoteRequest(BaseModel):
+    """피드백 투표 요청 — vote는 'up' 또는 'down'"""
+
+    vote: str  # "up" or "down"
+
+
+class FeedbackSummaryResponse(BaseModel):
+    """피드백 집계 응답"""
+
+    krx_code: str
+    up: int
+    down: int

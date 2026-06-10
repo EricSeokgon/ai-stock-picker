@@ -5,7 +5,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from stock_picker.api.routes import news, recommendations, sectors
+from stock_picker.api.routes import news, recommendations, sectors, stocks
 from stock_picker.auth.router import router as auth_router
 from stock_picker.backtest.router import router as backtest_router
 from stock_picker.notifications.alert_router import router as alert_router
@@ -43,6 +43,7 @@ def create_app() -> FastAPI:
     app.include_router(recommendations.router)
     app.include_router(news.router)
     app.include_router(sectors.router)
+    app.include_router(stocks.router)
     app.include_router(portfolio_router)
     app.include_router(backtest_router)
     app.include_router(ws_router, tags=["realtime"])

@@ -15,6 +15,8 @@ import { SectorTrendChart } from './components/SectorTrendChart';
 import { StockDetail } from './components/StockDetail';
 import { EtfRecommendationList } from './components/EtfRecommendationList';
 import { PortfolioSummary } from './components/PortfolioSummary';
+import { StockSearchBar } from './components/StockSearchBar';
+import StockDetailPage from './pages/StockDetailPage';
 import { useAuth } from './auth/AuthContext';
 import Login from './pages/Login';
 import Portfolio from './pages/Portfolio';
@@ -293,6 +295,11 @@ function Dashboard() {
             기준일: <strong>{recommendations.trade_date}</strong>
           </p>
 
+          {/* 종목 검색 바 */}
+          <div style={{ marginBottom: '1rem' }}>
+            <StockSearchBar onSelect={setSelectedKrxCode} />
+          </div>
+
           {/* 추천 필터 바 */}
           <RecommendationFilterBar
             sectors={availableSectors}
@@ -406,6 +413,7 @@ export default function App() {
           <ProtectedRoute><Settings /></ProtectedRoute>
         } />
         <Route path="/history" element={<History />} />
+        <Route path="/stocks/:krxCode" element={<StockDetailPage />} />
       </Routes>
     </div>
   );

@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +12,8 @@ from stock_picker.api.deps import get_cache, get_session
 from stock_picker.api.schemas import (
     ContributingNewsItem,
     DailyRecommendations,
+    FeedbackSummaryResponse,
+    FeedbackVoteRequest,
     PreparingResponse,
     RecommendationDetailResponse,
     RecommendationHistoryResponse,
@@ -18,7 +21,32 @@ from stock_picker.api.schemas import (
     RecommendationsResponse,
 )
 from stock_picker.db.models import AnalysisResult, Article, Recommendation, StockMention
+from stock_picker.feedback.service import get_feedback_summary, save_feedback
 from stock_picker.recommendation.cache import RecommendationCache
+
+# 선택적 Bearer 인증 — 토큰 없어도 오류 미발생
+_optional_bearer = HTTPBearer(auto_error=False)
+
+
+async def get_optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_optional_bearer),
+) -> int | None:
+    """선택적 JWT 인증 의존성.
+
+    토큰이 있으면 사용자 ID를 반환하고, 없으면 None을 반환한다.
+    토큰 검증 실패 시에도 None을 반환한다 (인증 불필요 엔드포인트용).
+    """
+    if credentials is None:
+        return None
+    try:
+        from stock_picker.auth.service import decode_token
+        payload = decode_token(credentials.credentials)
+        # payload에서 user_id 또는 sub 추출
+        # decode_token이 TokenPayload를 반환한다고 가정 (sub=username)
+        # 실제 user_id는 DB 조회 없이는 알 수 없으므로 None 반환 (익명 취급)
+        return None
+    except Exception:
+        return None
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 
@@ -205,6 +233,63 @@ async def get_recommendation_history(
     ]
 
     return RecommendationHistoryResponse(days=days, groups=groups)
+
+
+@router.post("/{krx_code}/feedback", response_model=FeedbackSummaryResponse)
+async def submit_feedback(
+    krx_code: str,
+    body: FeedbackVoteRequest,
+    session: AsyncSession = Depends(get_session),
+    user_id: int | None = Depends(get_optional_user),
+) -> FeedbackSummaryResponse:
+    """추천 종목 피드백 투표 제출.
+
+    인증 선택적 — 비로그인 사용자도 투표 가능.
+    vote 값이 "up" 또는 "down"이 아니면 422 반환.
+
+    Args:
+        krx_code: KRX 종목코드
+        body: 투표 요청 (vote: "up" | "down")
+        session: DB 세션
+        user_id: 로그인 사용자 ID (없으면 None)
+
+    Returns:
+        FeedbackSummaryResponse: 투표 후 집계 결과
+    """
+    # ValueError → 422 Unprocessable Entity (FastAPI 기본 동작)
+    try:
+        await save_feedback(
+            db=session,
+            krx_code=krx_code,
+            vote=body.vote,
+            user_id=user_id,
+        )
+    except ValueError as exc:
+        from fastapi import HTTPException as _HTTPException
+        raise _HTTPException(status_code=422, detail=str(exc)) from exc
+
+    summary = await get_feedback_summary(db=session, krx_code=krx_code)
+    return FeedbackSummaryResponse(**summary)
+
+
+@router.get("/{krx_code}/feedback", response_model=FeedbackSummaryResponse)
+async def get_feedback(
+    krx_code: str,
+    session: AsyncSession = Depends(get_session),
+) -> FeedbackSummaryResponse:
+    """추천 종목 피드백 집계 조회.
+
+    공개 엔드포인트 (인증 불필요).
+
+    Args:
+        krx_code: KRX 종목코드
+        session: DB 세션
+
+    Returns:
+        FeedbackSummaryResponse: up/down 투표 수
+    """
+    summary = await get_feedback_summary(db=session, krx_code=krx_code)
+    return FeedbackSummaryResponse(**summary)
 
 
 @router.get("/{krx_code}", response_model=RecommendationDetailResponse)

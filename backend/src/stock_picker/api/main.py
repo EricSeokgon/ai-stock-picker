@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from stock_picker.api.routes import news, recommendations, sectors, stocks
+from stock_picker.api.routes.health import router as health_router
 from stock_picker.auth.router import router as auth_router
 from stock_picker.backtest.router import router as backtest_router
 from stock_picker.notifications.alert_router import router as alert_router
@@ -29,16 +30,19 @@ def create_app() -> FastAPI:
         description="AI 기반 한국 주식 & ETF 추천 서비스",
     )
 
-    # CORS - React 프론트엔드 허용
+    # CORS — CORS_ORIGINS 환경변수 (쉼표 구분), 기본값: 개발 서버
+    cors_origins_raw = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")
+    cors_origins = [o.strip() for o in cors_origins_raw.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173"],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
     # 라우터 등록
+    app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(recommendations.router)
     app.include_router(news.router)
@@ -50,11 +54,6 @@ def create_app() -> FastAPI:
     app.include_router(watchlist_router, prefix="/watchlist", tags=["watchlist"])
     app.include_router(alert_router, tags=["notifications"])
     app.include_router(email_router, prefix="/notifications", tags=["notifications"])
-
-    @app.get("/health", tags=["system"])
-    async def health() -> dict[str, str]:
-        """서비스 헬스 체크"""
-        return {"status": "ok"}
 
     # 텔레그램 봇 선택적 시작 — TELEGRAM_BOT_TOKEN 환경변수 필요
     _start_telegram_bot_if_configured(app)

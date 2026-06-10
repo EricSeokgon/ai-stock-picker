@@ -1,0 +1,28 @@
+# Node.js (이미지 내부에서 새로 설치)
+node_modules/
+
+# 빌드 산출물 (이미지 내부에서 새로 빌드)
+dist/
+build/
+
+# 환경변수 (절대 이미지에 포함하지 않음)
+.env
+.env.*
+!.env.example
+
+# 개발 도구
+.eslintcache
+
+# IDE
+.idea/
+.vscode/
+
+# git
+.git/
+.gitignore
+
+# 문서
+*.md
+
+# OS
+.DS_Store

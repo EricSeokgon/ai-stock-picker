@@ -44,11 +44,30 @@ def _make_client() -> TestClient:
 
 class TestHealthEndpoint:
     def test_health_returns_ok(self) -> None:
-        """헬스 체크 엔드포인트가 status:ok를 반환해야 한다."""
-        client = _make_client()
-        response = client.get("/health")
+        """헬스 체크 엔드포인트가 status:ok를 반환해야 한다 (DB·Redis mock)."""
+        mock_conn = AsyncMock()
+        mock_conn.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_conn.__aexit__ = AsyncMock(return_value=False)
+        mock_conn.execute = AsyncMock()
+        mock_engine = MagicMock()
+        mock_engine.connect = MagicMock(return_value=mock_conn)
+
+        mock_redis = AsyncMock()
+        mock_redis.ping = AsyncMock()
+        mock_redis.aclose = AsyncMock()
+
+        with (
+            patch("stock_picker.api.routes.health.engine", mock_engine),
+            patch("stock_picker.api.deps.get_redis_client", return_value=mock_redis),
+        ):
+            client = _make_client()
+            response = client.get("/health")
+
         assert response.status_code == 200
-        assert response.json() == {"status": "ok"}
+        data = response.json()
+        assert data["status"] == "ok"
+        assert data["db"] == "ok"
+        assert data["redis"] == "ok"
 
 
 # ---------------------------------------------------------------------------

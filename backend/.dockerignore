@@ -1,0 +1,41 @@
+# Python 캐시
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# 가상환경 (이미지 내부에서 새로 생성)
+.venv/
+venv/
+env/
+
+# 테스트 산출물
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# 개발 도구
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.idea/
+.vscode/
+
+# 환경변수 (절대 이미지에 포함하지 않음)
+.env
+.env.*
+!.env.example
+
+# git
+.git/
+.gitignore
+
+# 문서
+*.md
+docs/
+
+# OS
+.DS_Store

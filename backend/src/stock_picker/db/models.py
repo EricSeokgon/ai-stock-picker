@@ -175,6 +175,10 @@ class Recommendation(Base):
     reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Claude Haiku가 생성한 한국어 추천 근거 텍스트 (TASK-002, 마이그레이션 0009)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 피드백 조정 전 기본 점수 (SPEC-STOCK-009 TASK-001, 마이그레이션 0012)
+    base_score: Mapped[float | None] = mapped_column(Numeric(6, 3), nullable=True)
+    # 피드백 조정량 (adjusted - base), 조정 없으면 None (SPEC-STOCK-009 TASK-001)
+    feedback_score: Mapped[float | None] = mapped_column(Numeric(6, 3), nullable=True)
     computed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

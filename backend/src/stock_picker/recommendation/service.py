@@ -7,6 +7,8 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.models import Recommendation
+from ..feedback.service import get_bulk_feedback
+from ..feedback.weighting import apply_feedback_adjustment, calculate_feedback_coefficient
 from ..mapping.prices import get_stock_price_data
 from ..scoring.engine import calculate_stock_score, rank_stocks
 from ..scoring.reasoning import generate_reasoning
@@ -113,10 +115,20 @@ class RecommendationService:
                 "top_summary": agg_data.get("top_summary", ""),
             }
 
-        # 4단계: Top 10 순위화
+        # 4단계: 피드백 가중치 조정 (벌크 조회 — N+1 쿼리 방지)
+        bulk_feedback = await get_bulk_feedback(session, list(scores.keys()))
+        for krx_code_fb, base in list(scores.items()):
+            fb = bulk_feedback.get(krx_code_fb, {"up": 0, "down": 0})
+            coeff = calculate_feedback_coefficient(fb["up"], fb["down"])
+            adjusted, fb_score = apply_feedback_adjustment(base, coeff)
+            scores[krx_code_fb] = adjusted
+            stock_details[krx_code_fb]["base_score"] = base
+            stock_details[krx_code_fb]["feedback_score"] = fb_score
+
+        # 5단계: Top 10 순위화
         ranked = rank_stocks(scores, top_n=10)
 
-        # 5단계: 결과 구성
+        # 6단계: 결과 구성
         recommendations: list[dict[str, Any]] = []
         for rank, (krx_code, total_score) in enumerate(ranked, start=1):
             detail = stock_details[krx_code]
@@ -152,6 +164,8 @@ class RecommendationService:
                 "rank": rank,
                 "krx_code": krx_code,
                 "total_score": round(total_score, 3),
+                "base_score": round(detail.get("base_score", total_score), 3),
+                "feedback_score": round(detail.get("feedback_score", 0.0), 3),
                 "sentiment_score": round(detail["sentiment_score"], 3),
                 "volume_score": round(detail["volume_score"], 3),
                 "momentum_score": round(detail["momentum_score"], 3),
@@ -162,10 +176,10 @@ class RecommendationService:
             }
             recommendations.append(rec)
 
-        # 6단계: DB 저장
+        # 7단계: DB 저장
         await self._save_recommendations(session, recommendations, today)
 
-        # 7단계: 캐시 갱신
+        # 8단계: 캐시 갱신
         if self._cache:
             await self._cache.set(cache_key, recommendations)
 
@@ -193,6 +207,8 @@ class RecommendationService:
                 krx_code=rec["krx_code"],
                 rank=rec["rank"],
                 total_score=rec["total_score"],
+                base_score=rec.get("base_score"),
+                feedback_score=rec.get("feedback_score"),
                 sentiment_score=rec["sentiment_score"],
                 volume_score=rec["volume_score"],
                 momentum_score=rec["momentum_score"],

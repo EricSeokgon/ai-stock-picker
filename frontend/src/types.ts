@@ -23,6 +23,20 @@ export interface ContributingNewsItem {
   published_at: string;
 }
 
+// 스코어 투명성 - 개별 팩터 기여도
+export interface ScoreFactorContribution {
+  factor: string;        // "sentiment" | "volume" | "momentum" | "anomaly"
+  weight: number;        // 예: 0.40
+  factor_score: number;  // 원시 팩터 점수 0~1
+  contribution: number;  // weight * factor_score
+}
+
+// 스코어 분해 (피드백 델타 포함)
+export interface ScoreBreakdown {
+  factors: ScoreFactorContribution[];
+  feedback_delta?: number | null;
+}
+
 // 개별 종목 추천 상세 정보
 export interface RecommendationDetail {
   krx_code: string;
@@ -35,6 +49,10 @@ export interface RecommendationDetail {
   reasoning: string;
   contributing_news: ContributingNewsItem[];
   disclaimer: string;
+  // 스코어 투명성 필드 (SPEC-STOCK-009)
+  base_score?: number | null;
+  feedback_score?: number | null;
+  score_breakdown?: ScoreBreakdown | null;
 }
 
 export interface RecommendationItem {
@@ -46,6 +64,9 @@ export interface RecommendationItem {
   momentum_score: number;
   anomaly_score: number;
   reasoning: string;
+  // 스코어 투명성 필드 (SPEC-STOCK-009)
+  base_score?: number | null;
+  feedback_score?: number | null;
 }
 
 export interface RecommendationsData {

@@ -26,6 +26,10 @@ class RecommendationItem(BaseModel):
     reasoning: str
     # Claude Haiku가 생성한 한국어 추천 근거 (TASK-004, nullable — 하위 호환성 유지)
     explanation: str | None = None
+    # 피드백 조정 전 기본 점수 (SPEC-STOCK-009, nullable — 구 데이터 호환)
+    base_score: float | None = None
+    # 피드백 조정량 delta (SPEC-STOCK-009, nullable — 구 데이터 호환)
+    feedback_score: float | None = None
 
 
 class RecommendationsResponse(BaseModel):
@@ -142,6 +146,22 @@ class ContributingNewsItem(BaseModel):
     published_at: datetime
 
 
+class ScoreFactorContribution(BaseModel):
+    """개별 요인의 점수 기여도"""
+
+    factor: str          # "sentiment", "volume", "momentum", "anomaly"
+    weight: float        # 해당 요인 가중치 (예: 0.40)
+    factor_score: float  # 요인 원시 점수 (0~1)
+    contribution: float  # weight * factor_score
+
+
+class ScoreBreakdown(BaseModel):
+    """점수 분해 상세 (4요인 기여도 + 피드백 델타)"""
+
+    factors: list[ScoreFactorContribution]
+    feedback_delta: float | None = None  # feedback_score (피드백 조정량)
+
+
 class RecommendationDetailResponse(BaseModel):
     """종목 추천 근거 상세 응답 (REQ-WEB-002, AC-8)"""
 
@@ -157,6 +177,12 @@ class RecommendationDetailResponse(BaseModel):
     explanation: str | None = None
     contributing_news: list[ContributingNewsItem]
     disclaimer: str = DISCLAIMER
+    # 피드백 조정 전 기본 점수 (SPEC-STOCK-009, nullable — 구 데이터 호환)
+    base_score: float | None = None
+    # 피드백 조정량 delta (SPEC-STOCK-009, nullable — 구 데이터 호환)
+    feedback_score: float | None = None
+    # 요인별 점수 기여도 분해 (SPEC-STOCK-009, nullable — 구 데이터 호환)
+    score_breakdown: ScoreBreakdown | None = None
 
 
 # ---------------------------------------------------------------------------

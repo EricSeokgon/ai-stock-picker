@@ -49,6 +49,56 @@ def calculate_stock_score(
     )
 
 
+def decompose_score(
+    sentiment: float,
+    volume: float,
+    momentum: float,
+    anomaly: float,
+) -> list[dict]:
+    """4요인 가중 기여도 분해.
+
+    calculate_stock_score와 동일한 가중치를 사용하되, 각 요인의
+    기여도를 개별적으로 계산하여 반환한다.
+    None 입력은 허용하지 않으며, 0.0으로 전달해야 한다.
+
+    Args:
+        sentiment: 감성 점수 (0.0~1.0)
+        volume: 거래량 점수 (0.0~1.0)
+        momentum: 모멘텀 점수 (0.0~1.0)
+        anomaly: 이상거래 점수 (0.0~1.0)
+
+    Returns:
+        [{"factor", "weight", "factor_score", "contribution"}, ...] 형태 목록.
+        기여도 합계 ≈ calculate_stock_score 결과 (부동소수점 오차 범위 내).
+    """
+    return [
+        {
+            "factor": "sentiment",
+            "weight": WEIGHT_SENTIMENT,
+            "factor_score": sentiment,
+            "contribution": WEIGHT_SENTIMENT * sentiment,
+        },
+        {
+            "factor": "volume",
+            "weight": WEIGHT_VOLUME,
+            "factor_score": volume,
+            "contribution": WEIGHT_VOLUME * volume,
+        },
+        {
+            "factor": "momentum",
+            "weight": WEIGHT_MOMENTUM,
+            "factor_score": momentum,
+            "contribution": WEIGHT_MOMENTUM * momentum,
+        },
+        {
+            "factor": "anomaly",
+            "weight": WEIGHT_ANOMALY,
+            "factor_score": anomaly,
+            "contribution": WEIGHT_ANOMALY * anomaly,
+        },
+    ]
+
+
 def rank_stocks(
     scores: dict[str, float],
     top_n: int = 10,

@@ -87,4 +87,36 @@ describe('RecommendationList', () => {
     await userEvent.click(items[1]);
     expect(onSelect).toHaveBeenCalledWith('000660');
   });
+
+  it('feedback_score가 0이 아닌 경우 피드백 반영 배지를 표시한다', () => {
+    const itemsWithFeedback: RecommendationItem[] = [
+      {
+        ...mockItems[0],
+        base_score: 0.80,
+        feedback_score: 0.05,
+      },
+    ];
+    render(<RecommendationList recommendations={itemsWithFeedback} />);
+    expect(screen.getByText(/피드백 반영/)).toBeInTheDocument();
+  });
+
+  it('feedback_score가 0이면 피드백 반영 배지를 표시하지 않는다', () => {
+    const itemsNoFeedback: RecommendationItem[] = [
+      {
+        ...mockItems[0],
+        base_score: 0.80,
+        feedback_score: 0,
+      },
+    ];
+    render(<RecommendationList recommendations={itemsNoFeedback} />);
+    expect(screen.queryByText(/피드백 반영/)).not.toBeInTheDocument();
+  });
+
+  it('base_score/feedback_score가 없는 경우 피드백 배지 없이 정상 렌더링된다', () => {
+    // mockItems에는 base_score/feedback_score 필드 없음
+    render(<RecommendationList recommendations={mockItems} />);
+    expect(screen.queryByText(/피드백 반영/)).not.toBeInTheDocument();
+    // 기존 KRX 코드들은 여전히 표시됨
+    expect(screen.getByText('005930')).toBeInTheDocument();
+  });
 });

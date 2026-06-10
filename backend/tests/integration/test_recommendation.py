@@ -70,15 +70,20 @@ class TestRecommendationServiceScoring:
                 new_callable=AsyncMock,
                 return_value=mock_prices,
             ):
-                # Redis mock
-                mock_cache = AsyncMock()
-                mock_cache.get = AsyncMock(return_value=None)
-                mock_cache.set = AsyncMock()
+                with patch(
+                    "stock_picker.recommendation.service.get_bulk_feedback",
+                    new_callable=AsyncMock,
+                    return_value={},
+                ):
+                    # Redis mock
+                    mock_cache = AsyncMock()
+                    mock_cache.get = AsyncMock(return_value=None)
+                    mock_cache.set = AsyncMock()
 
-                service = RecommendationService(cache=mock_cache)
-                service._save_recommendations = AsyncMock()
+                    service = RecommendationService(cache=mock_cache)
+                    service._save_recommendations = AsyncMock()
 
-                results = await service.run(mock_session, trade_date=date.today())
+                    results = await service.run(mock_session, trade_date=date.today())
 
         assert isinstance(results, list)
 
@@ -104,14 +109,19 @@ class TestRecommendationServiceScoring:
                 new_callable=AsyncMock,
                 return_value=mock_prices,
             ):
-                mock_cache = AsyncMock()
-                mock_cache.get = AsyncMock(return_value=None)
-                mock_cache.set = AsyncMock()
+                with patch(
+                    "stock_picker.recommendation.service.get_bulk_feedback",
+                    new_callable=AsyncMock,
+                    return_value={},
+                ):
+                    mock_cache = AsyncMock()
+                    mock_cache.get = AsyncMock(return_value=None)
+                    mock_cache.set = AsyncMock()
 
-                service = RecommendationService(cache=mock_cache)
-                service._save_recommendations = AsyncMock()
+                    service = RecommendationService(cache=mock_cache)
+                    service._save_recommendations = AsyncMock()
 
-                results = await service.run(mock_session)
+                    results = await service.run(mock_session)
 
         if results:
             assert "rank" in results[0]
@@ -140,17 +150,22 @@ class TestRecommendationServiceScoring:
                 new_callable=AsyncMock,
                 return_value=mock_prices,
             ):
-                mock_cache = AsyncMock()
-                mock_cache.get = AsyncMock(return_value=None)
-                mock_cache.set = AsyncMock()
+                with patch(
+                    "stock_picker.recommendation.service.get_bulk_feedback",
+                    new_callable=AsyncMock,
+                    return_value={},
+                ):
+                    mock_cache = AsyncMock()
+                    mock_cache.get = AsyncMock(return_value=None)
+                    mock_cache.set = AsyncMock()
 
-                service = RecommendationService(cache=mock_cache)
-                service._save_recommendations = AsyncMock()
+                    service = RecommendationService(cache=mock_cache)
+                    service._save_recommendations = AsyncMock()
 
-                await service.run(mock_session)
+                    await service.run(mock_session)
 
-                # 캐시 set이 호출되어야 함
-                mock_cache.set.assert_called_once()
+                    # 캐시 set이 호출되어야 함
+                    mock_cache.set.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_cached_result_returned_without_db_query(self):
@@ -199,13 +214,18 @@ class TestRecommendationServiceTopN:
                 new_callable=AsyncMock,
                 return_value=mock_prices,
             ):
-                mock_cache = AsyncMock()
-                mock_cache.get = AsyncMock(return_value=None)
-                mock_cache.set = AsyncMock()
+                with patch(
+                    "stock_picker.recommendation.service.get_bulk_feedback",
+                    new_callable=AsyncMock,
+                    return_value={},
+                ):
+                    mock_cache = AsyncMock()
+                    mock_cache.get = AsyncMock(return_value=None)
+                    mock_cache.set = AsyncMock()
 
-                service = RecommendationService(cache=mock_cache)
-                service._save_recommendations = AsyncMock()
+                    service = RecommendationService(cache=mock_cache)
+                    service._save_recommendations = AsyncMock()
 
-                results = await service.run(mock_session)
+                    results = await service.run(mock_session)
 
         assert len(results) <= 10

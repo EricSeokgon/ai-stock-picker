@@ -121,6 +121,25 @@ function RecommendationCard({
         <ScoreBar score={item.anomaly_score} label="이상감지" />
       </div>
 
+      {/* 피드백 반영 배지 — base_score와 feedback_score가 모두 있고 feedback_score != 0일 때 표시 */}
+      {item.base_score != null && item.feedback_score != null && item.feedback_score !== 0 && (
+        <div style={{ marginBottom: '0.5rem' }}>
+          <span
+            style={{
+              display: 'inline-block',
+              padding: '2px 8px',
+              borderRadius: '12px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              backgroundColor: item.feedback_score > 0 ? '#e8f5e9' : '#ffebee',
+              color: item.feedback_score > 0 ? '#2e7d32' : '#c62828',
+            }}
+          >
+            피드백 반영 {item.feedback_score > 0 ? '+' : ''}{item.feedback_score.toFixed(3)}
+          </span>
+        </div>
+      )}
+
       {/* 추천 이유 */}
       <p
         style={{

@@ -80,3 +80,49 @@ async def get_feedback_summary(
             counts[row.vote] = row.cnt
 
     return {"krx_code": krx_code, "up": counts["up"], "down": counts["down"]}
+
+
+# @MX:ANCHOR: [AUTO] 복수 종목 피드백 벌크 조회 - 추천 서비스에서 N+1 방지용으로 호출
+# @MX:REASON: RecommendationService.run(), 단위 테스트, 통합 테스트에서 3개 이상 참조
+
+
+async def get_bulk_feedback(
+    db: AsyncSession,
+    krx_codes: list[str],
+) -> dict[str, dict[str, int]]:
+    """여러 종목의 up/down 합계를 단일 GROUP BY 쿼리로 조회.
+
+    N+1 쿼리 방지 — krx_code, vote 기준 GROUP BY 단일 쿼리 사용.
+
+    Args:
+        db: 비동기 DB 세션
+        krx_codes: 조회할 KRX 종목코드 목록
+
+    Returns:
+        {krx_code: {"up": int, "down": int}}
+        목록에 없는 종목은 {"up": 0, "down": 0} 기본값으로 포함됨
+    """
+    # 기본값으로 모든 종목 초기화
+    result_map: dict[str, dict[str, int]] = {
+        code: {"up": 0, "down": 0} for code in krx_codes
+    }
+
+    if not krx_codes:
+        return result_map
+
+    stmt = (
+        select(
+            RecommendationFeedback.krx_code,
+            RecommendationFeedback.vote,
+            func.count(RecommendationFeedback.id).label("cnt"),
+        )
+        .where(RecommendationFeedback.krx_code.in_(krx_codes))
+        .group_by(RecommendationFeedback.krx_code, RecommendationFeedback.vote)
+    )
+    rows = await db.execute(stmt)
+
+    for row in rows.all():
+        if row.krx_code in result_map and row.vote in ("up", "down"):
+            result_map[row.krx_code][row.vote] = row.cnt
+
+    return result_map

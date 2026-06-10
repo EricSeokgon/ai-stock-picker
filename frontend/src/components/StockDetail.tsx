@@ -4,6 +4,7 @@ import { fetchRecommendationDetail } from '../api/client';
 import type { RecommendationDetail, ContributingNewsItem } from '../types';
 import { PriceChart } from './PriceChart';
 import { FeedbackButtons } from './FeedbackButtons';
+import { ScoreBreakdown } from './ScoreBreakdown';
 
 interface StockDetailProps {
   krxCode: string;
@@ -212,6 +213,16 @@ export function StockDetail({ krxCode, onClose }: StockDetailProps) {
                 <ScoreRow label="모멘텀" score={detail.momentum_score} />
                 <ScoreRow label="이상감지" score={detail.anomaly_score} />
               </div>
+
+              {/* 스코어 분해 — score_breakdown이 있을 때만 표시 */}
+              {detail.score_breakdown && (
+                <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+                  <h4 style={{ fontSize: '0.875rem', color: '#555', marginBottom: '0.5rem', margin: '0 0 0.5rem' }}>
+                    스코어 분해
+                  </h4>
+                  <ScoreBreakdown breakdown={detail.score_breakdown} />
+                </div>
+              )}
 
               {/* 가격 차트 — 실패해도 나머지 컨텐츠 영향 없음 */}
               <div style={{ marginBottom: '1rem' }}>

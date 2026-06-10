@@ -19,7 +19,10 @@ from stock_picker.api.schemas import (
     RecommendationHistoryResponse,
     RecommendationItem,
     RecommendationsResponse,
+    ScoreBreakdown,
+    ScoreFactorContribution,
 )
+from stock_picker.scoring.engine import decompose_score
 from stock_picker.db.models import AnalysisResult, Article, Recommendation, StockMention
 from stock_picker.feedback.service import get_feedback_summary, save_feedback
 from stock_picker.recommendation.cache import RecommendationCache
@@ -360,6 +363,25 @@ async def get_recommendation_detail(
     _expl_raw = getattr(rec, "explanation", None)
     explanation_val = _expl_raw if isinstance(_expl_raw, str) else None
 
+    # base_score / feedback_score: 구 데이터는 None일 수 있음
+    _base_raw = getattr(rec, "base_score", None)
+    base_score_val = float(_base_raw) if _base_raw is not None else None
+
+    _fb_raw = getattr(rec, "feedback_score", None)
+    feedback_score_val = float(_fb_raw) if _fb_raw is not None else None
+
+    # 점수 분해 계산 (요인 점수가 모두 존재하는 경우만)
+    decomposed = decompose_score(
+        sentiment=float(rec.sentiment_score),
+        volume=float(rec.volume_score),
+        momentum=float(rec.momentum_score),
+        anomaly=float(rec.anomaly_score),
+    )
+    score_breakdown = ScoreBreakdown(
+        factors=[ScoreFactorContribution(**f) for f in decomposed],
+        feedback_delta=feedback_score_val,
+    )
+
     return RecommendationDetailResponse(
         krx_code=rec.krx_code,
         trade_date=trade_date,
@@ -371,4 +393,7 @@ async def get_recommendation_detail(
         reasoning=rec.reasoning or "",
         explanation=explanation_val,
         contributing_news=contributing_news,
+        base_score=base_score_val,
+        feedback_score=feedback_score_val,
+        score_breakdown=score_breakdown,
     )

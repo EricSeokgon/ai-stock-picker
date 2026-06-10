@@ -88,6 +88,47 @@ class SectorTrendsResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# 섹터 랭킹 / 상세 스키마 (SPEC-STOCK-008 TASK-005, TASK-006)
+# ---------------------------------------------------------------------------
+
+
+class SectorRankingItem(BaseModel):
+    """섹터 랭킹 개별 항목"""
+
+    sector: str
+    trade_date: date
+    news_volume: int
+    avg_sentiment: float
+    trend_score: float
+
+
+class SectorRankingResponse(BaseModel):
+    """섹터 랭킹 응답"""
+
+    sort: str
+    limit: int
+    sectors: list[SectorRankingItem]
+    total: int
+
+
+class SectorStockItem(BaseModel):
+    """섹터 구성 종목 항목"""
+
+    krx_code: str
+    mention_count: int
+
+
+class SectorDetailResponse(BaseModel):
+    """섹터 상세 응답 (트렌드 시계열 + 구성 종목)"""
+
+    sector: str
+    days: int
+    trends: list[SectorTrendItem]
+    stocks: list[SectorStockItem]
+    total_stocks: int
+
+
+# ---------------------------------------------------------------------------
 # 추천 근거 상세 스키마 (TASK-025)
 # ---------------------------------------------------------------------------
 

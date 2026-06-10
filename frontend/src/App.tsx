@@ -24,6 +24,7 @@ import Backtest from './pages/Backtest';
 import Watchlist from './pages/Watchlist';
 import Settings from './pages/Settings';
 import History from './pages/History';
+import Sectors from './pages/Sectors';
 
 const API_BASE_DASHBOARD = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
@@ -118,6 +119,7 @@ function NavBar() {
       >
         <Link to="/" style={linkStyle} onClick={handleLinkClick}>홈</Link>
         <Link to="/history" style={linkStyle} onClick={handleLinkClick}>히스토리</Link>
+        <Link to="/sectors" style={linkStyle} onClick={handleLinkClick}>섹터 분석</Link>
         <Link to="/portfolio" style={linkStyle} onClick={handleLinkClick}>포트폴리오</Link>
         <Link to="/backtest" style={linkStyle} onClick={handleLinkClick}>백테스트</Link>
         {isAuthenticated && <Link to="/watchlist" style={linkStyle} onClick={handleLinkClick}>관심 목록</Link>}
@@ -413,6 +415,7 @@ export default function App() {
           <ProtectedRoute><Settings /></ProtectedRoute>
         } />
         <Route path="/history" element={<History />} />
+        <Route path="/sectors" element={<Sectors />} />
         <Route path="/stocks/:krxCode" element={<StockDetailPage />} />
       </Routes>
     </div>

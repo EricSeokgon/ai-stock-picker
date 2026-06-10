@@ -78,16 +78,61 @@ async def run_recommendation() -> None:
     log.info("추천 파이프라인 완료", count=len(result))
 
 
+async def run_sector_aggregation() -> None:
+    """섹터 트렌드 집계 실행.
+
+    오늘 날짜의 AnalysisResult를 집계해 sector_trends에 upsert한다.
+    실패 시 로그 기록 후 반환 — 파이프라인 진행 중단 없음.
+    Redis 캐시 무효화도 수행 (Redis 장애 시 graceful degradation).
+    """
+    import os
+    from datetime import date
+
+    import redis.asyncio as aioredis
+
+    from stock_picker.db.session import AsyncSessionLocal
+    from stock_picker.sector.service import aggregate_sector_trends
+
+    today = date.today()
+    log.info("섹터 집계 시작", trade_date=str(today))
+
+    try:
+        async with AsyncSessionLocal() as session:
+            count = await aggregate_sector_trends(session, today)
+            await session.commit()
+        log.info("섹터 집계 완료", trade_date=str(today), sector_count=count)
+    except Exception:
+        log.exception("섹터 집계 오류 — 파이프라인 계속 진행")
+        return
+
+    # Redis 캐시 무효화: sector_trends:* 패턴
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    try:
+        redis_client = aioredis.from_url(redis_url, decode_responses=True)
+        # sector_trends:* 및 sector_ranking:* 캐시 삭제
+        async with redis_client as r:
+            keys_trends = await r.keys("sector_trends:*")
+            keys_ranking = await r.keys("sector_ranking:*")
+            keys_detail = await r.keys("sector_detail:*")
+            all_keys = keys_trends + keys_ranking + keys_detail
+            if all_keys:
+                await r.delete(*all_keys)
+                log.info("섹터 캐시 무효화 완료", deleted_keys=len(all_keys))
+    except Exception:
+        log.warning("섹터 Redis 캐시 무효화 실패 — 무시하고 계속")
+
+
 async def run_daily_pipeline() -> None:
-    """일일 파이프라인: 수집 → 분석 → 추천 (REQ-NEWS-001).
+    """일일 파이프라인: 수집 → 분석 → 섹터집계 → 추천 (REQ-NEWS-001).
 
     오전 6시에 APScheduler가 호출한다.
-    각 단계는 순서대로 실행되며, 단계 실패 시 이후 단계도 중단된다.
+    각 단계는 순서대로 실행되며, 섹터 집계 단계 실패 시 이후 단계도 계속된다.
     """
     log.info("일일 파이프라인 시작")
     try:
         await collect_all()
         await run_analysis()
+        await run_sector_aggregation()
         await run_recommendation()
         log.info("일일 파이프라인 완료")
     except Exception:
@@ -99,12 +144,13 @@ async def run_intraday_pipeline() -> None:
     """장중 30분 증분 파이프라인 (REQ-NEWS-002, REQ-REC-006).
 
     09:00~15:30 매 30분마다 APScheduler가 호출한다.
-    증분 수집 → 분석 → 추천 재계산 순서로 실행한다.
+    증분 수집 → 분석 → 섹터집계 → 추천 재계산 순서로 실행한다.
     """
     log.info("장중 증분 파이프라인 시작")
     try:
         await collect_all()
         await run_analysis()
+        await run_sector_aggregation()
         await run_recommendation()
         log.info("장중 증분 파이프라인 완료")
     except Exception:

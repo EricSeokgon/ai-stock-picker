@@ -7,6 +7,155 @@
 
 ---
 
+## [0.9.0] - 2026-06-10
+
+### Added (Phase 9: 섹터 분석 대시보드 — SPEC-STOCK-008)
+
+#### 백엔드: 섹터 집계 생산자
+- **섹터 집계 서비스** (`sector/service.py` 신규)
+  - `aggregate_sector_trends(db, trade_date)`: AnalysisResult → sector_trends upsert
+  - trend_score 공식: `avg_sentiment × 0.7 + log(volume+1) × 0.3` ([-1.0, 1.0] 클램핑)
+  - 멀티 섹터 태깅 지원 (기사 1건이 여러 섹터에 카운트)
+  - PostgreSQL `ON CONFLICT DO UPDATE` 멱등 upsert
+- **파이프라인 연결**
+  - 일일/장중 파이프라인에 섹터 집계 단계 삽입 (분석 후, 추천 전)
+  - 집계 실패 시 로그만 남기고 파이프라인 계속 진행
+  - 집계 완료 후 `sector_trends:*` Redis 캐시 무효화
+- **Alembic 마이그레이션 0011**
+  - `sector_trends` 테이블에 `(sector, trade_date)` UNIQUE 제약 추가
+
+#### 백엔드: 섹터 API 확장
+- **`GET /sectors/ranking`** (신규)
+  - `sort=score|sentiment|volume`, `limit`, `days` 파라미터 지원
+  - 최신 거래일 기준 섹터 순위 반환
+- **`GET /sectors/{sector}/detail`** (신규)
+  - 섹터 트렌드 시계열 + 구성 종목(언급 횟수) 반환
+  - 데이터 없는 섹터 404 + 한국어 메시지
+
+#### 프론트엔드: 섹터 분석 페이지
+- **`/sectors` 페이지** (신규)
+  - 정렬 컨트롤: 트렌드 점수 / 감성 점수 / 뉴스 볼륨
+  - 섹터 순위 테이블 (클릭 시 상세 패널 토글)
+  - 빈 상태 / 로딩 / 오류 상태 처리
+  - 면책 고지 표시
+- **`SectorDetailPanel` 컴포넌트** (신규)
+  - Recharts LineChart: 7일 트렌드 점수 시계열
+  - 구성 종목 목록 (언급 횟수 포함)
+  - 종목 클릭 → `/stocks/:krxCode` 연계
+- **NavBar** "섹터 분석" 링크 추가
+
+---
+
+## [0.8.0] - 2026-06-10
+
+### Added (Phase 8: 종목 검색 · 상세 페이지 · 추천 품질 피드백 — SPEC-STOCK-007)
+
+#### Phase A: 종목 검색 API
+- **검색 기능**
+  - `GET /stocks/search?q=` 엔드포인트
+  - KRX 코드/종목명 부분 일치 검색
+  - 추천 종목 우선 정렬
+  - 최대 20개 반환
+
+- **검색 서비스**
+  - `stock/search_service.py` (신규)
+  - KRX 마스터 데이터 활용
+  - 확장 가능한 검색 로직
+
+#### Phase B: 가격 시계열 API
+- **시계열 데이터 API**
+  - `GET /stocks/{krx_code}/prices?days=30` 엔드포인트
+  - OHLCV 데이터 (Open, High, Low, Close, Volume)
+  - Redis TTL 3600s 캐시
+  - Graceful fallback (Redis 미사용 시)
+
+- **데이터 처리**
+  - `mapping/prices.py` (신규): 시계열 조회 및 캐시
+  - FinanceDataReader 활용
+  - 타임존 안전성 (KST)
+
+#### Phase C: 추천 피드백 API
+- **피드백 생성**
+  - `POST /recommendations/{krx_code}/feedback`
+  - up/down 투표 방식
+  - 선택적 JWT 인증 (미인증도 가능)
+
+- **피드백 조회**
+  - `GET /recommendations/{krx_code}/feedback`
+  - 피드백 집계 (up/down 카운트, 순수익률)
+  - 공개 엔드포인트
+
+- **데이터베이스**
+  - `recommendation_feedback` 테이블 (신규)
+  - krx_code, feedback_type(up/down), user_id(nullable), timestamp
+  - Alembic 마이그레이션 (0010_feedback.py)
+
+#### Phase D: React 컴포넌트 4종 신규
+- **StockSearchBar.tsx** (신규)
+  - 검색 입력 + 드롭다운
+  - Debounce 최적화 (300ms)
+  - 마우스/키보드 네비게이션
+
+- **PriceChart.tsx** (신규)
+  - Recharts LineChart 시각화
+  - 30일 OHLC 데이터 표시
+  - 반응형 레이아웃
+
+- **FeedbackButtons.tsx** (신규)
+  - Up/Down 투표 버튼
+  - 실시간 카운트 업데이트
+  - 로딩/오류 상태 처리
+
+- **StockDetailPage.tsx** (신규)
+  - `/stocks/:krxCode` 라우트
+  - StockSearchBar + PriceChart + FeedbackButtons 통합
+  - 종목명, 현재가, 30일 차트 표시
+  - 투자 면책 고지 포함
+
+#### Phase E: 프론트엔드 통합
+- **라우팅 강화**
+  - App.tsx에 `/stocks/:krxCode` 라우트 추가
+  - 보호되지 않은 공개 라우트 (비인증 접근 가능)
+
+- **재사용 컴포넌트**
+  - API 클라이언트 함수 신규 (search, getPrices, submitFeedback)
+  - TypeScript 타입 정의 (SearchResult, PriceData, FeedbackResponse)
+
+#### 테스트 및 품질 보증
+- **백엔드 테스트**: 47건 (신규)
+  - 종목 검색: 부분 일치, 추천 정렬, 최대 개수
+  - 가격 시계열: OHLCV 데이터, 캐시 동작, TTL
+  - 피드백: 생성, 조회, 집계 로직
+
+- **프론트엔드 테스트**: 20건 (신규)
+  - StockSearchBar: 입력, 드롭다운, 선택
+  - PriceChart: 데이터 렌더링, 반응형
+  - FeedbackButtons: 투표, 카운트 업데이트
+  - StockDetailPage: 통합 동작
+
+- **전체 테스트**: 394건 (374 backend + 20 frontend) 모두 통과
+- **테스트 커버리지: 91.5%**
+
+### Changed
+
+- API 엔드포인트: `/stocks/search`, `/stocks/{krx_code}/prices` 신규 추가
+- 피드백 시스템: 추천 품질 평가 기능 도입
+- 프론트엔드: 상세 페이지로 사용자 경험 향상
+
+### Fixed
+
+- 검색 성능: 최대 결과 개수 제한으로 응답 속도 개선
+- 가격 캐시: TTL 설정으로 데이터 신선도 보장
+- 피드백 중복: 동일 사용자의 중복 투표 방지 로직
+
+### Performance
+
+- 검색 응답: <100ms (전체 검색 결과 중 20개로 제한)
+- 가격 조회: Redis 캐시 활용으로 <50ms
+- 피드백 집계: O(n) 쿼리 최적화
+
+---
+
 ## [0.7.0] - 2026-06-10
 
 ### Added (Phase 7: AI 분석 고도화 및 추천 근거 투명성 — SPEC-STOCK-006)

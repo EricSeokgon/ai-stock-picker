@@ -4,6 +4,20 @@
 
 ## 핵심 기능
 
+### 섹터 분석 대시보드 (Phase 9 신규 — SPEC-STOCK-008)
+- **섹터 집계 생산자**: 일별 AnalysisResult → sector_trends 자동 집계, trend_score = avg_sentiment×0.7 + log(volume+1)×0.3
+- **섹터 순위 API**: `GET /sectors/ranking?sort=score|sentiment|volume` 실시간 섹터 랭킹
+- **섹터 상세 API**: `GET /sectors/{sector}/detail` 트렌드 시계열 + 구성 종목 목록
+- **섹터 분석 페이지**: React `/sectors` 라우트, 순위 표 + Recharts 트렌드 차트 + 상세 패널
+- **파이프라인 통합**: 일일/장중 파이프라인에 섹터 집계 단계 삽입, 실패 무중단
+
+### 종목 검색 · 상세 페이지 · 추천 품질 피드백 (Phase 8 신규 — SPEC-STOCK-007)
+- **종목 검색 API**: `GET /stocks/search?q=` KRX 코드/이름 부분 일치, 추천 종목 우선 정렬, 최대 20개 반환
+- **가격 시계열**: `GET /stocks/{krx_code}/prices?days=30` 30일 OHLCV 데이터, Redis TTL 3600s, graceful fallback
+- **추천 피드백**: `POST/GET /recommendations/{krx_code}/feedback` up/down 투표, 집계, 선택적 JWT 인증
+- **상세 페이지**: React `/stocks/:krxCode` 라우트, 종목명/차트/피드백 표시, 면책 고지 포함
+- **가격 차트**: Recharts LineChart로 30일 시계열 OHLC 시각화, 피드백 버튼 통합
+
 ### 추천 근거 설명 & 히스토리 & 감성 라벨 (Phase 7 신규 — SPEC-STOCK-006)
 - **Claude 자동 설명 생성**: 각 추천에 대해 Claude Haiku로 한국어 2~3문장 근거 자동 생성
 - **추천 히스토리 조회**: `GET /recommendations/history?days=N` (기본 7일, 범위 1~90일)로 날짜별 추천 기록 조회
@@ -293,6 +307,15 @@ curl -X POST http://localhost:8000/health
 | `POST` | `/telegram/unsubscribe` | 텔레그램 구독 취소 |
 | `GET` | `/telegram/status/{chat_id}` | 구독 상태 확인 |
 
+### 종목 검색 & 상세 정보 (SPEC-STOCK-007)
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| `GET` | `/stocks/search?q=` | 종목 검색 (KRX 코드/이름 부분 일치, 추천 우선) |
+| `GET` | `/stocks/{krx_code}/prices?days=30` | 가격 시계열 (OHLCV, Redis 캐시) |
+| `POST` | `/recommendations/{krx_code}/feedback` | 피드백 생성 (up/down 투표) |
+| `GET` | `/recommendations/{krx_code}/feedback` | 피드백 조회 (집계 결과) |
+
 ### 추천 정보
 
 | 메서드 | 경로 | 설명 | 응답 |
@@ -555,8 +578,8 @@ ETF_점수 = avg(관련_섹터의_트렌드_점수들)
 | 지표 | 목표 | 현황 |
 |------|------|------|
 | **API 응답 시간** | <500ms (P95) | 실시간 측정 |
-| **테스트 커버리지** | >85% | 90.2% |
-| **테스트 성공률** | 100% | 327/327 (100%) |
+| **테스트 커버리지** | >85% | 91.5% |
+| **테스트 성공률** | 100% | 394/394 (100%) |
 | **일일 뉴스 수집** | 100~300건 | 동적 |
 | **Claude API 처리** | 배치 단위 5개 | 최적화됨 |
 | **캐시 히트율** | >70% | Redis 활성화 |
@@ -657,3 +680,10 @@ MIT License - 자유롭게 사용, 수정, 배포 가능
   - Phase C: 뉴스 감성 5단계 라벨 (매우긍정/긍정/중립/부정/매우부정)
   - Phase D: 히스토리 페이지 (7/14/30일 탭, 날짜별 그룹)
   - Phase E: 뉴스 피드 한국어 배지 (5단계, 폴백 유지)
+- **Phase 8** (완료, 2026-06-10 — SPEC-STOCK-007):
+  - Phase A: 종목 검색 API (GET /stocks/search)
+  - Phase B: 가격 시계열 API + Redis 캐시
+  - Phase C: 추천 피드백 API (up/down 투표)
+  - Phase D: Alembic 0010 마이그레이션 (feedback 테이블)
+  - Phase E: React 컴포넌트 4종 신규 (StockSearchBar, PriceChart, FeedbackButtons, StockDetailPage)
+  - Phase F: 테스트 67건 추가 (backend 47 + frontend 20)

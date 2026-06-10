@@ -145,7 +145,11 @@
 | **테스트** | pytest 7.x, Playwright, @testing-library/react |
 | **배포** | Docker, docker-compose |
 
-## 주요 업데이트 (Phase 2: 사용자 기능 및 포트폴리오)
+## 주요 업데이트 (최신: Phase 9 - 피드백 기반 점수 투명성)
+
+**[0.10.0] - 2026-06-10** (SPEC-STOCK-009): 추천 품질 개선 — 피드백 기반 가중치 + 스코어 투명성
+
+### Phase 2: 사용자 기능 및 포트폴리오 (v0.2.0)
 
 **[0.2.0] - 2026-06-09**에서는 다음 5가지 주요 기능이 추가되었습니다:
 
@@ -687,3 +691,18 @@ MIT License - 자유롭게 사용, 수정, 배포 가능
   - Phase D: Alembic 0010 마이그레이션 (feedback 테이블)
   - Phase E: React 컴포넌트 4종 신규 (StockSearchBar, PriceChart, FeedbackButtons, StockDetailPage)
   - Phase F: 테스트 67건 추가 (backend 47 + frontend 20)
+- **Phase 9** (완료, 2026-06-10 — SPEC-STOCK-008):
+  - Phase A: 섹터 집계 생산자 (AnalysisResult → sector_trends)
+  - Phase B: 섹터 API 확장 (GET /sectors/ranking, /sectors/{sector}/detail)
+  - Phase C: 섹터 분석 페이지 React 신규
+  - Phase D: SectorDetailPanel 컴포넌트 (트렌드 차트, 구성 종목)
+  - Phase E: 파이프라인 통합 (일일/장중 갱신에 섹터 집계 삽입)
+- **Phase 10** (완료, 2026-06-10 — SPEC-STOCK-009):
+  - Phase A: Alembic 0012 마이그레이션 (base_score, feedback_score 컬럼)
+  - Phase B: 피드백 계수 계산 (신뢰도 가중, MAX_ADJ=0.15)
+  - Phase C: 피드백 일괄 집계 조회 (N+1 회피)
+  - Phase D: 추천 파이프라인 피드백 조정 통합
+  - Phase E: API 스키마 확장 (ScoreBreakdown, ScoreFactorContribution)
+  - Phase F: ScoreBreakdown React 컴포넌트 신규
+  - Phase G: 추천 목록 피드백 반영 배지 표시
+  - Phase H: 백엔드 테스트 35건 + 프론트엔드 테스트 10건 추가

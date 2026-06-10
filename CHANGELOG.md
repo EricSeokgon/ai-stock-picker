@@ -7,6 +7,86 @@
 
 ---
 
+## [0.10.0] - 2026-06-10
+
+### Added (Phase 10: 피드백 기반 가중치 + 스코어 투명성 — SPEC-STOCK-009)
+
+#### 백엔드: 피드백 기반 점수 조정
+- **Alembic 마이그레이션 0012**
+  - `recommendations` 테이블에 `base_score` (Numeric 6,3, nullable)와 `feedback_score` (Numeric 6,3, nullable) 컬럼 추가
+
+- **피드백 가중치 계산** (`feedback/weighting.py` 신규)
+  - `calculate_feedback_coefficient()`: 신뢰도 가중 계산 (feedback_count 기반, MAX_ADJ=0.15)
+  - `apply_feedback_adjustment()`: 조정 적용 함수 (0~1 클램프)
+
+- **피드백 일괄 집계** (`feedback/service.py` 개선)
+  - `get_bulk_feedback()`: GROUP BY 쿼리로 N+1 회피
+
+- **스코어 분해** (`scoring/engine.py` 개선)
+  - `decompose_score()`: 4요인(감성, 거래량, 모멘텀, 이상거래량) 기여도 분석
+
+#### 백엔드: 파이프라인 통합
+- **추천 엔진 변경** (`recommendation/service.py`)
+  - base_score 계산 후 피드백 조정 일괄 적용
+  - 기존 4요인 산식 유지 (하위 호환성)
+  - base_score / feedback_score 분리 저장
+
+#### 백엔드: API 확장
+- **응답 스키마** (`api/schemas.py`)
+  - `ScoreFactorContribution`: {factor, weight, factor_score, contribution}
+  - `ScoreBreakdown`: {factors[], feedback_delta}
+  - `RecommendationItem` / `RecommendationDetail`에 선택 필드 추가
+
+- **상세 응답** (`api/routes/recommendations.py`)
+  - `GET /recommendations` list: base_score, feedback_score 포함
+  - `GET /recommendations/{krx_code}` detail: score_breakdown 포함
+
+#### 프론트엔드: 스코어 시각화
+- **ScoreBreakdown.tsx** (신규)
+  - 요인별 기여도 막대 그래프
+  - 피드백 조정값(delta) 표시
+
+- **RecommendationList.tsx** 개선
+  - 피드백 조정 시 배지 표시 (feedback_score != 0)
+
+- **StockDetail.tsx** 개선
+  - ScoreBreakdown 섹션 통합
+
+#### 테스트 및 품질 보증
+- **백엔드 테스트**: 35건 (신규)
+  - weighting.py: 계수 계산, 조정 적용 (15개)
+  - scoring.py: 스코어 분해 (10개)
+  - integration: 파이프라인 + API 하위호환 (10개)
+  - **총 테스트**: 516건 (이전 481건)
+
+- **프론트엔드 테스트**: 10건 (신규)
+  - ScoreBreakdown: 렌더링, 요인 표시 (5개)
+  - RecommendationList: 피드백 배지 (3개)
+  - StockDetail: 분해 표시 (2개)
+  - **총 테스트**: 136건 (이전 126건)
+
+- **테스트 커버리지: 92.3%**
+
+### Changed
+
+- 추천 응답: base_score 와 feedback_score 분리 저장
+- 점수 투명성: 요인별 기여도 상세 제시
+- 피드백 영향도: 신뢰도 기반 가중 (과도한 조정 방지)
+
+### Fixed
+
+- 피드백 과다 영향: MAX_ADJ=0.15로 제한
+- N+1 쿼리: GROUP BY 일괄 집계
+- 하위 호환성: 선택 필드 도입으로 기존 API 유지
+
+### Backward Compatibility
+
+- 기존 `/recommendations` 응답 유지 (선택 필드만 추가)
+- 기존 점수 산식 변화 없음 (feedback 조정은 별개)
+- 마이그레이션 후 신규 필드 선택적 조회 가능
+
+---
+
 ## [0.9.0] - 2026-06-10
 
 ### Added (Phase 9: 섹터 분석 대시보드 — SPEC-STOCK-008)

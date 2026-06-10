@@ -200,20 +200,37 @@ cp .env.example .env
 # - REDIS_URL: Redis 연결 문자열 (선택, 기본값: redis://localhost:6379/0)
 # - SECRET_KEY: JWT 토큰 서명용 비밀키 (권장)
 # - TELEGRAM_BOT_TOKEN: 텔레그램 봇 토큰 (선택)
+# - CORS_ORIGINS: 프론트엔드 오리진 (기본: http://localhost:3000)
+# - SMTP_* (선택): 이메일 알림 설정
 ```
 
-### 2. Docker Compose로 시작 (권장)
+### 2. Docker Compose로 시작 (권장) — Phase 11 신규
 
 ```bash
-# 전체 시스템 시작 (PostgreSQL + Redis + 백엔드)
+# 전체 스택 시작: PostgreSQL + Redis + 백엔드 + 프론트엔드 (nginx)
 docker-compose up -d
 
-# 데이터베이스 마이그레이션
+# 데이터베이스 마이그레이션 (자동으로 실행되지만, 필요 시 수동 실행)
 docker-compose exec backend alembic upgrade head
+
+# 시스템 상태 확인
+curl http://localhost:8000/health
+
+# 프론트엔드 접속
+# http://localhost:3000 (브라우저)
 
 # 로그 확인
 docker-compose logs -f backend
+docker-compose logs -f frontend
+docker-compose logs -f db
 ```
+
+**특징:**
+- `docker compose up` **단일 명령**으로 전체 스택 기동
+- 자동 헬스 체크로 서비스 준비 순서 보장
+- DB/Redis 데이터는 named volume으로 영속화
+- 프론트엔드는 nginx를 통해 SPA 라우팅 + `/api` 리버스 프록시 제공
+- Redis 장애 시에도 백엔드는 graceful degradation 유지
 
 ### 3. 로컬 개발 환경 설정
 

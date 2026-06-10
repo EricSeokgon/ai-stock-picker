@@ -1,8 +1,8 @@
 # SPEC-STOCK-010 진행 상황 (Progress)
 
 - **SPEC**: SPEC-STOCK-010 — Docker 컨테이너화 + 운영 환경 설정
-- **Status**: IN_PROGRESS
-- **Version**: 0.1.0
+- **Status**: DONE
+- **Version**: 1.0.0
 - **Created**: 2026-06-10
 - **Updated**: 2026-06-11
 - **Author**: ircp
@@ -14,8 +14,8 @@
 | 단계 | 상태 |
 |------|------|
 | Plan (spec/tasks/acceptance 작성) | 완료 |
-| Run (구현) | 진행 중 |
-| Sync (문서화) | 대기 |
+| Run (구현) | 완료 |
+| Sync (문서화) | 완료 |
 
 ## 작업 진행 (tasks.md 동기화)
 
@@ -57,4 +57,11 @@
   ② 루트 `docker-compose.yml`은 postgres+redis만 존재 → backend/frontend 추가.
   ③ Claude 키 env는 `ANTHROPIC_API_KEY`(코드 일치, `CLAUDE_API_KEY` 아님).
   ④ DB URL은 `postgresql+asyncpg://` 드라이버, auth는 동기 엔진 파생.
-- 테스트 베이스라인: 516 backend / 136 frontend 통과 유지 목표.
+- 테스트 베이스라인: 526 backend / 136 frontend 통과 유지 달성.
+
+## Sync 단계 완료
+
+- ✅ README.md 업데이트 — Docker 실행 가이드 추가, Phase 11 신규 내용 반영
+- ✅ CHANGELOG.md 업데이트 — v0.11.0 항목 추가 (전체 기능 요약)
+- ✅ progress.md 업데이트 — 상태를 DONE으로 변경, 모든 테스트 통과 기록
+- ✅ Git 커밋 — `docs(SPEC-STOCK-010): README·CHANGELOG·progress 동기화 — v0.11.0`

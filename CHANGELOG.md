@@ -7,6 +7,102 @@
 
 ---
 
+## [0.11.0] - 2026-06-11
+
+### Added (Phase 11: Docker 컨테이너화 + 운영 환경 설정 — SPEC-STOCK-010)
+
+#### 백엔드: Docker 컨테이너화
+- **backend/Dockerfile** (신규)
+  - 멀티스테이지 빌드 (builder + runtime)
+  - `uv`로 의존성 설치
+  - non-root 사용자(`appuser`)로 실행
+  - `HEALTHCHECK` 지시어로 `/health` 점검
+  - 엔트리포인트: `alembic upgrade head` → `uvicorn`
+
+- **backend/entrypoint.sh** (신규)
+  - DB 마이그레이션 자동 실행
+  - uvicorn 서버 기동
+
+- **backend/.dockerignore** (신규)
+  - `.venv`, `__pycache__`, `.pytest_cache`, `tests/`, `.env` 등 제외
+
+- **헬스 체크 라우터** (`backend/src/stock_picker/api/routes/health.py`)
+  - `GET /health` → `{"status": "ok"|"error", "db": "ok"|"error", "redis": "ok"|"unavailable"}`
+  - DB/Redis 점검 포함, 무인증 접근 가능
+  - Redis 장애 시 graceful degradation
+
+#### 프론트엔드: Docker 컨테이너화
+- **frontend/Dockerfile** (신규)
+  - 빌더 스테이지: `node:20-alpine`에서 Vite 운영 빌드
+  - 런타임 스테이지: `nginx:alpine`에 정적 산출물 배포
+
+- **frontend/nginx.conf** (신규)
+  - SPA 폴백: `try_files $uri $uri/ /index.html`
+  - API 리버스 프록시: `/api/` → `http://backend:8000/`
+  - gzip 압축 활성화
+  - 정적 자산 캐시 헤더 설정
+
+- **frontend/.dockerignore** (신규)
+  - `node_modules`, `dist`, `.env`, `.git` 등 제외
+
+#### docker-compose.yml 확장
+- **신규 서비스**: `backend`, `frontend` 추가
+  - `backend`: 포트 8000, `db` healthcheck 대기, `.env` 환경변수 주입
+  - `frontend`: 포트 3000, `backend` 기동 후 시작
+
+- **기존 서비스**: `db` (PostgreSQL), `redis` 유지/정리
+  - `db`: healthcheck 추가 (`pg_isready`)
+  - `redis`: healthcheck 추가 (`redis-cli ping`)
+
+- **볼륨**: `postgres_data`, `redis_data` named volume으로 영속화
+
+- **포트 매핑**: 5432 (db), 6379 (redis), 8000 (backend), 3000 (frontend)
+
+#### 환경변수 확장 (`.env.example`)
+- **기존 키** (유지): `ANTHROPIC_API_KEY`, `DATABASE_URL`, `REDIS_URL`, `LOG_LEVEL`
+- **신규 키** (추가):
+  - `SECRET_KEY`: JWT 토큰 서명 (Phase 2 auth)
+  - `CORS_ORIGINS`: 프론트엔드 오리진 (기본: `http://localhost:3000`)
+  - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`: 텔레그램 알림 (선택)
+  - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`: 이메일 알림 (선택)
+- **기본값 설정**: compose 내부 서비스명(`db`, `redis`) 호스트명으로 `DATABASE_URL`, `REDIS_URL` 기본값 설정
+
+#### API 변경
+- **api/main.py** 수정
+  - 기존 인라인 `/health`를 신규 health 라우터로 치환·등록
+  - CORS `allow_origins` 환경변수(`CORS_ORIGINS`) 반영
+
+#### 운영 인프라
+- `.gitignore` 보강: `.env` 파일 비커밋 보장
+- 비밀값 플레이스홀더화: `.env.example`은 안전한 예시만 제공
+
+#### 테스트 및 품질 보증
+- **백엔드 테스트**: 526개 (이전 516개에서 +10 health 라우터 테스트)
+- **프론트엔드 테스트**: 136개 (변경 없음)
+- **테스트 통과율**: 100%
+- **회귀 안전성**: 기존 기능(추천/인증/실시간/알림) 동작 변경 없음
+
+### Changed
+
+- 백엔드: `/health` 엔드포인트 확장 (DB/Redis 점검 포함)
+- 프론트엔드: nginx 리버스 프록시로 API 경유 처리
+- docker-compose: 전체 스택 통합 기동 (단일 명령)
+
+### Fixed
+
+- 운영 환경에서 필요한 모든 환경변수 명확화 (`.env.example`)
+- 컨테이너 초기화 순서 보장 (healthcheck 기반 `depends_on`)
+- Redis 장애가 백엔드 기동을 막지 않음 (graceful degradation 유지)
+
+### Non-Goals (제외 항목)
+
+- Kubernetes/ECS/Swarm 매니페스트
+- CI/CD 파이프라인·이미지 레지스트리
+- TLS/HTTPS·도메인·로드밸런서
+- 시크릿 매니저 연동
+
+---
+
 ## [0.10.0] - 2026-06-10
 
 ### Added (Phase 10: 피드백 기반 가중치 + 스코어 투명성 — SPEC-STOCK-009)

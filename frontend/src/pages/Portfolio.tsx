@@ -12,6 +12,14 @@ import {
   type PortfolioPerformance,
 } from '../api/portfolio';
 import { LivePriceBadge } from '../components/LivePriceBadge';
+import {
+  fetchRebalanceAdvice,
+  fetchRiskProfile,
+  fetchMarketBriefing,
+  type RebalanceAdvice,
+  type RiskProfileAdvice,
+  type MarketBriefingAdvice,
+} from '../api/advice';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
@@ -197,6 +205,158 @@ function AiAnalysisSection({ portfolioId, token }: { portfolioId: number; token:
   );
 }
 
+// AI 투자 조언 섹션 — 리밸런싱·리스크·브리핑 (SPEC-STOCK-014)
+// @MX:NOTE: [AUTO] 3종 조언을 탭으로 전환하는 단일 섹션 컴포넌트
+function AdviceSection({ token }: { token: string }) {
+  type Tab = 'rebalance' | 'risk' | 'briefing';
+  const [tab, setTab] = useState<Tab>('rebalance');
+  const [rebalance, setRebalance] = useState<RebalanceAdvice | null>(null);
+  const [risk, setRisk] = useState<RiskProfileAdvice | null>(null);
+  const [briefing, setBriefing] = useState<MarketBriefingAdvice | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFetch() {
+    setLoading(true);
+    setError(null);
+    try {
+      if (tab === 'rebalance') {
+        const data = await fetchRebalanceAdvice(token);
+        setRebalance(data);
+      } else if (tab === 'risk') {
+        const data = await fetchRiskProfile(token);
+        setRisk(data);
+      } else {
+        const data = await fetchMarketBriefing(token);
+        setBriefing(data);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'AI 조언 요청 실패');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const tabLabel: Record<Tab, string> = {
+    rebalance: '리밸런싱',
+    risk: '리스크',
+    briefing: '시장 브리핑',
+  };
+
+  const sectionStyle: React.CSSProperties = {
+    marginTop: '1rem',
+    padding: '0.75rem',
+    border: '1px solid #e8f5e9',
+    borderRadius: '4px',
+    background: '#f9fbe7',
+  };
+
+  const tabBtnStyle = (active: boolean): React.CSSProperties => ({
+    padding: '0.3rem 0.7rem',
+    border: `1px solid ${active ? '#388e3c' : '#ccc'}`,
+    background: active ? '#388e3c' : '#fff',
+    color: active ? '#fff' : '#333',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '0.8rem',
+  });
+
+  return (
+    <div style={sectionStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+        <strong style={{ fontSize: '0.875rem' }}>AI 투자 조언</strong>
+        {(['rebalance', 'risk', 'briefing'] as Tab[]).map((t) => (
+          <button key={t} style={tabBtnStyle(tab === t)} onClick={() => setTab(t)}>
+            {tabLabel[t]}
+          </button>
+        ))}
+        <button
+          onClick={() => void handleFetch()}
+          disabled={loading}
+          style={{
+            padding: '0.3rem 0.7rem', background: '#1976d2', color: '#fff',
+            border: 'none', borderRadius: '4px', cursor: loading ? 'default' : 'pointer',
+            fontSize: '0.8rem', opacity: loading ? 0.7 : 1, marginLeft: 'auto',
+          }}
+        >
+          {loading ? '요청 중...' : '조언 받기'}
+        </button>
+      </div>
+
+      {error && (
+        <p style={{ color: '#c62828', fontSize: '0.8rem', margin: '0 0 0.5rem' }}>{error}</p>
+      )}
+
+      {/* 리밸런싱 결과 */}
+      {tab === 'rebalance' && rebalance && (
+        <div style={{ fontSize: '0.875rem' }}>
+          {rebalance.message && <p style={{ color: '#666' }}>{rebalance.message}</p>}
+          {rebalance.error && <p style={{ color: '#c62828' }}>{rebalance.error}</p>}
+          {rebalance.actions && rebalance.actions.length > 0 && (
+            <ul style={{ margin: '0 0 0.5rem 1rem', padding: 0 }}>
+              {rebalance.actions.map((action, i) => (
+                <li key={i} style={{ marginBottom: '0.3rem' }}>
+                  <strong>{action.krx_code}</strong>
+                  {' — '}
+                  <span style={{
+                    color: action.action === 'buy_more' ? '#388e3c'
+                      : action.action === 'reduce' ? '#c62828' : '#666'
+                  }}>
+                    {action.action === 'buy_more' ? '매수 추가' : action.action === 'reduce' ? '비중 축소' : '유지'}
+                  </span>
+                  {': '}{action.reason}
+                </li>
+              ))}
+            </ul>
+          )}
+          {rebalance.disclaimer && (
+            <p style={{ fontSize: '0.75rem', color: '#888', margin: 0 }}>{rebalance.disclaimer}</p>
+          )}
+        </div>
+      )}
+
+      {/* 리스크 프로파일 결과 */}
+      {tab === 'risk' && risk && (
+        <div style={{ fontSize: '0.875rem' }}>
+          {risk.message && <p style={{ color: '#666' }}>{risk.message}</p>}
+          {risk.error && <p style={{ color: '#c62828' }}>{risk.error}</p>}
+          {risk.risk_score !== undefined && risk.risk_score !== null && (
+            <div style={{ marginBottom: '0.5rem' }}>
+              <strong>리스크 점수: </strong>
+              <span style={{
+                fontWeight: 'bold',
+                color: risk.risk_score >= 70 ? '#c62828' : risk.risk_score >= 40 ? '#f57c00' : '#388e3c',
+              }}>
+                {risk.risk_score}/100
+              </span>
+            </div>
+          )}
+          {risk.explanation && (
+            <p style={{ margin: '0 0 0.5rem', lineHeight: 1.5 }}>{risk.explanation}</p>
+          )}
+          {risk.disclaimer && (
+            <p style={{ fontSize: '0.75rem', color: '#888', margin: 0 }}>{risk.disclaimer}</p>
+          )}
+        </div>
+      )}
+
+      {/* 시장 브리핑 결과 */}
+      {tab === 'briefing' && briefing && (
+        <div style={{ fontSize: '0.875rem' }}>
+          {briefing.message && <p style={{ color: '#666' }}>{briefing.message}</p>}
+          {briefing.error && <p style={{ color: '#c62828' }}>{briefing.error}</p>}
+          {briefing.briefing && (
+            <p style={{ margin: '0 0 0.5rem', lineHeight: 1.5, whiteSpace: 'pre-line' }}>{briefing.briefing}</p>
+          )}
+          {briefing.disclaimer && (
+            <p style={{ fontSize: '0.75rem', color: '#888', margin: 0 }}>{briefing.disclaimer}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // 포트폴리오 상세 패널 (보유 종목 + 성과)
 function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: string }) {
   const [holdings, setHoldings] = useState<Holding[]>([]);
@@ -328,6 +488,9 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
 
       {/* AI 분석 섹션 (REQ-FE-005) */}
       <AiAnalysisSection portfolioId={portfolioId} token={token} />
+
+      {/* AI 투자 조언 섹션 (SPEC-STOCK-014) */}
+      <AdviceSection token={token} />
     </div>
   );
 }

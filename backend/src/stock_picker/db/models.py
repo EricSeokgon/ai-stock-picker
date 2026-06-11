@@ -464,3 +464,54 @@ class Notification(Base):
     related_alert: Mapped["WatchlistAlert | None"] = relationship(
         "WatchlistAlert", lazy="noload"
     )
+
+
+# ── Phase I: AI 투자 조언 (SPEC-STOCK-014) ────────────────────────────────────
+
+class AIAdvice(Base):
+    """AI 투자 조언 영속화 테이블 — 리밸런싱·리스크·시장브리핑 조언과 피드백"""
+
+    # @MX:ANCHOR: [AUTO] AI 조언 서비스 핵심 엔티티
+    # @MX:REASON: advice/router.py, 조언 생성 서비스, 피드백 집계 등 3개 이상 모듈에서 사용
+    # @MX:SPEC: SPEC-STOCK-014 REQ-AIV-001
+
+    __tablename__ = "ai_advice"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    # 조언 타입: rebalance | risk_profile | market_briefing
+    advice_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    # 기준일 — 동일 날짜 중복 요청 방지 및 이력 정렬용
+    ref_date: Mapped[date] = mapped_column(Date, nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    # 조언 본문 (서술형 한국어)
+    body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 구조화 데이터 (JSON 직렬화 — 리밸런싱 액션 목록 등)
+    payload: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 리스크 점수 0~100 (risk_profile 타입만 사용)
+    risk_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # 피드백: helpful | not_helpful | None(미평가)
+    feedback: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    feedback_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMPTZ(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        # 동일 사용자·타입·기준일 조언 1회만 생성 (멱등성 보장)
+        UniqueConstraint(
+            "user_id", "advice_type", "ref_date",
+            name="uq_ai_advice_user_type_date",
+        ),
+        # 사용자별 타입별 최신 이력 조회 최적화
+        Index("ix_ai_advice_user_type", "user_id", "advice_type", "created_at"),
+    )
+
+    # 연관 관계
+    user: Mapped["User"] = relationship("User", lazy="noload")

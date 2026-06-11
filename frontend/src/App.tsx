@@ -26,6 +26,7 @@ import Settings from './pages/Settings';
 import History from './pages/History';
 import Sectors from './pages/Sectors';
 import NotificationsPage from './pages/Notifications';
+import AdviceHistory from './pages/AdviceHistory';
 import { fetchUnreadCount } from './api/notifications';
 
 const API_BASE_DASHBOARD = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
@@ -143,6 +144,7 @@ function NavBar() {
         <Link to="/backtest" style={linkStyle} onClick={handleLinkClick}>백테스트</Link>
         {isAuthenticated && <Link to="/watchlist" style={linkStyle} onClick={handleLinkClick}>관심 목록</Link>}
         {isAuthenticated && <Link to="/settings" style={linkStyle} onClick={handleLinkClick}>설정</Link>}
+        {isAuthenticated && <Link to="/advice/history" style={linkStyle} onClick={handleLinkClick}>AI 조언</Link>}
         {isAuthenticated && (
           <Link
             to="/notifications"
@@ -439,6 +441,12 @@ function Dashboard() {
   );
 }
 
+// AdviceHistory는 token prop을 받으므로 AuthContext에서 주입하는 래퍼 필요
+function AdviceHistoryWrapper() {
+  const { token } = useAuth();
+  return <AdviceHistory token={token} />;
+}
+
 export default function App() {
   return (
     <div
@@ -471,6 +479,9 @@ export default function App() {
         <Route path="/stocks/:krxCode" element={<StockDetailPage />} />
         <Route path="/notifications" element={
           <ProtectedRoute><NotificationsPage /></ProtectedRoute>
+        } />
+        <Route path="/advice/history" element={
+          <ProtectedRoute><AdviceHistoryWrapper /></ProtectedRoute>
         } />
       </Routes>
     </div>

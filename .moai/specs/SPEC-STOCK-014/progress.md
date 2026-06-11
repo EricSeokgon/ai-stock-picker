@@ -13,7 +13,7 @@
 |------|------|
 | Plan (기획) | 완료 |
 | Run (구현) | 완료 |
-| Sync (문서화) | 대기 |
+| Sync (문서화) | 완료 |
 
 ---
 
@@ -102,3 +102,9 @@
 - `analyze_portfolio()` Claude 호출·면책·예외 격리 패턴
 - `recommendation/explanation.py` 실패 시 None·예외 격리 패턴
 - `get_current_user`·`get_db_session`·`get_redis_client`/`get_cache` 의존성
+
+---
+
+## 다음 액션
+
+SPEC-STOCK-014 완료. 다음 SPEC 계획 시 `/moai plan` 사용.

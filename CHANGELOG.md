@@ -7,6 +7,59 @@
 
 ---
 
+## [0.15.0] - 2026-06-11
+
+### Added (Phase 15: AI 투자 조언 고도화 — SPEC-STOCK-014)
+
+#### 백엔드: AI 투자 조언 시스템
+
+- **Alembic 마이그레이션 0015**
+  - `ai_advice` 테이블 신규 생성
+  - 컬럼: id, user_id(FK→users, CASCADE), advice_type(enum: rebalance/risk_profile/market_briefing), content(JSON), ref_date(DATE), risk_score(nullable, 0~100), feedback(nullable: helpful/not_helpful), created_at
+  - 멱등성 보장 UNIQUE 제약: `(user_id, advice_type, ref_date)` — 일일 1회 갱신
+
+- **AI 조언 라우터** (`advice_router.py`, prefix `/advice`, JWT 인증 필수)
+  - `POST /advice/rebalance` — 포트폴리오 리밸런싱 제안 (보유 주식 vs 추천 비교, Claude Haiku 기반)
+  - `POST /advice/risk-profile` — 리스크 프로파일 분석 (섹터 집중도, risk_score 0~100 산출)
+  - `GET /advice/market-briefing` — 일일 시장 브리핑 (Redis 캐시 1회/일/사용자, 키: `ai_advice:briefing:{user_id}:{date}`)
+  - `GET /advice/history` — 조언 이력 조회 (페이지네이션, 정렬)
+  - `POST /advice/{advice_id}/feedback` — 조언 피드백 (helpful/not_helpful 품질 데이터 수집)
+
+- **AI 조언 서비스** (`advice/service.py`)
+  - `generate_rebalance_advice()`: 보유 종목 포트폴리오 vs 추천 종목 비교 후 리밸런싱 제안
+  - `generate_risk_profile()`: 섹터별 보유량 분석 → risk_score 계산 (집중도 높음 = 고위험)
+  - `generate_market_briefing()`: Claude Haiku로 시장 요약 (1일 1회 캐시)
+  - `save_advice_safe()`: UNIQUE 제약 위배 시 UPDATE (멱등성)
+  - 모든 응답에 "투자 면책 문구" 포함, 자동 매매·실시간 데이터 스코프 외
+
+#### 프론트엔드: AI 조언 UI
+
+- **포트폴리오 페이지 AI 조언 패널**
+  - 3개 탭: 리밸런싱, 리스크 분석, 시장 브리핑
+  - 각 탭별 로딩 상태, 에러 표시, 재요청 버튼
+
+- **조언 이력 페이지** (`/advice/history` 라우트)
+  - 조언 목록 (최신순, 페이지네이션)
+  - 각 조언별 조언 타입, 날짜, helpful/not_helpful 피드백 버튼
+  - 피드백 저장 후 UI 즉시 갱신
+
+- **API 함수** (`api/advice.ts`)
+  - `rebalanceAdvice()`, `riskProfileAdvice()`, `marketBriefing()`, `getAdviceHistory()`, `submitAdviceFeedback()`
+
+#### 테스트 및 품질 보증
+
+- **백엔드 테스트**: 47개 통과
+  - `test_ai_advice_model.py` (19개): AIAdvice ORM 모델, 제약, 직렬화
+  - `test_advice_service.py` (18개): 리밸런싱, 리스크 분석, 시장 브리핑 서비스 단위
+  - `test_advice_router.py` (10개): 5개 엔드포인트 통합 테스트
+  - 백엔드 커버리지: 87.30%
+
+- **프론트엔드 테스트**: 170개 통과
+  - 기존 모든 컴포넌트 테스트 유지
+  - 새 조언 컴포넌트 테스트 추가 예정
+
+---
+
 ## [0.14.0] - 2026-06-11
 
 ### Added (Phase 14: 알림·인박스 시스템 — SPEC-STOCK-013)

@@ -4,6 +4,15 @@
 
 ## 핵심 기능
 
+### AI 투자 조언 고도화 (Phase 15 신규 — SPEC-STOCK-014)
+- **포트폴리오 리밸런싱 제안**: 보유 주식·추천 비교 기반 AI 제안 (POST /advice/rebalance)
+- **리스크 프로파일 분석**: 섹터 집중도 기반 리스크 점수 0~100 산출 (POST /advice/risk-profile)
+- **맞춤형 시장 브리핑**: 1일 1회 캐시, Redis 키 `ai_advice:briefing:{user_id}:{date}` (GET /advice/market-briefing)
+- **조언 이력 & 피드백**: AI 조언 영속 저장, helpful/not_helpful 품질 피드백 (GET /advice/history)
+- **프론트엔드**: 포트폴리오 3탭 조언 패널 + /advice/history 이력 페이지
+- **마이그레이션 0015**: `ai_advice` 테이블, UNIQUE(user_id, advice_type, ref_date) 멱등성 보장
+- **면책 고지**: 모든 응답에 투자 면책 문구 포함, 자동 매매·실시간 데이터 스코프 외
+
 ### 알림·인박스 시스템 (Phase 14 신규 — SPEC-STOCK-013)
 - **인앱 알림 인박스**: 가격 알림·추천 변경 이력을 앱 내부에 영속 저장, 미읽음/읽음 상태 관리
 - **인박스 API**: `GET /notifications/inbox` 목록 조회, `PATCH` 읽음 처리, `GET /notifications/inbox/unread-count` 미읽음 배지

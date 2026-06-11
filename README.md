@@ -90,6 +90,56 @@
 - **AI 분석**: 포트폴리오의 AI 기반 상세 분석 결과 표시
 - **투명한 면책 고지**: 모든 화면에 투자 책임 면책 고지 표시
 
+## CI/CD 파이프라인 (Phase 12 신규 — SPEC-STOCK-011)
+
+GitHub Actions를 통한 완전 자동화된 CI/CD 파이프라인:
+
+### CI 워크플로 (`.github/workflows/ci.yml`)
+
+**트리거**: `push` 및 `pull_request` (master 브랜치)
+
+**병렬 잡**:
+
+1. **백엔드 검사** (`backend-ci`)
+   - ESLint 기반 Linting (ruff)
+   - 컴파일 검증 (compileall)
+   - 테스트 실행 (pytest, 85% 이상 커버리지 필수)
+   - uv 패키지 캐싱
+
+2. **프론트엔드 검사** (`frontend-ci`)
+   - ESLint 9 flat config 검증
+   - 테스트 실행 (vitest)
+   - 운영 빌드 검증 (Vite build)
+   - npm 캐싱
+
+3. **Docker 빌드 검증** (`docker-build`)
+   - 백엔드·프론트엔드 Dockerfile 빌드 (실제 푸시 없음)
+   - GitHub Actions 캐시 활용
+
+**배지**: [![CI](https://github.com/{owner}/ai-stock-picker/actions/workflows/ci.yml/badge.svg)](https://github.com/{owner}/ai-stock-picker/actions/workflows/ci.yml)
+
+### CD 워크플로 (`.github/workflows/cd.yml`)
+
+**트리거**: CI 워크플로 성공 후 master 브랜치에서만 실행
+
+**자동 배포**:
+
+- 백엔드 이미지: `ghcr.io/{owner}/ai-stock-picker-backend:latest` + `:{SHA}`
+- 프론트엔드 이미지: `ghcr.io/{owner}/ai-stock-picker-frontend:latest` + `:{SHA}`
+- GitHub Container Registry (ghcr.io)에 자동 푸시
+- 인증: GitHub 기본 `GITHUB_TOKEN` 사용
+
+**이미지 다운로드**:
+
+```bash
+# 최신 버전
+docker pull ghcr.io/{owner}/ai-stock-picker-backend:latest
+docker pull ghcr.io/{owner}/ai-stock-picker-frontend:latest
+
+# 특정 버전
+docker pull ghcr.io/{owner}/ai-stock-picker-backend:sha-abc123
+```
+
 ## 아키텍처
 
 ```

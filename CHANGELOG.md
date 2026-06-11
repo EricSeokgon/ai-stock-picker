@@ -7,6 +7,55 @@
 
 ---
 
+## [0.12.0] - 2026-06-11
+
+### Added (Phase 12: GitHub Actions CI/CD 파이프라인 — SPEC-STOCK-011)
+
+#### CI 파이프라인 (`.github/workflows/ci.yml`)
+- **트리거**: `push` + `pull_request` → branches: master
+- **병렬 잡 3개**:
+  1. **백엔드 CI**: ruff lint + compileall + pytest (85% 커버리지 필수)
+  2. **프론트엔드 CI**: eslint (새 flat config) + vitest + Vite 빌드
+  3. **Docker 빌드 검증**: backend + frontend Dockerfile 빌드 (GHA cache 활용)
+- **캐싱**: uv 패키지 (pyproject.toml 해시) + npm 의존성 + Docker 레이어
+
+#### CD 파이프라인 (`.github/workflows/cd.yml`)
+- **트리거**: CI 워크플로 성공 + master 브랜치 (workflow_run 이벤트)
+- **자동 배포**: ghcr.io로 이미지 푸시
+  - `ghcr.io/{owner}/ai-stock-picker-backend:latest` + `:sha:{SHA}`
+  - `ghcr.io/{owner}/ai-stock-picker-frontend:latest` + `:sha:{SHA}`
+- **인증**: GitHub 기본 GITHUB_TOKEN 사용 (별도 시크릿 불필요)
+
+#### 프론트엔드: ESLint 선행 구성
+- **frontend/eslint.config.js**: ESLint 9 flat config 신규
+  - `@eslint/js` recommended
+  - `typescript-eslint` v8+
+  - `eslint-plugin-react-hooks` v5+
+- **frontend/package.json**: `lint` 스크립트 추가 (`eslint src`)
+
+#### API 개선
+- `api/main.py`: 기존 `/health` 인라인 엔드포인트 → 신규 health 라우터로 통합
+- CORS `allow_origins` 환경변수(`CORS_ORIGINS`) 반영
+
+#### 테스트 및 품질 보증
+- **백엔드 테스트**: 526개 (+10 health 라우터 테스트)
+- **프론트엔드 테스트**: 136개 (변경 없음)
+- **테스트 통과율**: 100%
+- **회귀 안전성**: 기존 기능 모두 검증
+
+### Changed
+
+- 프론트엔드: ESLint 9 도입으로 현대적 linting 확보
+- CI 워크플로: 모든 프로젝트 언어 병렬 검증으로 피드백 속도 개선
+- CD 배포: GitHub Actions 자동화로 수동 배포 제거
+
+### Fixed
+
+- CI 실패 시 master 브랜치에 자동 배포되는 버그 방지 (workflow_run 조건)
+- Docker 캐시 미스로 인한 느린 빌드 개선 (GHA cache 적용)
+
+---
+
 ## [0.11.0] - 2026-06-11
 
 ### Added (Phase 11: Docker 컨테이너화 + 운영 환경 설정 — SPEC-STOCK-010)

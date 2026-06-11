@@ -1,11 +1,11 @@
 // 관심 목록 관리 페이지 (REQ-FE-003)
-// - 관심 목록 종목 표시 + LivePriceBadge
+// - 관심 목록 종목 표시 + 멀티플렉스 LivePrice (SPEC-STOCK-016 M5)
 // - 삭제 버튼(✕)
 // - 목표가 알림 추가/삭제
 // - 미인증 시 /login 리다이렉트
 // - 빈 목록 안내 메시지
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import {
@@ -17,7 +17,7 @@ import {
   type WatchlistItem,
   type WatchlistAlert,
 } from '../api/watchlist';
-import { LivePriceBadge } from '../components/LivePriceBadge';
+import { useLivePrices } from '../hooks/useLivePrices';
 
 // 알림 추가 인라인 폼 상태
 interface AlertFormState {
@@ -36,6 +36,10 @@ export default function Watchlist() {
   const { isAuthenticated, token } = useAuth();
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [alerts, setAlerts] = useState<WatchlistAlert[]>([]);
+
+  // 멀티플렉스 WS — items가 바뀔 때만 심볼 목록 재계산 (REQ-FE-010)
+  const symbols = useMemo(() => items.map((i) => i.krx_code), [items]);
+  const livePrices = useLivePrices(symbols);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // 열린 알림 폼 — krxCode를 키로 사용, '' 이면 닫힘
@@ -178,7 +182,22 @@ export default function Watchlist() {
               <div style={rowStyle}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
                   <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{item.krx_code}</span>
-                  <LivePriceBadge krxCode={item.krx_code} />
+                  {livePrices[item.krx_code] ? (
+                    <span
+                      style={{
+                        fontSize: '0.85rem',
+                        color: (livePrices[item.krx_code].change_pct ?? 0) >= 0 ? '#c62828' : '#1565c0',
+                        fontWeight: 500,
+                      }}
+                      aria-label={`${item.krx_code} 현재가`}
+                    >
+                      {livePrices[item.krx_code].price.toLocaleString()}원{' '}
+                      ({livePrices[item.krx_code].change_pct >= 0 ? '+' : ''}
+                      {livePrices[item.krx_code].change_pct.toFixed(2)}%)
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.8rem', color: '#999' }}>로딩 중...</span>
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button

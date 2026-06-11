@@ -1,5 +1,6 @@
 // 메인 앱 — 라우팅 및 네비게이션 포함
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useLivePrices } from './hooks/useLivePrices';
 import { Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { fetchRecommendations, fetchNews, fetchSectorTrends } from './api/client';
@@ -298,6 +299,16 @@ function Dashboard() {
 
   const stockItems = allRecommendations.filter((item) => !isEtfCode(item.krx_code));
   const etfItems = allRecommendations.filter((item) => isEtfCode(item.krx_code));
+
+  // 멀티플렉스 WS — 대시보드 추천 종목 실시간 가격 (SPEC-STOCK-016 M5)
+  const dashboardSymbols = useMemo(
+    () => allRecommendations.map((i) => i.krx_code),
+    [allRecommendations],
+  );
+  // livePrices는 RecommendationList props로 전달 가능하지만 현재는 대시보드 수준에서만 구독
+  // 실제 UI 표시는 RecommendationList 내부의 LivePriceBadge가 담당 (하위 호환 유지)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _dashboardLivePrices = useLivePrices(dashboardSymbols);
 
   // 현재 추천 목록에서 고유 섹터 추출 (RecommendationItem에 sector 필드가 있을 경우)
   const availableSectors: string[] = Array.from(

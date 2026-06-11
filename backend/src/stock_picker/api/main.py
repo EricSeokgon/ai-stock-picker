@@ -1,6 +1,9 @@
 # FastAPI 앱 진입점
+import asyncio
 import logging
 import os
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +23,41 @@ from stock_picker.watchlist.router import router as watchlist_router
 logger = logging.getLogger(__name__)
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """FastAPI lifespan — 브로드캐스트 루프를 백그라운드 태스크로 시작/종료.
+
+    # @MX:WARN: [AUTO] asyncio 백그라운드 태스크 — task.cancel() 로만 종료
+    # @MX:REASON: CancelledError를 catch하지 않으면 종료 시 예외가 로그에 남음
+    """
+    from stock_picker.realtime.price_broadcast import price_broadcast_loop
+    from stock_picker.realtime.ws_router import manager
+
+    # DB 세션 팩토리 — 선택적 (DB 미설정 환경에서도 동작)
+    db_session_factory = None
+    try:
+        from stock_picker.db.session import async_session_factory
+        db_session_factory = async_session_factory
+    except Exception:
+        logger.debug("DB 세션 팩토리 미설정 — 가격 알림 평가 비활성화")
+
+    task = asyncio.create_task(
+        price_broadcast_loop(manager, db_session_factory),
+        name="price_broadcast_loop",
+    )
+    logger.info("가격 브로드캐스트 백그라운드 루프 시작")
+
+    try:
+        yield
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        logger.info("가격 브로드캐스트 백그라운드 루프 종료")
+
+
 def create_app() -> FastAPI:
     """FastAPI 애플리케이션 팩토리.
 
@@ -30,6 +68,7 @@ def create_app() -> FastAPI:
         title="한국 주식 추천 시스템",
         version="0.2.0",
         description="AI 기반 한국 주식 & ETF 추천 서비스",
+        lifespan=_lifespan,
     )
 
     # CORS — CORS_ORIGINS 환경변수 (쉼표 구분), 기본값: 개발 서버

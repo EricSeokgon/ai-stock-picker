@@ -38,7 +38,11 @@
   - `_normalize_series()` 추가
   - 벤치마크 실패 시 run 중단 없이 `benchmark_value=None` 처리
   - `_TOP_N` 하드코딩 제거, `top_n`/`universe_size` 파라미터 사용
-- [ ] M5. 프론트엔드 정합 — api 타입·차트·승률 표시 (T-016~019)
+- [x] M5. 프론트엔드 정합 — api 타입·차트·승률 표시 (T-016~019)
+  - `backtest.ts`: BacktestStartResponse(run_id:string), BacktestRun(id:string, win_rate, total_trades, completed_at), BacktestDailyResult(benchmark_value: null 허용) 타입 정합
+  - `Backtest.tsx`: win_rate/total_return 퍼센트 표시, benchmark null 처리, pending/running 상태 배지·메시지
+  - universe_size/top_n 선택 입력 필드 추가, POST 응답 run_id로 자동 확장
+  - T-023: `src/__tests__/backtest.test.ts` — 23개 테스트 작성·통과
 - [x] M6(BE). 테스트 — 메트릭 유닛 + runner + 라우터 통합 (T-020~022)
   - `test_backtest_metrics.py`: total_return·win_rate·portfolio_series 신규 케이스 29개
   - `test_backtest_runner.py`: 신규 파일 (상태전환·벤치마크실패·universe 파라미터)

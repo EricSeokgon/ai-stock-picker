@@ -24,8 +24,8 @@ function statusColor(status: BacktestRun['status']): string {
 function statusLabel(status: BacktestRun['status']): string {
   switch (status) {
     case 'done': return '완료';
-    case 'running': return '실행 중';
-    case 'pending': return '대기';
+    case 'running': return '진행 중';
+    case 'pending': return '진행 중';
     case 'failed': return '실패';
   }
 }
@@ -38,6 +38,11 @@ function fmtPct(v: number | null): string {
 function fmtNum(v: number | null, digits = 3): string {
   if (v === null) return '-';
   return v.toFixed(digits);
+}
+
+// 차트 데이터 — benchmark_value가 전부 null이면 벤치마크 라인 숨김
+function hasBenchmark(results: BacktestDailyResult[]): boolean {
+  return results.some((r) => r.benchmark_value !== null);
 }
 
 // 백테스트 상세 패널 (지표 + 차트)
@@ -64,6 +69,9 @@ function BacktestDetail({ run, token }: { run: BacktestRun; token: string }) {
 
   const metricStyle: React.CSSProperties = { fontSize: '0.875rem' };
 
+  // pending/running 상태: 로딩 메시지 표시
+  const isPending = run.status === 'pending' || run.status === 'running';
+
   return (
     <div style={panelStyle}>
       {/* 핵심 지표 */}
@@ -72,11 +80,15 @@ function BacktestDetail({ run, token }: { run: BacktestRun; token: string }) {
         <div style={metricStyle}><span style={{ color: '#666' }}>최대 낙폭 </span><strong>{fmtPct(run.max_drawdown)}</strong></div>
         <div style={metricStyle}><span style={{ color: '#666' }}>샤프 비율 </span><strong>{fmtNum(run.sharpe_ratio)}</strong></div>
         <div style={metricStyle}><span style={{ color: '#666' }}>총 수익률 </span><strong>{fmtPct(run.total_return)}</strong></div>
+        <div style={metricStyle}><span style={{ color: '#666' }}>승률 </span><strong>{run.win_rate !== null ? `${(run.win_rate * 100).toFixed(1)}%` : '-'}</strong></div>
+        <div style={metricStyle}><span style={{ color: '#666' }}>총 거래 </span><strong>{run.total_trades ?? '-'}</strong></div>
       </div>
 
       {/* 차트 */}
-      {run.status !== 'done' ? (
-        <p style={{ color: '#666', fontSize: '0.875rem' }}>실행이 완료된 후 차트가 표시됩니다.</p>
+      {isPending ? (
+        <p style={{ color: '#f57c00', fontSize: '0.875rem' }}>백테스트 실행 중... 잠시 후 결과가 표시됩니다.</p>
+      ) : run.status === 'failed' ? (
+        <p style={{ color: '#c62828', fontSize: '0.875rem' }}>백테스트 실행에 실패했습니다.</p>
       ) : loading ? (
         <p style={{ color: '#666', fontSize: '0.875rem' }}>결과 로딩 중...</p>
       ) : error ? (
@@ -89,8 +101,8 @@ function BacktestDetail({ run, token }: { run: BacktestRun; token: string }) {
             <LineChart data={results} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" tick={{ fontSize: 11 }} tickCount={6} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => v.toFixed(0)} />
-              <Tooltip formatter={(v: number) => v.toFixed(2)} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => v.toFixed(2)} />
+              <Tooltip formatter={(v: number) => v.toFixed(4)} />
               <Legend />
               <Line
                 type="monotone"
@@ -98,14 +110,18 @@ function BacktestDetail({ run, token }: { run: BacktestRun; token: string }) {
                 stroke="#1976d2"
                 dot={false}
                 name="전략 포트폴리오"
+                connectNulls={false}
               />
-              <Line
-                type="monotone"
-                dataKey="benchmark_value"
-                stroke="#f57c00"
-                dot={false}
-                name="벤치마크"
-              />
+              {hasBenchmark(results) && (
+                <Line
+                  type="monotone"
+                  dataKey="benchmark_value"
+                  stroke="#f57c00"
+                  dot={false}
+                  name="벤치마크"
+                  connectNulls={false}
+                />
+              )}
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -119,14 +135,14 @@ export default function Backtest() {
   const [runs, setRuns] = useState<BacktestRun[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // 실행 폼 상태
   const [strategy, setStrategy] = useState<BacktestStrategy>('momentum');
   const [startDate, setStartDate] = useState('2023-01-01');
   const [endDate, setEndDate] = useState('2024-01-01');
-  const [universeSize, setUniverseSize] = useState('100');
-  const [topN, setTopN] = useState('10');
+  const [universeSize, setUniverseSize] = useState('');
+  const [topN, setTopN] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -150,14 +166,20 @@ export default function Backtest() {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await apiRunBacktest(token, {
-        strategy,
-        start_date: startDate,
-        end_date: endDate,
-        universe_size: Number(universeSize),
-        top_n: Number(topN),
-      });
+      const req: {
+        strategy: string;
+        start_date: string;
+        end_date: string;
+        universe_size?: number;
+        top_n?: number;
+      } = { strategy, start_date: startDate, end_date: endDate };
+      if (universeSize) req.universe_size = Number(universeSize);
+      if (topN) req.top_n = Number(topN);
+
+      const resp = await apiRunBacktest(token, req);
+      // run_id를 확인하여 해당 항목 자동 展開
       await loadRuns();
+      if (resp.run_id) setExpandedId(resp.run_id);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : '실행 실패');
     } finally {
@@ -202,13 +224,23 @@ export default function Backtest() {
             </label>
           </div>
           <div>
-            <label style={labelStyle}>유니버스 크기<br />
-              <input type="number" min="1" value={universeSize} onChange={(e) => setUniverseSize(e.target.value)} style={{ ...inputStyle, width: '80px' }} />
+            <label style={labelStyle}>유니버스 크기 (선택)<br />
+              <input
+                type="number" min="1" value={universeSize}
+                onChange={(e) => setUniverseSize(e.target.value)}
+                placeholder="기본값"
+                style={{ ...inputStyle, width: '90px' }}
+              />
             </label>
           </div>
           <div>
-            <label style={labelStyle}>상위 N종목<br />
-              <input type="number" min="1" value={topN} onChange={(e) => setTopN(e.target.value)} style={{ ...inputStyle, width: '70px' }} />
+            <label style={labelStyle}>상위 N종목 (선택)<br />
+              <input
+                type="number" min="1" value={topN}
+                onChange={(e) => setTopN(e.target.value)}
+                placeholder="기본값"
+                style={{ ...inputStyle, width: '90px' }}
+              />
             </label>
           </div>
           <button type="submit" disabled={submitting}
@@ -245,6 +277,9 @@ export default function Backtest() {
               }}>
                 {statusLabel(run.status)}
               </span>
+              {(run.status === 'pending' || run.status === 'running') && (
+                <span style={{ fontSize: '0.75rem', color: '#f57c00' }}>처리 중...</span>
+              )}
             </div>
             <span style={{ fontSize: '0.8rem', color: '#666' }}>{expandedId === run.id ? '▲' : '▼'}</span>
           </div>

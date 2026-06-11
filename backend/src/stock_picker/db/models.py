@@ -352,7 +352,7 @@ class BacktestRun(Base):
     strategy: Mapped[str] = mapped_column(String(50), nullable=False)
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
-    # 상태: pending → running → done / error
+    # 상태: pending → running → done / failed
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -360,6 +360,9 @@ class BacktestRun(Base):
         nullable=False,
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # 파라미터: 유니버스 크기, 상위 종목 수 (NULL이면 기본값 사용)
+    universe_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    top_n: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # 연관 관계
     user: Mapped["User"] = relationship("User", back_populates="backtest_runs")

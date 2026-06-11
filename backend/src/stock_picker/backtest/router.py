@@ -2,8 +2,9 @@
 import asyncio
 import os
 import logging
+from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from stock_picker.auth.dependencies import get_current_user, get_db_session
@@ -12,8 +13,8 @@ from stock_picker.backtest.schemas import (
     BacktestRunDetail,
     BacktestRunRequest,
     BacktestRunResponse,
-    DailyResultResponse,
-    PaginatedDailyResults,
+    BacktestStartResponse,
+    DailyResultTimeSeries,
 )
 from stock_picker.db.models import BacktestDailyResult, BacktestRun, User
 
@@ -22,12 +23,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/backtest", tags=["backtest"])
 
 
-@router.post("/run", response_model=BacktestRunResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/run", response_model=BacktestStartResponse, status_code=status.HTTP_202_ACCEPTED)
 def start_backtest(
     body: BacktestRunRequest,
     db: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-) -> BacktestRun:
+) -> BacktestStartResponse:
     """백테스트 작업 제출 — run_id 즉시 반환, 비동기 실행.
 
     # @MX:WARN: [AUTO] 동기 라우터에서 asyncio.create_task 호출
@@ -40,6 +41,8 @@ def start_backtest(
         start_date=body.start_date,
         end_date=body.end_date,
         status="pending",
+        universe_size=body.universe_size,
+        top_n=body.top_n,
     )
     db.add(run)
     db.commit()
@@ -55,14 +58,25 @@ def start_backtest(
         if loop.is_running():
             from stock_picker.backtest.runner import run_backtest
             asyncio.create_task(
-                run_backtest(run.id, body.strategy, body.start_date, body.end_date, db_url)
+                run_backtest(
+                    run.id,
+                    body.strategy,
+                    body.start_date,
+                    body.end_date,
+                    db_url,
+                    body.universe_size,
+                    body.top_n,
+                )
             )
             logger.info("백테스트 작업 제출 — run_id=%d", run.id)
     except RuntimeError:
         # 이벤트 루프가 없는 경우 (테스트 환경)
         logger.warning("이벤트 루프 없음 — 백테스트 run_id=%d는 수동 실행 필요", run.id)
 
-    return run
+    return BacktestStartResponse(
+        run_id=run.id,
+        message=f"백테스트 작업이 제출되었습니다 (run_id={run.id})",
+    )
 
 
 @router.get("/runs", response_model=list[BacktestRunResponse])
@@ -117,19 +131,23 @@ def get_run(
             detail.cagr = m.calculate_cagr(daily_returns, run.start_date, run.end_date)
             detail.max_drawdown = m.calculate_max_drawdown(cumulative)
             detail.sharpe_ratio = m.calculate_sharpe_ratio(daily_returns)
+            detail.total_return = m.calculate_total_return(cumulative)
+            detail.win_rate = m.calculate_win_rate(daily_returns)
 
     return detail
 
 
-@router.get("/runs/{run_id}/results", response_model=PaginatedDailyResults)
+@router.get("/runs/{run_id}/results", response_model=list[DailyResultTimeSeries])
 def get_results(
     run_id: int,
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=50, ge=1, le=500),
     db: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-) -> PaginatedDailyResults:
-    """백테스트 일별 결과 페이지네이션 조회"""
+) -> list[DailyResultTimeSeries]:
+    """백테스트 일별 포트폴리오 시계열 조회 — flat array 반환.
+
+    # @MX:ANCHOR: [AUTO] 프론트엔드 차트 계약 엔드포인트
+    # @MX:REASON: 프론트엔드가 직접 소비하는 타임시리즈 API — 스키마 변경 시 FE 계약 깨짐
+    """
     # 소유권 확인
     run = (
         db.query(BacktestRun)
@@ -142,26 +160,42 @@ def get_results(
             detail="백테스트 실행을 찾을 수 없습니다",
         )
 
-    total = (
-        db.query(BacktestDailyResult)
-        .filter(BacktestDailyResult.run_id == run_id)
-        .count()
-    )
-    items = (
+    # 날짜 기준으로 집계 (동일 날짜 여러 종목 → 평균 수익률)
+    all_results = (
         db.query(BacktestDailyResult)
         .filter(BacktestDailyResult.run_id == run_id)
         .order_by(BacktestDailyResult.trade_date)
-        .offset((page - 1) * page_size)
-        .limit(page_size)
         .all()
     )
 
-    return PaginatedDailyResults(
-        items=[DailyResultResponse.model_validate(item) for item in items],
-        total=total,
-        page=page,
-        page_size=page_size,
-    )
+    if not all_results:
+        return []
+
+    # 날짜별 평균 일별 수익률 집계
+    date_returns: dict[date, list[float]] = {}
+    for rec in all_results:
+        d = rec.trade_date
+        if rec.return_pct is not None:
+            date_returns.setdefault(d, []).append(float(rec.return_pct))
+
+    sorted_dates = sorted(date_returns.keys())
+    if not sorted_dates:
+        return []
+
+    # 포트폴리오 가치 시계열 구성 (시작값 1.0)
+    portfolio_value = 1.0
+    output: list[DailyResultTimeSeries] = []
+    for d in sorted_dates:
+        avg_return = sum(date_returns[d]) / len(date_returns[d])
+        portfolio_value *= (1.0 + avg_return)
+        output.append(DailyResultTimeSeries(
+            date=d.isoformat(),
+            portfolio_value=round(portfolio_value, 6),
+            benchmark_value=None,  # 벤치마크는 runner에서 별도 저장 예정
+            daily_return=round(avg_return, 6),
+        ))
+
+    return output
 
 
 def _build_cumulative(daily_returns: list[float]) -> list[float]:

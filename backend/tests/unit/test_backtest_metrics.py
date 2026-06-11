@@ -1,4 +1,4 @@
-# 백테스트 성과 지표 유닛 테스트 — CAGR, 최대 낙폭, 샤프 비율
+# 백테스트 성과 지표 유닛 테스트 — CAGR, 최대 낙폭, 샤프 비율, 총 수익률, 승률
 from datetime import date
 
 import pytest
@@ -7,6 +7,9 @@ from stock_picker.backtest.metrics import (
     calculate_cagr,
     calculate_max_drawdown,
     calculate_sharpe_ratio,
+    calculate_total_return,
+    calculate_win_rate,
+    build_portfolio_value_series,
 )
 
 
@@ -142,3 +145,86 @@ class TestCalculateSharpeRatio:
         sharpe = calculate_sharpe_ratio(daily_returns, risk_free_rate=0.0)
         assert isinstance(sharpe, float)
         # 연환산이 적용되므로 절댓값이 커야 함
+
+
+class TestCalculateTotalReturn:
+    """calculate_total_return 테스트 (T-020)"""
+
+    def test_empty_list_returns_zero(self):
+        """빈 목록 → 0.0 반환"""
+        assert calculate_total_return([]) == 0.0
+
+    def test_positive_gain(self):
+        """양수 수익 케이스"""
+        # 1.0 → 1.2 → 20% 수익
+        cumulative = [1.0, 1.1, 1.2]
+        result = calculate_total_return(cumulative)
+        assert pytest.approx(result, abs=1e-6) == 0.2
+
+    def test_no_change(self):
+        """수익 없음 → 0.0"""
+        cumulative = [1.0, 1.0, 1.0]
+        assert calculate_total_return(cumulative) == 0.0
+
+    def test_loss(self):
+        """손실 케이스 — 음수 반환"""
+        cumulative = [1.0, 0.9, 0.8]
+        result = calculate_total_return(cumulative)
+        assert pytest.approx(result, abs=1e-6) == -0.2
+
+    def test_single_value(self):
+        """단일 값 → 0.0 (초기값 = 최종값)"""
+        assert calculate_total_return([1.0]) == 0.0
+
+
+class TestCalculateWinRate:
+    """calculate_win_rate 테스트 (T-020)"""
+
+    def test_empty_list_returns_zero(self):
+        """빈 목록 → 0.0 반환"""
+        assert calculate_win_rate([]) == 0.0
+
+    def test_all_positive_returns_one(self):
+        """모두 양수 → 승률 1.0"""
+        assert calculate_win_rate([0.01, 0.02, 0.03]) == pytest.approx(1.0)
+
+    def test_all_negative_returns_zero(self):
+        """모두 음수 → 승률 0.0"""
+        assert calculate_win_rate([-0.01, -0.02, -0.03]) == 0.0
+
+    def test_half_positive(self):
+        """절반 양수 → 승률 0.5"""
+        result = calculate_win_rate([0.01, -0.01, 0.02, -0.02])
+        assert pytest.approx(result, abs=1e-6) == 0.5
+
+    def test_mixed_returns(self):
+        """3/5 양수 → 0.6"""
+        result = calculate_win_rate([0.01, -0.01, 0.02, 0.03, -0.005])
+        assert pytest.approx(result, abs=1e-6) == 0.6
+
+
+class TestBuildPortfolioValueSeries:
+    """build_portfolio_value_series 테스트 (T-020)"""
+
+    def test_empty_returns_empty(self):
+        """빈 입력 → 빈 출력"""
+        assert build_portfolio_value_series([]) == []
+
+    def test_starts_near_initial(self):
+        """정규화 — 첫 번째 결과는 (1 + 첫 수익률)"""
+        series = build_portfolio_value_series([0.1])
+        assert pytest.approx(series[0], abs=1e-6) == 1.1
+
+    def test_cumulative_growth(self):
+        """누적 성장 검증"""
+        # 10% → 10% → 총 21% 성장
+        series = build_portfolio_value_series([0.1, 0.1])
+        assert len(series) == 2
+        assert pytest.approx(series[0], abs=1e-6) == 1.1
+        assert pytest.approx(series[1], abs=1e-6) == 1.21
+
+    def test_length_matches_input(self):
+        """출력 길이 = 입력 길이"""
+        returns = [0.01, -0.005, 0.02, -0.01, 0.015]
+        series = build_portfolio_value_series(returns)
+        assert len(series) == len(returns)

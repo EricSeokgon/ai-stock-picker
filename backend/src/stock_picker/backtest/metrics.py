@@ -1,4 +1,4 @@
-# 백테스트 성과 지표 계산 — CAGR, 최대 낙폭, 샤프 비율
+# 백테스트 성과 지표 계산 — CAGR, 최대 낙폭, 샤프 비율, 총 수익률, 승률
 import math
 from datetime import date
 
@@ -98,3 +98,59 @@ def calculate_sharpe_ratio(
     # 연환산 샤프 비율 (√252 스케일링)
     sharpe = (mean_return - daily_risk_free) / std_dev * math.sqrt(252)
     return round(sharpe, 4)
+
+
+def calculate_total_return(cumulative_returns: list[float]) -> float:
+    """총 수익률 계산.
+
+    # @MX:ANCHOR: [AUTO] 총 수익률 계산 — router.py와 테스트 모두 호출
+    # @MX:REASON: get_run 엔드포인트, 테스트 코드에서 fan_in >= 3
+
+    Args:
+        cumulative_returns: 누적 포트폴리오 가치 시계열 (시작값 1.0 기준)
+
+    Returns:
+        총 수익률 (예: 0.20 = 20%). 빈 목록이면 0.0 반환.
+    """
+    if not cumulative_returns:
+        return 0.0
+    # 총 수익률 = 최종값 / 초기값 - 1
+    initial = cumulative_returns[0]
+    if initial == 0:
+        return 0.0
+    return round(cumulative_returns[-1] / initial - 1.0, 6)
+
+
+def calculate_win_rate(daily_returns: list[float]) -> float:
+    """승률 계산.
+
+    # @MX:ANCHOR: [AUTO] 승률 계산 — router.py와 테스트 모두 호출
+    # @MX:REASON: get_run 엔드포인트, 테스트 코드에서 fan_in >= 3
+
+    Args:
+        daily_returns: 일별 수익률 목록
+
+    Returns:
+        승률 (양수 수익 일수 / 전체 유효 일수). 빈 목록이면 0.0 반환.
+    """
+    valid = [r for r in daily_returns if r is not None]
+    if not valid:
+        return 0.0
+    winning_days = sum(1 for r in valid if r > 0)
+    return round(winning_days / len(valid), 6)
+
+
+def build_portfolio_value_series(daily_returns: list[float]) -> list[float]:
+    """일별 수익률에서 포트폴리오 가치 시계열 생성 (시작값 1.0 기준).
+
+    Args:
+        daily_returns: 일별 수익률 목록
+
+    Returns:
+        각 날짜의 포트폴리오 가치 (시작값 1.0으로 정규화)
+    """
+    series = [1.0]
+    for r in daily_returns:
+        series.append(series[-1] * (1.0 + r))
+    # 시작점(1.0)을 제외하고 각 거래일의 값만 반환 (daily_returns와 길이 일치)
+    return series[1:]

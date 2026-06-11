@@ -10,6 +10,8 @@ class BacktestRunRequest(BaseModel):
     strategy: str
     start_date: date
     end_date: date
+    universe_size: int | None = None
+    top_n: int | None = None
 
     @field_validator("strategy")
     @classmethod
@@ -29,6 +31,26 @@ class BacktestRunRequest(BaseModel):
             raise ValueError("종료일은 시작일보다 이후여야 합니다")
         return v
 
+    @field_validator("universe_size")
+    @classmethod
+    def universe_size_positive(cls, v: int | None) -> int | None:
+        if v is not None and v < 1:
+            raise ValueError("universe_size는 1 이상이어야 합니다")
+        return v
+
+    @field_validator("top_n")
+    @classmethod
+    def top_n_positive(cls, v: int | None) -> int | None:
+        if v is not None and v < 1:
+            raise ValueError("top_n은 1 이상이어야 합니다")
+        return v
+
+
+class BacktestStartResponse(BaseModel):
+    """백테스트 시작 응답 — run_id 즉시 반환"""
+    run_id: int
+    message: str
+
 
 class BacktestRunResponse(BaseModel):
     """백테스트 실행 응답"""
@@ -40,6 +62,8 @@ class BacktestRunResponse(BaseModel):
     status: str
     created_at: datetime
     completed_at: datetime | None = None
+    universe_size: int | None = None
+    top_n: int | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -49,7 +73,17 @@ class BacktestRunDetail(BacktestRunResponse):
     cagr: float | None = None
     max_drawdown: float | None = None
     sharpe_ratio: float | None = None
+    total_return: float | None = None
+    win_rate: float | None = None
     total_trades: int = 0
+
+
+class DailyResultTimeSeries(BaseModel):
+    """일별 포트폴리오 가치 시계열"""
+    date: str
+    portfolio_value: float
+    benchmark_value: float | None = None
+    daily_return: float
 
 
 class DailyResultResponse(BaseModel):

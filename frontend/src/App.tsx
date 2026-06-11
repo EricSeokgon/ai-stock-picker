@@ -25,6 +25,8 @@ import Watchlist from './pages/Watchlist';
 import Settings from './pages/Settings';
 import History from './pages/History';
 import Sectors from './pages/Sectors';
+import NotificationsPage from './pages/Notifications';
+import { fetchUnreadCount } from './api/notifications';
 
 const API_BASE_DASHBOARD = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
@@ -55,9 +57,26 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 
 // 모바일 반응형 NavBar — 768px 미만에서 햄버거 메뉴 표시
 function NavBar() {
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user, logout, token } = useAuth();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // 미읽음 알림 수 — 30초마다 폴링 (REQ-FE-001)
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!isAuthenticated || !token) {
+      setUnreadCount(0);
+      return;
+    }
+    const load = () => {
+      fetchUnreadCount(token)
+        .then(setUnreadCount)
+        .catch(() => { /* 네트워크 오류 무시 */ });
+    };
+    load();
+    const interval = setInterval(load, 30_000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, token]);
 
   function handleLogout() {
     logout();
@@ -124,6 +143,39 @@ function NavBar() {
         <Link to="/backtest" style={linkStyle} onClick={handleLinkClick}>백테스트</Link>
         {isAuthenticated && <Link to="/watchlist" style={linkStyle} onClick={handleLinkClick}>관심 목록</Link>}
         {isAuthenticated && <Link to="/settings" style={linkStyle} onClick={handleLinkClick}>설정</Link>}
+        {isAuthenticated && (
+          <Link
+            to="/notifications"
+            onClick={handleLinkClick}
+            aria-label={`알림${unreadCount > 0 ? ` (미읽음 ${unreadCount}개)` : ''}`}
+            style={{ ...linkStyle, position: 'relative', display: 'inline-flex', alignItems: 'center' }}
+          >
+            🔔
+            {unreadCount > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '-6px',
+                  right: '-8px',
+                  background: '#e53935',
+                  color: '#fff',
+                  borderRadius: '50%',
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  minWidth: '16px',
+                  height: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  lineHeight: 1,
+                  padding: '0 2px',
+                }}
+              >
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </Link>
+        )}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           {isAuthenticated ? (
             <>
@@ -417,6 +469,9 @@ export default function App() {
         <Route path="/history" element={<History />} />
         <Route path="/sectors" element={<Sectors />} />
         <Route path="/stocks/:krxCode" element={<StockDetailPage />} />
+        <Route path="/notifications" element={
+          <ProtectedRoute><NotificationsPage /></ProtectedRoute>
+        } />
       </Routes>
     </div>
   );

@@ -15,10 +15,14 @@ vi.mock('../auth/AuthContext', () => ({
 // notifications API 모킹
 const mockSubscribeEmail = vi.fn<[string, string], Promise<EmailSubscription>>();
 const mockUnsubscribeEmail = vi.fn<[string], Promise<{ message: string }>>();
-vi.mock('../api/notifications', () => ({
-  subscribeEmail: (...args: [string, string]) => mockSubscribeEmail(...args),
-  unsubscribeEmail: (...args: [string]) => mockUnsubscribeEmail(...args),
-}));
+vi.mock('../api/notifications', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/notifications')>();
+  return {
+    ...actual,
+    subscribeEmail: (...args: [string, string]) => mockSubscribeEmail(...args),
+    unsubscribeEmail: (...args: [string]) => mockUnsubscribeEmail(...args),
+  };
+});
 
 // Navigate 모킹
 vi.mock('react-router-dom', async (importOriginal) => {

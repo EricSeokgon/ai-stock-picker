@@ -1,6 +1,6 @@
 # Progress — SPEC-STOCK-013 알림·모니터링 시스템 (Phase 14)
 
-- **상태**: PLANNING
+- **상태**: RUN COMPLETE
 - **생성**: 2026-06-11
 - **갱신**: 2026-06-11
 - **작성자**: ircp
@@ -12,7 +12,7 @@
 | 단계 | 상태 |
 |------|------|
 | Plan (기획) | 완료 |
-| Run (구현) | 대기 |
+| Run (구현) | 완료 |
 | Sync (문서화) | 대기 |
 
 ---
@@ -21,12 +21,12 @@
 
 | 마일스톤 | 설명 | 상태 |
 |----------|------|------|
-| M1 | 데이터 모델 & 마이그레이션 0014 (notifications) | TODO |
-| M2 | 인박스 서비스 & 라우터 | TODO |
-| M3 | 가격 알림 → 인박스 연동 | TODO |
-| M4 | 추천 변경 감지 | TODO |
-| M5 | 프론트 알림 인박스 UI | TODO |
-| M6 | 테스트 & 품질 게이트 | TODO |
+| M1 | 데이터 모델 & 마이그레이션 0014 (notifications) | DONE |
+| M2 | 인박스 서비스 & 라우터 | DONE |
+| M3 | 가격 알림 → 인박스 연동 | DONE |
+| M4 | 추천 변경 감지 | DONE |
+| M5 | 프론트 알림 인박스 UI | DONE |
+| M6 | 테스트 & 품질 게이트 | DONE |
 
 ---
 
@@ -42,7 +42,16 @@
 
 ---
 
+## 구현 결과 (M6 완료 기준)
+
+- **백엔드 테스트**: 18/18 통과
+  - `backend/tests/unit/test_rec_change.py` (8개): `check_rec_changes()`, `_insert_notification_safe()` 단위 테스트
+  - `backend/tests/integration/test_inbox_router.py` (10개): 인박스 HTTP 엔드포인트 통합 테스트
+- **프론트엔드 테스트**: 170/170 통과
+  - `frontend/src/__tests__/notifications_inbox.test.ts` (11개): 인박스 API 함수 단위 테스트
+  - `frontend/src/__tests__/Settings.test.tsx` (importOriginal 패턴 적용)
+- **버그 수정**: `frontend/src/api/*.js` 스테일 컴파일 아티팩트 삭제 (vitest가 `.ts` 대신 `.js` 로드하던 문제)
+
 ## 다음 액션
 
-- `/moai run SPEC-STOCK-013` 으로 M1(모델·마이그레이션)부터 구현 시작.
-- RUN 단계에서 `/notifications` prefix 경로 충돌(기존 email_router) 여부를 검증하고 필요 시 `/notifications/inbox` 네임스페이스로 분리.
+- `/moai sync SPEC-STOCK-013` 으로 문서화 및 PR 생성.

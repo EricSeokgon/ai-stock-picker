@@ -412,3 +412,55 @@ class RecommendationFeedback(Base):
         Integer, ForeignKey("users.id"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+# ── Phase H: 알림·모니터링 시스템 (SPEC-STOCK-013) ─────────────────────────────
+
+class Notification(Base):
+    """인앱 알림 인박스 — 가격 알림·추천 변동을 사용자별로 수신"""
+
+    # @MX:ANCHOR: [AUTO] 알림 인박스 핵심 엔티티
+    # @MX:REASON: inbox_router, _trigger_alert (scheduler), rec_change 등 3개 이상 모듈에서 생성·조회
+    # @MX:SPEC: SPEC-STOCK-013 REQ-NOTI-001
+
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    # 알림 타입: price_alert | rec_new | rec_dropped
+    type: Mapped[str] = mapped_column(String(20), nullable=False)
+    krx_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # 기준일 (rec 변동 → trade_date, price_alert → triggered_at.date)
+    ref_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    related_alert_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("watchlist_alerts.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    read_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMPTZ(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        # 중복 알림 방지: 동일 사용자·타입·종목·기준일 알림 1회만 허용
+        UniqueConstraint(
+            "user_id", "type", "krx_code", "ref_date",
+            name="uq_notification_user_type_code_date",
+        ),
+        # 미읽음 우선 목록 조회 최적화
+        Index("ix_notifications_user_read_created", "user_id", "is_read", "created_at"),
+    )
+
+    # 연관 관계
+    user: Mapped["User"] = relationship("User", lazy="noload")
+    related_alert: Mapped["WatchlistAlert | None"] = relationship(
+        "WatchlistAlert", lazy="noload"
+    )

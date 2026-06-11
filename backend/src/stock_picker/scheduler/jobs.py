@@ -123,17 +123,24 @@ async def run_sector_aggregation() -> None:
 
 
 async def run_daily_pipeline() -> None:
-    """일일 파이프라인: 수집 → 분석 → 섹터집계 → 추천 (REQ-NEWS-001).
+    """일일 파이프라인: 수집 → 분석 → 섹터집계 → 추천 → 추천 변동 알림 (REQ-NEWS-001).
 
     오전 6시에 APScheduler가 호출한다.
     각 단계는 순서대로 실행되며, 섹터 집계 단계 실패 시 이후 단계도 계속된다.
     """
+    from stock_picker.notifications.rec_change import check_rec_changes
+
     log.info("일일 파이프라인 시작")
     try:
         await collect_all()
         await run_analysis()
         await run_sector_aggregation()
         await run_recommendation()
+        # REQ-RC-001: 추천 파이프라인 직후 변동 감지
+        try:
+            check_rec_changes()
+        except Exception:
+            log.exception("추천 변동 알림 생성 실패 — 파이프라인 계속 진행")
         log.info("일일 파이프라인 완료")
     except Exception:
         log.exception("일일 파이프라인 오류 발생")
@@ -144,14 +151,21 @@ async def run_intraday_pipeline() -> None:
     """장중 30분 증분 파이프라인 (REQ-NEWS-002, REQ-REC-006).
 
     09:00~15:30 매 30분마다 APScheduler가 호출한다.
-    증분 수집 → 분석 → 섹터집계 → 추천 재계산 순서로 실행한다.
+    증분 수집 → 분석 → 섹터집계 → 추천 재계산 → 추천 변동 알림 순서로 실행한다.
     """
+    from stock_picker.notifications.rec_change import check_rec_changes
+
     log.info("장중 증분 파이프라인 시작")
     try:
         await collect_all()
         await run_analysis()
         await run_sector_aggregation()
         await run_recommendation()
+        # UNIQUE 제약으로 같은 날 중복 생성 방지 (REQ-RC-007)
+        try:
+            check_rec_changes()
+        except Exception:
+            log.exception("추천 변동 알림 생성 실패 — 파이프라인 계속 진행")
         log.info("장중 증분 파이프라인 완료")
     except Exception:
         log.exception("장중 증분 파이프라인 오류 발생")
@@ -211,7 +225,33 @@ def _trigger_alert(alert, current_price: float, db) -> None:
         except Exception:
             log.exception("이메일 알림 발송 실패 — alert_id=%s", alert.id)
 
-    # 3) 알림 비활성화
+    # 3) 인박스 알림 생성 (REQ-PA-001)
+    try:
+        from stock_picker.db.models import Notification
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        ref_date = datetime.utcnow().date()
+        stmt = pg_insert(Notification).values(
+            user_id=alert.user_id,
+            type="price_alert",
+            krx_code=alert.krx_code,
+            title=f"[가격 알림] {alert.krx_code} 목표가 도달",
+            body=(
+                f"현재가 {current_price:,.0f}원이 목표가 "
+                f"{alert.target_price:,.0f}원에 도달했습니다."
+            ),
+            is_read=False,
+            ref_date=ref_date,
+            related_alert_id=alert.id,
+        )
+        stmt = stmt.on_conflict_do_nothing(
+            constraint="uq_notification_user_type_code_date"
+        )
+        db.execute(stmt)
+    except Exception:
+        log.exception("인박스 알림 생성 실패 — alert_id=%s", alert.id)
+
+    # 4) 알림 비활성화
     alert.is_active = False
     alert.triggered_at = datetime.utcnow()
     db.commit()

@@ -7,6 +7,96 @@
 
 ---
 
+## [0.13.0] - 2026-06-11
+
+### Added (Phase 13: 백테스트 엔진 완성 — SPEC-STOCK-012)
+
+#### 백엔드: 백테스트 시스템 완성
+- **Alembic 마이그레이션 0013**
+  - `backtest_runs` 테이블에 `universe_size`, `top_n` 컬럼(nullable, 정수) 추가
+  - 실행 시점의 파라미터 영속화
+
+- **POST /backtest/run 스키마 정합**
+  - 요청: `{strategy, start_date, end_date, universe_size?, top_n?}` (선택 파라미터)
+  - 응답: HTTP 202 + `{run_id, message}` (백엔드-프론트 계약 통일)
+  - start_date >= end_date 검증 (HTTP 422)
+  - universe_size/top_n 1 이상 검증
+
+- **상태 값 통일**
+  - `error` → `failed` 상태값 일원화
+  - pending/running/done/failed 4가지 상태로 통일
+
+- **성과 지표 확장**
+  - `calculate_total_return()`: 포트폴리오 누적 수익률 (최종/초기-1)
+  - `calculate_win_rate()`: 수익 양수 거래일 / 전체 거래일 (0~1 범위)
+  - `build_portfolio_value_series()`: 날짜별 포트폴리오 가치 시계열
+  - 거래일 데이터 부재 시 안전한 기본값(0.0) 반환 (0 나누기 방지)
+
+- **벤치마크 수집·정규화**
+  - `_fetch_benchmark_data()`: FinanceDataReader로 KS11(KOSPI), KQ11(KOSDAQ) 지수 수집
+  - 벤치마크 실패 시 run 중단 없이 `benchmark_value=null` 처리 (graceful degradation)
+  - `_normalize_series()`: 동일 기준(시작값) 기반 정규화
+
+- **일별 결과 응답 스키마 변경**
+  - 기존: `PaginatedDailyResults`(거래 단위: trade_date, krx_code, signal, price, return_pct)
+  - 신규: flat array `[{date, portfolio_value, benchmark_value, daily_return}]` (날짜 단위)
+
+- **GET /backtest/runs/{id} 응답 확장**
+  - cagr, max_drawdown, sharpe_ratio, total_return, win_rate, total_trades 포함
+
+- **러너 파라미터 통합**
+  - 하드코딩된 `_TOP_N` 제거 → `top_n`, `universe_size` 파라미터 사용
+  - FinanceDataReader 동기 호출을 `run_in_executor`로 래핑 (asyncio 논블로킹)
+
+#### 프론트엔드: 프론트-백 계약 정합
+- **backtest.ts 타입 정합**
+  - `BacktestStartResponse`: `{run_id: string, message: string}` (HTTP 202)
+  - `BacktestRun`: `{id: string, win_rate, total_trades, completed_at, ...}` 추가 필드
+  - `BacktestDailyResult`: `{benchmark_value: null|number}` 허용 (null-safe)
+
+- **Backtest.tsx 강화**
+  - universe_size, top_n 선택 입력 필드 추가
+  - POST 응답 run_id로 자동 상세 페이지 확장
+  - win_rate, total_return 퍼센트 표시
+  - benchmark null 처리 (차트 렌더링 안 함)
+  - pending/running 상태 배지 + 진행 중 메시지 표시
+
+#### 테스트 및 품질 보증
+- **백엔드 테스트**: 신규 테스트 추가
+  - test_backtest_metrics.py: total_return, win_rate, portfolio_series 신규 케이스 29개
+  - test_backtest_runner.py: 신규 파일 (상태전환, 벤치마크실패, universe 파라미터) 다수
+  - test_backtest_router.py: POST 202 구조, universe_size/top_n 검증, flat array 결과
+  - **전체 테스트**: 551/556 통과 (5개 사전 존재 collector HTTP 테스트 실패, 이번 구현 무관)
+
+- **프론트엔드 테스트**: 신규 테스트
+  - src/__tests__/backtest.test.ts: 23개 테스트 작성·통과
+
+- **테스트 커버리지**: 85%+ 유지
+
+### Changed
+
+- 백테스트 응답: POST `/backtest/run` 이제 HTTP 202 + `{run_id, message}` 반환
+- 상태 enum: `error` → `failed` 통일
+- 결과 형식: 거래 단위 → 날짜 단위 시계열로 변경
+- 벤치마크: KOSPI/KOSDAQ 자동 수집 및 정규화
+
+### Fixed
+
+- 프론트-백 계약 불일치: 응답 형식·status enum·결과 시계열 일원화
+- 벤치마크 데이터 미수집 시에도 백테스트 계속 진행 (graceful degradation)
+- 거래일 데이터 부재 시 0 나누기 오류 방지
+
+### Non-Goals (제외 항목)
+
+- 거래 비용·슬리피지·세금 모델링
+- 신규 전략 추가 (momentum/volume 외)
+- 결과 캐싱/Redis
+- 포트폴리오 리밸런싱 정교화
+- CSV/PDF 내보내기·결과 공유
+- 다중 벤치마크 사용자 선택
+
+---
+
 ## [0.12.0] - 2026-06-11
 
 ### Added (Phase 12: GitHub Actions CI/CD 파이프라인 — SPEC-STOCK-011)

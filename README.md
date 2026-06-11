@@ -361,14 +361,29 @@ curl -X POST http://localhost:8000/health
 | `GET` | `/portfolios/{id}/performance` | 포트폴리오 성과 분석 |
 | `POST` | `/portfolios/{id}/ai-analysis` | 포트폴리오 AI 분석 (claude-haiku-4-5) (Phase 4 신규) |
 
-### 백테스팅 (Backtesting)
+### 백테스팅 (Backtesting) — Phase 13 완성 (SPEC-STOCK-012)
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| `POST` | `/backtest/run` | 백테스트 실행 (전략, 기간, 종목) |
+| `POST` | `/backtest/run` | 백테스트 실행 (전략, 기간, universe_size, top_n) — HTTP 202 반환 |
 | `GET` | `/backtest/runs` | 백테스트 이력 조회 |
-| `GET` | `/backtest/runs/{id}` | 백테스트 결과 조회 |
-| `GET` | `/backtest/runs/{id}/results` | 일별 백테스트 결과 |
+| `GET` | `/backtest/runs/{id}` | 백테스트 결과 조회 (지표: cagr, max_drawdown, sharpe_ratio, total_return, win_rate) |
+| `GET` | `/backtest/runs/{id}/results` | 일자 단위 가치 시계열 (date, portfolio_value, benchmark_value, daily_return) |
+
+**주요 기능**:
+- **전략 선택**: momentum (모멘텀) 또는 volume (거래량) 전략
+- **종목 선택 파라미터**:
+  - `universe_size`: 후보 종목 수 (기본값 정의)
+  - `top_n`: 최종 포트폴리오에 포함할 상위 종목 수 (기본값 정의)
+- **벤치마크 비교**: KOSPI(KS11) 및 KOSDAQ(KQ11) 지수 자동 수집
+  - 동일 기준으로 정규화된 포트폴리오·벤치마크 가치 시계열
+  - 벤치마크 데이터 미수집 시에도 백테스트 계속 진행 (benchmark_value=null)
+- **성과 지표**: 
+  - 누적 수익률(total_return): 최종 / 초기 가치 - 1
+  - 승률(win_rate): 수익 양수 거래일 / 전체 거래일
+  - CAGR, 최대 낙폭, 샤프 비율
+  - 거래일 데이터 없을 시 안전한 기본값(0.0) 반환
+- **상태 관리**: pending → running → done (또는 failed)
 
 ### 텔레그램 봇 (Telegram)
 

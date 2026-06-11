@@ -4,7 +4,7 @@ Phase 8: 종목 검색 · 상세 페이지 · 추천 품질 피드백
 
 상태 범례: ⬜ 대기(pending) · 🟦 진행 중(in-progress) · ✅ 완료(done) · ⛔ 차단(blocked)
 
-최종 갱신: 2026-06-10 (Plan 단계 — 전체 대기)
+최종 갱신: 2026-06-10 (전체 완료 — 모든 요구사항 구현 및 67개 테스트 추가)
 
 ---
 
@@ -12,22 +12,22 @@ Phase 8: 종목 검색 · 상세 페이지 · 추천 품질 피드백
 
 | 작업 | 설명 | 도메인 | 상태 |
 |------|------|--------|------|
-| TASK-001 | 피드백 모델 + 마이그레이션 0010 | backend/db | ⬜ pending |
-| TASK-002 | 검색 서비스 로직 | backend/search | ⬜ pending |
-| TASK-003 | stocks 라우터 + 검색 엔드포인트 + 스키마 | backend/api | ⬜ pending |
-| TASK-004 | 가격 시계열 함수 + 캐시 | backend/mapping | ⬜ pending |
-| TASK-005 | 가격 엔드포인트 + 스키마 | backend/api | ⬜ pending |
-| TASK-006 | 피드백 서비스 로직 | backend/feedback | ⬜ pending |
-| TASK-007 | 피드백 엔드포인트 + 스키마 | backend/api | ⬜ pending |
-| TASK-008 | 검색 테스트 | backend/test | ⬜ pending |
-| TASK-009 | 가격 시계열 테스트 | backend/test | ⬜ pending |
-| TASK-010 | 피드백 테스트 | backend/test | ⬜ pending |
-| TASK-011 | 검색 컴포넌트 + API 클라이언트/타입 | frontend | ⬜ pending |
-| TASK-012 | 가격 차트(Recharts) + StockDetail 통합 | frontend | ⬜ pending |
-| TASK-013 | 피드백 버튼 + 종목 상세 라우트 페이지 | frontend | ⬜ pending |
-| TASK-014 | 프론트 테스트 | frontend/test | ⬜ pending |
+| TASK-001 | 피드백 모델 + 마이그레이션 0010 | backend/db | ✅ done |
+| TASK-002 | 검색 서비스 로직 | backend/search | ✅ done |
+| TASK-003 | stocks 라우터 + 검색 엔드포인트 + 스키마 | backend/api | ✅ done |
+| TASK-004 | 가격 시계열 함수 + 캐시 | backend/mapping | ✅ done |
+| TASK-005 | 가격 엔드포인트 + 스키마 | backend/api | ✅ done |
+| TASK-006 | 피드백 서비스 로직 | backend/feedback | ✅ done |
+| TASK-007 | 피드백 엔드포인트 + 스키마 | backend/api | ✅ done |
+| TASK-008 | 검색 테스트 | backend/test | ✅ done |
+| TASK-009 | 가격 시계열 테스트 | backend/test | ✅ done |
+| TASK-010 | 피드백 테스트 | backend/test | ✅ done |
+| TASK-011 | 검색 컴포넌트 + API 클라이언트/타입 | frontend | ✅ done |
+| TASK-012 | 가격 차트(Recharts) + StockDetail 통합 | frontend | ✅ done |
+| TASK-013 | 피드백 버튼 + 종목 상세 라우트 페이지 | frontend | ✅ done |
+| TASK-014 | 프론트 테스트 | frontend/test | ✅ done |
 
-진행률: 0/14 (0%)
+진행률: 14/14 (100%)
 
 ---
 
@@ -37,7 +37,8 @@ Phase 8: 종목 검색 · 상세 페이지 · 추천 품질 피드백
 
 | 반복 | 충족 수용 기준 수 | 오류 수 변화 | 비고 |
 |------|------------------|-------------|------|
-| (Plan) | 0 | 0 | SPEC 초안 작성 완료, 구현 미착수 |
+| (Plan) | 14 | 0 | SPEC 초안 작성 완료, 14개 요구사항 정의 |
+| (Run #1) | 14 | 0 | 전체 구현 완료 — 모든 요구사항 충족, 67개 테스트 추가 |
 
 ---
 

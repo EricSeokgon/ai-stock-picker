@@ -2,9 +2,10 @@
 
 - **SPEC ID**: SPEC-STOCK-012
 - **제목**: 백테스트 엔진 완성 (Phase 13)
-- **Status**: IN_PROGRESS
+- **Status**: DONE
 - **Phase**: Phase 13
 - **생성일**: 2026-06-11
+- **완료일**: 2026-06-11
 - **작성자**: ircp
 
 ---
@@ -14,8 +15,8 @@
 | 단계 | 상태 | 비고 |
 | --- | --- | --- |
 | Plan (기획) | 완료 | spec/tasks/acceptance/progress 4파일 작성 |
-| Run (구현) | 진행 중 | M1~M4 + M6(BE) 완료, M5(FE) 대기 |
-| Sync (문서화) | 대기 | README·CHANGELOG 갱신 |
+| Run (구현) | 완료 | M1~M6 모두 완료 (BE/FE 계약 정합, 벤치마크, 지표) |
+| Sync (문서화) | 완료 | README·CHANGELOG v0.13.0 동기화 |
 
 ## 마일스톤 진행
 
@@ -58,4 +59,5 @@
 
 ## 변경 이력
 
-- 2026-06-11: SPEC 초안 작성 (v0.1.0), Status=PLANNING.
+- 2026-06-11: SPEC 초안 작성 (v0.1.0), Status=PLANNING
+- 2026-06-11: Phase 13 구현 완료 (v1.0.0), Status=DONE. M1~M6 마일스톤 전체 달성, 백테스트 시스템 완성.

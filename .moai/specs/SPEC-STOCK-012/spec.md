@@ -1,7 +1,7 @@
 ---
 id: SPEC-STOCK-012
-version: 0.1.0
-status: planning
+version: 1.0.0
+status: done
 created: 2026-06-11
 updated: 2026-06-11
 author: ircp

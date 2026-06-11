@@ -7,6 +7,54 @@
 
 ---
 
+## [0.14.0] - 2026-06-11
+
+### Added (Phase 14: 알림·인박스 시스템 — SPEC-STOCK-013)
+
+#### 백엔드: 알림 인박스 시스템
+- **Alembic 마이그레이션 0014**
+  - `notifications` 테이블 신규 생성
+  - 컬럼: id, user_id(FK→users, CASCADE), type, krx_code, title, body, is_read(기본 false), ref_date(nullable), related_alert_id(FK→watchlist_alerts, nullable), created_at, read_at
+  - 중복 방지 UNIQUE 제약: `(user_id, type, krx_code, ref_date)` — 장중 30분 재실행 멱등성 보장
+
+- **인박스 라우터** (`inbox_router.py`, prefix `/notifications/inbox`, JWT 인증 필수)
+  - `GET /notifications/inbox` — 알림 목록 조회 (`unread_only`, `limit` 파라미터)
+  - `GET /notifications/inbox/unread-count` — 미읽음 개수
+  - `PATCH /notifications/inbox/{id}/read` — 단건 읽음 처리
+  - `PATCH /notifications/inbox/read-all` — 전체 읽음 처리
+
+- **추천 변경 감지** (`rec_change.py`)
+  - `check_rec_changes()`: 현재 `trade_date` 추천 유니버스 vs 직전 `trade_date` 비교
+  - 관심 종목이 추천에 신규 진입 → `rec_new` 알림 생성
+  - 관심 종목이 추천에서 이탈 → `rec_dropped` 알림 생성
+  - UNIQUE 제약으로 중복 알림 방지 (멱등성)
+
+- **스케줄러 연동** (`scheduler/jobs.py`)
+  - `_trigger_alert`: 텔레그램/이메일 발송 외 인박스 레코드 추가 생성
+  - `run_daily_pipeline` / `run_intraday_pipeline`: 추천 파이프라인 직후 `check_rec_changes()` 호출 (신규 타이머 없음, graceful degradation)
+
+#### 프론트엔드: 알림 인박스 UI
+- **NavBar 알림 종 아이콘**: 미읽음 배지 표시, 비로그인 시 숨김
+- **알림 인박스 페이지** (`/notifications` 라우트)
+  - 최신 순 목록, 읽음/미읽음 시각 구분
+  - 단건·전체 읽음 처리, 배지 즉시 갱신
+- **인박스 API 함수** (`notifications.ts`)
+  - `fetchNotifications`, `fetchUnreadCount`, `markNotificationRead`, `markAllNotificationsRead`
+
+#### 테스트 및 품질 보증
+- **백엔드 테스트**: 18/18 통과
+  - `test_rec_change.py` (8개): `check_rec_changes()`, `_insert_notification_safe()` 단위 테스트
+  - `test_inbox_router.py` (10개): 인박스 HTTP 엔드포인트 통합 테스트
+- **프론트엔드 테스트**: 170/170 통과
+  - `notifications_inbox.test.ts` (11개): 인박스 API 함수 단위 테스트
+  - `Settings.test.tsx` (`importOriginal` 패턴 적용)
+
+### Fixed
+
+- **스테일 컴파일 아티팩트 제거**: `frontend/src/api/*.js` 9개 삭제 — vitest가 `.ts` 대신 `.js`를 로드하던 문제 해결
+
+---
+
 ## [0.13.0] - 2026-06-11
 
 ### Added (Phase 13: 백테스트 엔진 완성 — SPEC-STOCK-012)

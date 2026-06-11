@@ -1,6 +1,6 @@
 # Progress — SPEC-STOCK-013 알림·모니터링 시스템 (Phase 14)
 
-- **상태**: RUN COMPLETE
+- **상태**: SYNC COMPLETE
 - **생성**: 2026-06-11
 - **갱신**: 2026-06-11
 - **작성자**: ircp
@@ -13,7 +13,7 @@
 |------|------|
 | Plan (기획) | 완료 |
 | Run (구현) | 완료 |
-| Sync (문서화) | 대기 |
+| Sync (문서화) | 완료 |
 
 ---
 
@@ -54,4 +54,4 @@
 
 ## 다음 액션
 
-- `/moai sync SPEC-STOCK-013` 으로 문서화 및 PR 생성.
+SPEC-STOCK-013 완료. 다음 SPEC 계획 시 /moai plan 사용.

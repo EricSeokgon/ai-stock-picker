@@ -4,6 +4,15 @@
 
 ## 핵심 기능
 
+### 알림·인박스 시스템 (Phase 14 신규 — SPEC-STOCK-013)
+- **인앱 알림 인박스**: 가격 알림·추천 변경 이력을 앱 내부에 영속 저장, 미읽음/읽음 상태 관리
+- **인박스 API**: `GET /notifications/inbox` 목록 조회, `PATCH` 읽음 처리, `GET /notifications/inbox/unread-count` 미읽음 배지
+- **추천 변경 알림**: 관심 종목이 추천에 신규 진입(`rec_new`) / 이탈(`rec_dropped`) 시 자동 인박스 알림 생성
+- **가격 알림 인박스 연동**: 기존 텔레그램/이메일 알림 발동 시 동시에 인박스 레코드 저장
+- **NavBar 종 아이콘**: 미읽음 배지 표시 + 알림 인박스 페이지(`/notifications`), 비로그인 시 숨김
+- **멱등 중복 방지**: `UNIQUE(user_id, type, krx_code, ref_date)` — 장중 30분 재실행에도 중복 알림 없음
+- **마이그레이션 0014**: `notifications` 테이블 단일 추가, 인덱스 `(user_id, is_read, created_at DESC)` 최적화
+
 ### 섹터 분석 대시보드 (Phase 9 신규 — SPEC-STOCK-008)
 - **섹터 집계 생산자**: 일별 AnalysisResult → sector_trends 자동 집계, trend_score = avg_sentiment×0.7 + log(volume+1)×0.3
 - **섹터 순위 API**: `GET /sectors/ranking?sort=score|sentiment|volume` 실시간 섹터 랭킹

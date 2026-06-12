@@ -1,11 +1,14 @@
-# 포트폴리오 서비스 레이어 — CRUD + 성과 계산
+# 포트폴리오 서비스 레이어 — CRUD + 성과 계산 (SPEC-STOCK-017 확장)
 import logging
+from collections import defaultdict
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from stock_picker.db.models import Portfolio, PortfolioHolding
+from stock_picker.portfolio.utils import get_sector
+from stock_picker.realtime.price_feed import get_current_price
 
 logger = logging.getLogger(__name__)
 
@@ -76,48 +79,42 @@ def remove_holding(db: Session, holding_id: int) -> None:
         db.commit()
 
 
-def _get_current_price(krx_code: str) -> float:
-    """FinanceDataReader로 현재가 조회.
+def _classify(return_pct: float) -> str:
+    """수익률 기반 성과 분류.
 
-    # @MX:WARN: [AUTO] 외부 API 호출 — 네트워크 오류 시 fallback 필요
-    # @MX:REASON: FinanceDataReader는 동기 HTTP 호출이며 타임아웃 처리 없음
-
-    실패 시 0.0 반환 (호출부에서 처리).
+    # @MX:NOTE: [AUTO] REQ-PERF-003 분류 기준 — high: >=+5%, low: <=-5%, 나머지: normal
     """
-    try:
-        import FinanceDataReader as fdr
-        df = fdr.DataReader(krx_code)
-        if df is None or df.empty:
-            logger.warning("가격 데이터 없음 — krx_code=%s", krx_code)
-            return 0.0
-        close_col = "Close" if "Close" in df.columns else df.columns[-1]
-        return float(df[close_col].iloc[-1])
-    except Exception:
-        logger.exception("현재가 조회 실패 — krx_code=%s", krx_code)
-        return 0.0
+    if return_pct >= 5.0:
+        return "high"
+    if return_pct <= -5.0:
+        return "low"
+    return "normal"
 
 
 def calculate_performance(
     db: Session, portfolio_id: int, user_id: int
 ) -> dict[str, Any]:
-    """포트폴리오 성과 계산 — 현재가 기반.
+    """포트폴리오 성과 계산 — Redis 캐시 현재가 기반 (SPEC-STOCK-017).
+
+    # @MX:ANCHOR: [AUTO] calculate_performance — router, tests 3곳 이상에서 참조
+    # @MX:REASON: [AUTO] 성과 API의 단일 계산 진입점 (SPEC-STOCK-017 REQ-PERF-001~009)
 
     Returns:
         {
-            "holdings": [
-                {
-                    "krx_code": "005930",
-                    "quantity": 10,
-                    "avg_buy_price": 70000.0,
-                    "current_price": 75000.0,
-                    "return_pct": 7.14,
-                }
-            ],
-            "total_invested": 700000.0,
-            "total_current": 750000.0,
-            "total_return_pct": 7.14,
+            "holdings": [...],
+            "total_invested": float,
+            "total_current": float,
+            "total_return_pct": float,
+            "classification_summary": {"high": {...}, "normal": {...}, "low": {...}},
+            "sector_performance": [...],
         }
     """
+    _empty_summary = {
+        "high": {"count": 0, "invested": 0.0, "invested_pct": 0.0},
+        "normal": {"count": 0, "invested": 0.0, "invested_pct": 0.0},
+        "low": {"count": 0, "invested": 0.0, "invested_pct": 0.0},
+    }
+
     portfolio = get_portfolio_with_holdings(db, portfolio_id, user_id)
     if portfolio is None:
         return {
@@ -125,24 +122,42 @@ def calculate_performance(
             "total_invested": 0.0,
             "total_current": 0.0,
             "total_return_pct": 0.0,
+            "classification_summary": _empty_summary,
+            "sector_performance": [],
         }
 
-    holdings_perf = []
+    holdings_perf: list[dict[str, Any]] = []
     total_invested = 0.0
     total_current = 0.0
+    # 섹터별 집계용 임시 구조
+    sector_map: dict[str, dict[str, Any]] = defaultdict(
+        lambda: {"invested": 0.0, "current": 0.0, "count": 0}
+    )
 
     for h in portfolio.holdings:
         buy_price = float(h.avg_buy_price)
-        current_price = _get_current_price(h.krx_code)
         invested = buy_price * h.quantity
-        current_val = current_price * h.quantity
 
-        # 현재가 조회 실패 시 매수가로 대체
-        if current_price == 0.0:
+        # Redis 캐시 지원 현재가 조회 (get_current_price: dict | None)
+        price_result = get_current_price(h.krx_code)
+        price_unavailable = price_result is None
+
+        if price_unavailable:
+            # 현재가 미수신 시 매수가로 대체, 수익률 0
             current_price = buy_price
             current_val = invested
+            return_pct = 0.0
+            logger.warning("현재가 조회 실패 — krx_code=%s, 매수가로 대체", h.krx_code)
+        else:
+            current_price = float(price_result["price"])  # type: ignore[index]
+            current_val = current_price * h.quantity
+            # 매입가 0 → 0 나눗셈 방지
+            return_pct = (
+                ((current_price - buy_price) / buy_price * 100) if buy_price > 0 else 0.0
+            )
 
-        return_pct = ((current_price - buy_price) / buy_price * 100) if buy_price > 0 else 0.0
+        classification = _classify(return_pct)
+        sector = get_sector(h.krx_code)
 
         holdings_perf.append({
             "krx_code": h.krx_code,
@@ -150,9 +165,18 @@ def calculate_performance(
             "avg_buy_price": buy_price,
             "current_price": current_price,
             "return_pct": round(return_pct, 2),
+            "classification": classification,
+            "sector": sector,
+            "price_unavailable": price_unavailable,
         })
+
         total_invested += invested
         total_current += current_val
+
+        # 섹터 집계
+        sector_map[sector]["invested"] += invested
+        sector_map[sector]["current"] += current_val
+        sector_map[sector]["count"] += 1
 
     total_return_pct = (
         ((total_current - total_invested) / total_invested * 100)
@@ -160,9 +184,45 @@ def calculate_performance(
         else 0.0
     )
 
+    # classification_summary 계산
+    summary: dict[str, dict[str, Any]] = {
+        "high": {"count": 0, "invested": 0.0, "invested_pct": 0.0},
+        "normal": {"count": 0, "invested": 0.0, "invested_pct": 0.0},
+        "low": {"count": 0, "invested": 0.0, "invested_pct": 0.0},
+    }
+    for hp in holdings_perf:
+        cls = hp["classification"]
+        invested_val = hp["avg_buy_price"] * hp["quantity"]
+        summary[cls]["count"] += 1
+        summary[cls]["invested"] += invested_val
+
+    if total_invested > 0:
+        for cls in summary:
+            summary[cls]["invested_pct"] = round(
+                summary[cls]["invested"] / total_invested * 100, 2
+            )
+
+    # sector_performance 계산 (투자금 내림차순 정렬)
+    sector_perf = []
+    for sector_name, data in sector_map.items():
+        s_invested = data["invested"]
+        s_current = data["current"]
+        s_return_pct = (
+            ((s_current - s_invested) / s_invested * 100) if s_invested > 0 else 0.0
+        )
+        sector_perf.append({
+            "sector": sector_name,
+            "holding_count": data["count"],
+            "invested": round(s_invested, 2),
+            "return_pct": round(s_return_pct, 2),
+        })
+    sector_perf.sort(key=lambda x: x["invested"], reverse=True)
+
     return {
         "holdings": holdings_perf,
         "total_invested": round(total_invested, 2),
         "total_current": round(total_current, 2),
         "total_return_pct": round(total_return_pct, 2),
+        "classification_summary": summary,
+        "sector_performance": sector_perf,
     }

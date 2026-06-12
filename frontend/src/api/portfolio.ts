@@ -20,25 +20,46 @@ export interface Holding {
   created_at: string;
 }
 
-// 성과 데이터 타입
+// 성과 데이터 타입 (SPEC-STOCK-017: 백엔드 응답과 정합화 + 신규 필드 추가)
 export interface HoldingPerformance {
   krx_code: string;
   quantity: number;
   avg_buy_price: number;
-  current_price: number | null;
+  current_price: number;
+  return_pct: number;
+  // SPEC-STOCK-017 신규 필드
+  classification: 'high' | 'normal' | 'low';
+  sector: string;
+  price_unavailable: boolean;
+}
+
+export interface ClassificationGroup {
+  count: number;
   invested: number;
-  current_value: number | null;
-  return_pct: number | null;
+  invested_pct: number;
+}
+
+export interface ClassificationSummary {
+  high: ClassificationGroup;
+  normal: ClassificationGroup;
+  low: ClassificationGroup;
+}
+
+export interface SectorPerformance {
+  sector: string;
+  holding_count: number;
+  invested: number;
+  return_pct: number;
 }
 
 export interface PortfolioPerformance {
-  portfolio_id: number;
-  holdings_count: number;
-  total_invested: number;
-  current_value: number | null;
-  total_return: number | null;
-  total_return_pct: number | null;
   holdings: HoldingPerformance[];
+  total_invested: number;
+  total_current: number;
+  total_return_pct: number;
+  // SPEC-STOCK-017 신규 필드
+  classification_summary: ClassificationSummary;
+  sector_performance: SectorPerformance[];
 }
 
 // @MX:ANCHOR: [AUTO] 포트폴리오 API 공통 헤더 생성 — Portfolio/Backtest/AuthContext에서 호출

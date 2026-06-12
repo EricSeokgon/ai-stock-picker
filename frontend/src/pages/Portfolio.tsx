@@ -12,6 +12,7 @@ import {
   type PortfolioPerformance,
 } from '../api/portfolio';
 import { LivePriceBadge } from '../components/LivePriceBadge';
+import { PerformanceDonutChart } from '../components/PerformanceDonutChart';
 import {
   fetchRebalanceAdvice,
   fetchRiskProfile,
@@ -420,7 +421,7 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
           </div>
           <div style={{ minWidth: '80px' }}>
             <span style={{ fontSize: '0.75rem', color: '#666' }}>현재 평가금</span><br />
-            <strong>{performance.current_value !== null ? `₩${performance.current_value.toLocaleString()}` : '-'}</strong>
+            <strong>₩{performance.total_current.toLocaleString()}</strong>
           </div>
           <div style={{ minWidth: '80px' }}>
             <span style={{ fontSize: '0.75rem', color: '#666' }}>수익률</span><br />
@@ -430,13 +431,61 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
           </div>
           <div style={{ minWidth: '80px' }}>
             <span style={{ fontSize: '0.75rem', color: '#666' }}>종목 수</span><br />
-            <strong>{performance.holdings_count}</strong>
+            <strong>{performance.holdings.length}</strong>
           </div>
           <style>{`
             @media (max-width: 767px) {
               .portfolio-summary-cards { flex-direction: column !important; gap: 0.75rem !important; }
             }
           `}</style>
+        </div>
+      )}
+
+      {/* 성과 분석 대시보드 패널 (SPEC-STOCK-017) */}
+      {performance && performance.holdings.length > 0 && (
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+          {/* 도넛 차트 */}
+          <div style={{ minWidth: '200px' }}>
+            <PerformanceDonutChart summary={performance.classification_summary} />
+          </div>
+
+          {/* 분류별 목록 */}
+          <div style={{ flex: '1', minWidth: '180px' }}>
+            <h5 style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#555' }}>성과 분류</h5>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              {(['high', 'normal', 'low'] as const).map((cls) => {
+                const clsLabels = { high: '고수익 (≥+5%)', normal: '보통 (-5%~+5%)', low: '저수익 (≤-5%)' };
+                const clsColors = { high: '#2e7d32', normal: '#1565c0', low: '#c62828' };
+                const group = performance.classification_summary[cls];
+                return (
+                  <div key={cls} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: clsColors[cls], flexShrink: 0 }} />
+                    <span style={{ color: '#555' }}>{clsLabels[cls]}</span>
+                    <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{group.count}종목</span>
+                    <span style={{ color: '#888' }}>({group.invested_pct.toFixed(1)}%)</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 섹터별 집계 */}
+          <div style={{ flex: '1', minWidth: '200px' }}>
+            <h5 style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#555' }}>섹터별 성과</h5>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              {performance.sector_performance.map((sp) => (
+                <div key={sp.sector} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', borderBottom: '1px solid #eee', paddingBottom: '0.15rem' }}>
+                  <span style={{ color: '#555' }}>{sp.sector}</span>
+                  <span>
+                    <span style={{ color: '#888', marginRight: '0.5rem' }}>{sp.holding_count}종목</span>
+                    <span style={{ fontWeight: 600, color: sp.return_pct >= 0 ? '#2e7d32' : '#c62828' }}>
+                      {sp.return_pct >= 0 ? '+' : ''}{sp.return_pct.toFixed(2)}%
+                    </span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

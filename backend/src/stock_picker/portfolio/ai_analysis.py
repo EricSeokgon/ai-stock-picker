@@ -9,44 +9,12 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from stock_picker.db.models import Portfolio, PortfolioHolding
+from stock_picker.portfolio.utils import get_sector as _get_sector  # SPEC-STOCK-017: 공유 utils로 통합
 
 logger = logging.getLogger(__name__)
 
 # 면책 문구 — 투자 권유 아님 명시
 _DISCLAIMER = "본 분석은 투자 권유가 아닌 정보 제공 목적입니다."
-
-# 섹터 매핑 — KRX 코드 앞 2자리 기반 간략 분류
-# 실제 운영에서는 krx_master 데이터를 사용하는 것이 더 정확함
-_SECTOR_MAP: dict[str, str] = {
-    "00": "금융",
-    "00594": "IT/반도체",
-    "005": "전자/반도체",
-    "006": "화학",
-    "007": "철강/금속",
-    "008": "건설",
-    "009": "기계",
-    "01": "자동차",
-    "02": "에너지",
-    "03": "통신",
-    "04": "유통/소비재",
-    "05": "바이오/제약",
-    "06": "금융",
-    "07": "IT/서비스",
-    "08": "미디어/엔터",
-    "09": "건설/부동산",
-}
-
-
-def _get_sector(krx_code: str) -> str:
-    """KRX 코드 앞 2자리로 대략적인 섹터 분류.
-
-    정확한 분류 데이터 없으면 '기타' fallback.
-    """
-    prefix2 = krx_code[:2] if len(krx_code) >= 2 else ""
-    for key, sector in _SECTOR_MAP.items():
-        if krx_code.startswith(key):
-            return sector
-    return "기타"
 
 
 def analyze_portfolio(portfolio_id: int, user_id: int, db: Session) -> dict[str, Any]:

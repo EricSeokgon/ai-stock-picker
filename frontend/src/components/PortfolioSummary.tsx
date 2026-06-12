@@ -63,7 +63,7 @@ export function PortfolioSummary() {
         </div>
         <div>
           <span style={{ color: '#666' }}>종목 수 </span>
-          <strong>{performance.holdings_count}</strong>
+          <strong>{performance.holdings.length}</strong>
         </div>
       </div>
     </div>

@@ -199,8 +199,11 @@ class TestCalculatePerformance:
         db.query.return_value.filter.return_value.first.return_value = portfolio
         db.query.return_value.filter.return_value.all.return_value = [holding]
 
-        # 현재가를 75000으로 mocking
-        with patch.object(service, "_get_current_price", return_value=75000.0):
+        # 현재가를 75000으로 mocking (SPEC-STOCK-017: get_current_price → dict 반환)
+        with patch(
+            "stock_picker.portfolio.service.get_current_price",
+            return_value={"price": 75000.0},
+        ):
             result = service.calculate_performance(db, portfolio_id=1, user_id=1)
 
         assert result["total_invested"] == 700000.0
@@ -217,7 +220,10 @@ class TestCalculatePerformance:
         db.query.return_value.filter.return_value.first.return_value = portfolio
         db.query.return_value.filter.return_value.all.return_value = [holding]
 
-        with patch.object(service, "_get_current_price", return_value=63000.0):
+        with patch(
+            "stock_picker.portfolio.service.get_current_price",
+            return_value={"price": 63000.0},
+        ):
             result = service.calculate_performance(db, portfolio_id=1, user_id=1)
 
         assert result["total_return_pct"] == pytest.approx(-10.0, abs=0.01)
@@ -232,7 +238,10 @@ class TestCalculatePerformance:
         db.query.return_value.filter.return_value.first.return_value = portfolio
         db.query.return_value.filter.return_value.all.return_value = [holding]
 
-        with patch.object(service, "_get_current_price", return_value=0.0):
+        with patch(
+            "stock_picker.portfolio.service.get_current_price",
+            return_value=None,
+        ):
             result = service.calculate_performance(db, portfolio_id=1, user_id=1)
 
         assert result["total_return_pct"] == 0.0

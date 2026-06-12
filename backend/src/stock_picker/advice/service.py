@@ -7,37 +7,13 @@ from typing import Any
 
 import anthropic
 
+from stock_picker.portfolio.utils import get_sector as _get_sector  # SPEC-STOCK-017: 공유 utils로 통합
+
 logger = logging.getLogger(__name__)
 
 # 면책 문구 — 기존 portfolio/ai_analysis.py 패턴 재사용
 # @MX:NOTE: [AUTO] 모든 AI 조언 응답에 포함해야 하는 필수 면책 문구 (REQ-AIV-002)
 _DISCLAIMER = "본 분석은 투자 권유가 아닌 정보 제공 목적입니다."
-
-# 섹터 매핑 — ai_analysis.py에서 재사용
-_SECTOR_MAP: dict[str, str] = {
-    "005": "전자/반도체",
-    "006": "화학",
-    "007": "철강/금속",
-    "008": "건설",
-    "009": "기계",
-    "01": "자동차",
-    "02": "에너지",
-    "03": "통신",
-    "04": "유통/소비재",
-    "05": "바이오/제약",
-    "06": "금융",
-    "07": "IT/서비스",
-    "08": "미디어/엔터",
-    "09": "건설/부동산",
-}
-
-
-def _get_sector(krx_code: str) -> str:
-    """KRX 코드 앞 자리로 섹터 분류 (fallback: 기타)"""
-    for key, sector in _SECTOR_MAP.items():
-        if krx_code.startswith(key):
-            return sector
-    return "기타"
 
 
 def _get_api_key() -> str:

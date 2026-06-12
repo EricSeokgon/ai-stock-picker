@@ -7,6 +7,21 @@
 
 ---
 
+## [0.17.0] - 2026-06-12
+
+### Added
+- 포트폴리오 성과 분석 대시보드 (Phase 17, SPEC-STOCK-017)
+- 섹터별 수익률 집계 (SectorPerformance)
+- 수익률 분류: 고수익(≥+5%), 일반, 저수익(≤-5%)
+- recharts 도넛 차트 (고수익/일반/저수익 비율 시각화)
+
+### Changed
+- `get_sector()` 유틸리티 함수 공통 모듈로 통합 (portfolio/utils.py)
+- 포트폴리오 성과 API: 프론트엔드 타입 드리프트 수정 (current_value, total_return)
+- 가격 조회 Redis 캐시 통합 (realtime/price_feed.get_current_price)
+
+---
+
 ## [0.16.0] - 2026-06-12
 
 ### Added (Phase 16: 실시간 주가 스트리밍 — SPEC-STOCK-016)

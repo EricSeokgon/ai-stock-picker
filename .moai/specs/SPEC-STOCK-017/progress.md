@@ -1,7 +1,7 @@
 # SPEC-STOCK-017 진행 상황 (Progress)
 
 - **SPEC**: SPEC-STOCK-017 사용자 포트폴리오 성과 분석 (Portfolio Performance Analysis)
-- **상태(Status)**: RUN COMPLETE
+- **상태(Status)**: SYNC COMPLETE
 - **우선순위(Priority)**: Medium
 - **최종 업데이트**: 2026-06-12
 

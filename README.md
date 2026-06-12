@@ -4,6 +4,17 @@
 
 ## 핵심 기능
 
+### 실시간 주가 스트리밍 (Phase 16 신규 — SPEC-STOCK-016)
+- **멀티플렉스 WebSocket** (`ws /ws/prices`): 단일 연결로 다수 종목 구독/해지
+- **ConnectionManager**: 인메모리 구독 레지스트리, 심볼별 팬아웃
+- **가격 브로드캐스트 루프**: 10초 주기 폴링, `REALTIME_PRICE_MOCK` 개발 모킹 지원
+- **가격 알림 연동**: WatchlistAlert 임계 도달 → notifications 인박스 자동 생성
+- **Watchlist 마이그레이션**: N개 WS 연결 → 단일 멀티플렉스 연결로 성능 개선
+- **Dashboard 실시간 시세**: 추천 종목 실시간 가격 표시
+- **기존 단일 종목 엔드포인트** (`/ws/prices/{krx_code}`) 무중단 유지
+- **Graceful degradation**: WS 실패 시 마지막 알려진 값 유지
+- **테스트**: 백엔드 34개 신규 (650 총 통과), 프론트엔드 179개 총 통과
+
 ### AI 투자 조언 고도화 (Phase 15 신규 — SPEC-STOCK-014)
 - **포트폴리오 리밸런싱 제안**: 보유 주식·추천 비교 기반 AI 제안 (POST /advice/rebalance)
 - **리스크 프로파일 분석**: 섹터 집중도 기반 리스크 점수 0~100 산출 (POST /advice/risk-profile)

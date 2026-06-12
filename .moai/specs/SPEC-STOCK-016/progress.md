@@ -1,6 +1,6 @@
 # SPEC-STOCK-016 진행 상황 — 실시간 주가 스트리밍 (Real-time Stock Price Streaming)
 
-- **상태(Status)**: RUN COMPLETE
+- **상태(Status)**: SYNC COMPLETE
 - **버전**: 0.2.0
 - **생성일**: 2026-06-12
 - **우선순위**: medium
@@ -97,6 +97,23 @@
 |--------|------|------|------|
 | backend pytest | 650 | 5 | 5개 실패는 기존 test_collectors.py (pre-existing) |
 | frontend vitest | 179 | 0 | 전체 통과 |
+
+---
+
+## Sync 단계 (2026-06-12 완료)
+
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| CHANGELOG 업데이트 | 완료 | v0.16.0 섹션 추가 |
+| README 업데이트 | 완료 | "실시간 주가 스트리밍" 섹션 추가 |
+| Progress 파일 업데이트 | 완료 | 상태 변경: RUN COMPLETE → SYNC COMPLETE |
+| Git 커밋 | 대기 | docs(SPEC-STOCK-016): Sync — README·CHANGELOG·progress 동기화 — v0.16.0 |
+
+---
+
+## 다음 액션
+
+SPEC-STOCK-016 완료. 다음 SPEC 계획 시 `/moai plan` 사용.
 
 ---
 

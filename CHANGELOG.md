@@ -7,6 +7,80 @@
 
 ---
 
+## [0.16.0] - 2026-06-12
+
+### Added (Phase 16: 실시간 주가 스트리밍 — SPEC-STOCK-016)
+
+#### 백엔드: 멀티플렉스 WebSocket 실시간 주가 스트리밍
+
+- **ConnectionManager** (`connection_manager.py`)
+  - 인메모리 구독 레지스트리: connection → symbols, symbol → connections 맵핑
+  - `subscribe(connection_id, symbol)`: 종목 구독 추가
+  - `unsubscribe(connection_id, symbol)`: 종목 구독 해지
+  - `broadcast_price(symbol, price_data)`: 심볼별 팬아웃 브로드캐스트
+  - `cleanup(connection_id)`: 연결 종료 시 정리
+
+- **Price Broadcast Loop** (`price_broadcast.py`)
+  - 10초 주기 폴링 및 가격 업데이트 전파
+  - `REALTIME_PRICE_MOCK` 환경변수로 개발 모킹 모드 지원 (true: 시뮬레이션, false: 실제 데이터)
+  - `WatchlistAlert` 임계값 체크 → `notifications` 테이블에 `price_alert` 자동 생성
+  - Graceful degradation: WS 실패 시 마지막 알려진 값 유지
+
+- **멀티플렉스 WebSocket 엔드포인트** (`ws_router.py`)
+  - `ws /ws/prices` — 단일 WebSocket 연결로 다수 종목 구독/해지
+  - 메시지 포맷:
+    - `{"action": "subscribe", "symbol": "KRX_CODE"}` — 종목 구독 추가
+    - `{"action": "unsubscribe", "symbol": "KRX_CODE"}` — 종목 구독 해지
+  - 응답: `{"symbol": "KRX_CODE", "price": float, "change_percent": float, "timestamp": ISO8601}`
+  - 기존 단일 종목 엔드포인트 `/ws/prices/{krx_code}` 무중단 유지
+  - Lifespan context manager: 앱 시작 시 `price_broadcast_loop` 태스크 자동 생성, 종료 시 정리
+
+#### 백엔드 테스트
+
+- **ConnectionManager 단위 테스트** (`test_connection_manager.py`, 14개)
+  - subscribe/unsubscribe, broadcast, cleanup 기본 동작
+  - 중복 구독, 중복 구독 해지, 비존재 연결 에러 핸들링
+  - 심볼별 팬아웃 정확성 검증
+
+- **Price Broadcast 단위 테스트** (`test_price_broadcast.py`, 13개)
+  - 10초 주기 동작, REALTIME_PRICE_MOCK 모드
+  - WatchlistAlert 임계값 체크 및 notification 생성
+  - 에러 복구, 시뮬레이션 데이터 생성
+
+- **멀티플렉스 WebSocket 통합 테스트** (`test_ws_prices_multiplex.py`, 7개)
+  - subscribe/unsubscribe 메시지 처리
+  - 가격 브로드캐스트 수신 검증
+  - 연결 종료 시 정리 확인
+
+- **전체**: 백엔드 테스트 650개 통과
+
+#### 프론트엔드: 실시간 주가 및 Watchlist 마이그레이션
+
+- **useLivePrices 훅** (`useLivePrices.ts`)
+  - 단일 WebSocket 연결로 다수 종목 실시간 가격 관리
+  - `useLivePrices(symbols: string[])` → `{ prices: Record<string, PriceData>, isConnected: boolean, error: string | null }`
+  - 자동 재연결, 구독 추가/제거 처리
+
+- **Watchlist 마이그레이션** (`Watchlist.tsx`)
+  - N개 WebSocket 연결 → `useLivePrices` 단일 멀티플렉스 연결로 변경
+  - 가격 업데이트 성능 개선 (연결 수 감소, 브로드캐스트 효율 증대)
+
+- **Dashboard 실시간 주가** (`App.tsx`)
+  - AI 조언의 추천 종목 목록에 실시간 시세 표시
+  - `useLivePrices` 훅으로 다중 종목 가격 업데이트
+
+- **프론트엔드 테스트** (`useLivePrices.test.ts`, 9개)
+  - subscribe/unsubscribe 동작 검증
+  - 재연결 로직, 에러 핸들링
+
+- **전체**: 프론트엔드 테스트 179개 통과
+
+#### 데이터베이스
+
+- DB 마이그레이션 없음 (ConnectionManager는 인메모리)
+
+---
+
 ## [0.15.0] - 2026-06-11
 
 ### Added (Phase 15: AI 투자 조언 고도화 — SPEC-STOCK-014)

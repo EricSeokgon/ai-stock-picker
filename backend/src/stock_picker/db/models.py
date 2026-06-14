@@ -515,3 +515,71 @@ class AIAdvice(Base):
 
     # 연관 관계
     user: Mapped["User"] = relationship("User", lazy="noload")
+
+
+# ── Phase J: 종목 스크리너 (SPEC-STOCK-018) ───────────────────────────────────
+
+
+class StockFundamental(Base):
+    """종목별 재무지표 스냅샷 테이블 — 일일 수집 잡이 upsert (SPEC-STOCK-018)
+
+    # @MX:ANCHOR: [AUTO] 스크리너 서비스 핵심 데이터 엔티티
+    # @MX:REASON: screener/service.py(필터 쿼리), screener/router.py, 일일 수집 잡 등 3곳 이상 참조
+    # @MX:SPEC: SPEC-STOCK-018 REQ-SCR-DATA-001
+    """
+
+    __tablename__ = "stock_fundamentals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    krx_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    sector: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    current_price: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    change_pct: Mapped[float | None] = mapped_column(Numeric(8, 4), nullable=True)
+    per: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    pbr: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    roe: Mapped[float | None] = mapped_column(Numeric(8, 4), nullable=True)
+    market_cap: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    dividend_yield: Mapped[float | None] = mapped_column(Numeric(8, 4), nullable=True)
+    week52_high: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    week52_low: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    # 현재가의 52주 레인지 내 위치 (%) — (current - low) / (high - low) * 100
+    price_vs_52w_pct: Mapped[float | None] = mapped_column(Numeric(8, 4), nullable=True)
+    snapshot_date: Mapped[date] = mapped_column(Date, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint("krx_code", "snapshot_date", name="uq_fundamentals_code_date"),
+        Index("ix_fundamentals_snapshot_date", "snapshot_date"),
+    )
+
+
+class ScreenerPreset(Base):
+    """스크리너 프리셋 — 사용자별 필터 조합 저장 (SPEC-STOCK-018)
+
+    사용자당 최대 5개. criteria는 JSON 직렬화 문자열.
+    """
+
+    __tablename__ = "screener_presets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    # 필터 조건 JSON 직렬화 문자열 (ScreenerCriteria)
+    criteria: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        # 동일 사용자·이름 중복 방지 (REQ-SCR-PRESET-006)
+        UniqueConstraint("user_id", "name", name="uq_screener_preset_user_name"),
+    )

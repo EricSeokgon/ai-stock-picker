@@ -112,3 +112,40 @@ class PortfolioPerformance(BaseModel):
     # SPEC-STOCK-017 신규 필드
     classification_summary: ClassificationSummary = ClassificationSummary()
     sector_performance: list[SectorPerformance] = []
+
+
+# ── SPEC-STOCK-019 배당 포트폴리오 분석 스키마 ────────────────────────────────
+
+class HoldingDividend(BaseModel):
+    """보유 종목별 배당 데이터 (SPEC-STOCK-019 REQ-DIV-001~004)"""
+    krx_code: str
+    name: str | None = None
+    quantity: int
+    # 배당 지표 (FDR 베스트에포트 — 없으면 None)
+    dps: float | None = None              # 주당 배당금(원), 직전 회계연도
+    dividend_yield: float | None = None   # 배당수익률(%)
+    ex_dividend_month: int | None = None  # 배당기준일에서 파생한 지급 예상 월(1~12)
+    annual_income: float = 0.0            # quantity × dps (dps 없으면 0.0)
+    yoy_dps_change_pct: float | None = None  # 전년 대비 DPS 증감률(%), 다년 미확보 시 None
+    dividend_available: bool = False       # dps 또는 yield 중 하나라도 있으면 True
+
+
+class DividendCalendarMonth(BaseModel):
+    """월별 배당 캘린더 항목 (SPEC-STOCK-019 REQ-DIV-020)"""
+    month: int                       # 1~12
+    holdings: list[str]              # 해당 월 지급 예상 종목 코드 목록
+    total_income: float              # 해당 월 예상 배당 수익 합계
+
+
+class PortfolioDividends(BaseModel):
+    """포트폴리오 배당 분석 응답 (SPEC-STOCK-019 REQ-DIV-010~013·020~023)
+
+    # @MX:ANCHOR: [AUTO] 배당 분석 API 응답 스키마
+    # @MX:REASON: router, dividend service, 프론트 API 래퍼에서 3곳 이상 참조
+    """
+    holdings: list[HoldingDividend]
+    total_annual_income: float            # 모든 보유의 annual_income 합계
+    weighted_avg_yield: float             # 투자금 가중 평균 배당수익률(%)
+    calendar: list[DividendCalendarMonth] # 지급월 확인된 종목만 포함
+    coverage_count: int                   # dividend_available=True 인 보유 수
+    total_holdings: int                   # 전체 보유 수

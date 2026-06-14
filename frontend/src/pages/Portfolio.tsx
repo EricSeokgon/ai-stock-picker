@@ -11,6 +11,7 @@ import {
   type Holding,
   type PortfolioPerformance,
 } from '../api/portfolio';
+import { getPortfolioDividends, type PortfolioDividends } from '../api/dividends';
 import { LivePriceBadge } from '../components/LivePriceBadge';
 import { PerformanceDonutChart } from '../components/PerformanceDonutChart';
 import {
@@ -104,6 +105,170 @@ function CreatePortfolioModal({
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+// 배당 분석 섹션 컴포넌트 (SPEC-STOCK-019)
+function DividendsSection({ portfolioId, token }: { portfolioId: number; token: string }) {
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<PortfolioDividends | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showCalendar, setShowCalendar] = useState(false);
+
+  async function handleFetch() {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await getPortfolioDividends(token, portfolioId);
+      setData(result);
+    } catch {
+      setError('배당 데이터를 가져오지 못했습니다. 잠시 후 다시 시도하세요.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const sectionStyle: React.CSSProperties = {
+    marginTop: '1rem',
+    padding: '0.75rem',
+    border: '1px solid #e8f5e9',
+    borderRadius: '4px',
+    background: '#f9fff9',
+  };
+
+  const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+  return (
+    <div style={sectionStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+        <strong style={{ fontSize: '0.875rem' }}>배당 분석</strong>
+        <button
+          onClick={() => void handleFetch()}
+          disabled={loading}
+          style={{
+            padding: '0.3rem 0.7rem', background: '#2e7d32', color: '#fff',
+            border: 'none', borderRadius: '4px', cursor: loading ? 'default' : 'pointer',
+            fontSize: '0.8rem', opacity: loading ? 0.7 : 1,
+          }}
+        >
+          {loading ? '조회 중...' : '배당 분석 조회'}
+        </button>
+        {data && (
+          <button
+            onClick={() => setShowCalendar((v) => !v)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem', color: '#666' }}
+          >
+            {showCalendar ? '▲ 캘린더 닫기' : '▼ 배당 캘린더 보기'}
+          </button>
+        )}
+      </div>
+
+      {error && (
+        <p style={{ color: '#c62828', fontSize: '0.8rem', margin: '0.25rem 0' }}>{error}</p>
+      )}
+
+      {data && (
+        <>
+          {/* 요약 카드 */}
+          <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+            <div>
+              <span style={{ fontSize: '0.75rem', color: '#555' }}>연간 배당 수입</span><br />
+              <strong style={{ fontSize: '0.95rem', color: '#2e7d32' }}>
+                ₩{Math.round(data.total_annual_income).toLocaleString()}
+              </strong>
+            </div>
+            <div>
+              <span style={{ fontSize: '0.75rem', color: '#555' }}>가중 평균 배당수익률</span><br />
+              <strong style={{ fontSize: '0.95rem' }}>
+                {data.weighted_avg_yield > 0 ? `${data.weighted_avg_yield.toFixed(2)}%` : '-'}
+              </strong>
+            </div>
+            <div>
+              <span style={{ fontSize: '0.75rem', color: '#555' }}>배당 확인 종목</span><br />
+              <strong>{data.coverage_count} / {data.total_holdings}</strong>
+            </div>
+          </div>
+
+          {/* 종목별 배당 테이블 */}
+          {data.holdings.length > 0 && (
+            <div style={{ overflowX: 'auto', marginBottom: '0.75rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', minWidth: '400px' }}>
+                <thead>
+                  <tr style={{ background: '#e8f5e9' }}>
+                    <th style={{ padding: '0.35rem 0.5rem', textAlign: 'left' }}>종목</th>
+                    <th style={{ padding: '0.35rem 0.5rem', textAlign: 'right' }}>DPS(원)</th>
+                    <th style={{ padding: '0.35rem 0.5rem', textAlign: 'right' }}>배당수익률</th>
+                    <th style={{ padding: '0.35rem 0.5rem', textAlign: 'right' }}>연간 수입</th>
+                    <th style={{ padding: '0.35rem 0.5rem', textAlign: 'center' }}>지급월</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.holdings.map((h) => (
+                    <tr key={h.krx_code} style={{ borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '0.35rem 0.5rem' }}>
+                        <span style={{ fontWeight: 600 }}>{h.krx_code}</span>
+                        {h.name && <span style={{ color: '#666', marginLeft: '0.3rem', fontSize: '0.75rem' }}>{h.name}</span>}
+                      </td>
+                      <td style={{ padding: '0.35rem 0.5rem', textAlign: 'right' }}>
+                        {h.dps != null ? h.dps.toLocaleString() : <span style={{ color: '#aaa' }}>-</span>}
+                      </td>
+                      <td style={{ padding: '0.35rem 0.5rem', textAlign: 'right' }}>
+                        {h.dividend_yield != null ? `${h.dividend_yield.toFixed(2)}%` : <span style={{ color: '#aaa' }}>-</span>}
+                      </td>
+                      <td style={{ padding: '0.35rem 0.5rem', textAlign: 'right', color: '#2e7d32' }}>
+                        {h.annual_income > 0 ? `₩${Math.round(h.annual_income).toLocaleString()}` : <span style={{ color: '#aaa' }}>-</span>}
+                      </td>
+                      <td style={{ padding: '0.35rem 0.5rem', textAlign: 'center' }}>
+                        {h.ex_dividend_month != null ? `${h.ex_dividend_month}월` : <span style={{ color: '#aaa' }}>-</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* 12개월 배당 캘린더 그리드 */}
+          {showCalendar && (
+            <div>
+              <h5 style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#555' }}>배당 캘린더 (지급월 기준)</h5>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem' }}>
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => {
+                  const entry = data.calendar.find((c) => c.month === month);
+                  const hasDiv = entry != null && entry.holdings.length > 0;
+                  return (
+                    <div
+                      key={month}
+                      style={{
+                        padding: '0.4rem',
+                        border: `1px solid ${hasDiv ? '#81c784' : '#e0e0e0'}`,
+                        borderRadius: '4px',
+                        background: hasDiv ? '#f1f8e9' : '#fafafa',
+                        fontSize: '0.75rem',
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, color: hasDiv ? '#2e7d32' : '#999', marginBottom: '0.2rem' }}>
+                        {MONTHS[month - 1]}
+                      </div>
+                      {hasDiv ? (
+                        <>
+                          <div style={{ color: '#555' }}>{entry.holdings.join(', ')}</div>
+                          <div style={{ color: '#2e7d32', marginTop: '0.15rem' }}>
+                            ₩{Math.round(entry.total_income).toLocaleString()}
+                          </div>
+                        </>
+                      ) : (
+                        <div style={{ color: '#bbb' }}>-</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -534,6 +699,9 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
           </button>
         </form>
       </div>
+
+      {/* 배당 분석 섹션 (SPEC-STOCK-019) */}
+      <DividendsSection portfolioId={portfolioId} token={token} />
 
       {/* AI 분석 섹션 (REQ-FE-005) */}
       <AiAnalysisSection portfolioId={portfolioId} token={token} />

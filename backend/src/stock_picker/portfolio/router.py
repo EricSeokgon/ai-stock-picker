@@ -1,19 +1,22 @@
-# 포트폴리오 라우터 — CRUD + 성과 조회 엔드포인트
+# 포트폴리오 라우터 — CRUD + 성과 조회 + 배당 분석 엔드포인트
+import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from stock_picker.api.deps import get_redis_client
 from stock_picker.auth.dependencies import get_current_user, get_db_session
 from stock_picker.db.models import Portfolio, PortfolioHolding, User
 from stock_picker.portfolio import service
+from stock_picker.portfolio.ai_analysis import analyze_portfolio
+from stock_picker.portfolio.dividends import calculate_portfolio_dividends
 from stock_picker.portfolio.schemas import (
     HoldingCreate,
     HoldingResponse,
     PortfolioCreate,
     PortfolioPerformance,
     PortfolioResponse,
+    PortfolioDividends,
 )
-
-from stock_picker.portfolio.ai_analysis import analyze_portfolio
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
@@ -131,3 +134,25 @@ def get_performance(
 
     result = service.calculate_performance(db, portfolio_id=portfolio_id, user_id=current_user.id)
     return PortfolioPerformance(**result)
+
+
+@router.get("/{portfolio_id}/dividends", response_model=PortfolioDividends)
+async def get_portfolio_dividends(
+    portfolio_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    redis: aioredis.Redis = Depends(get_redis_client),
+) -> PortfolioDividends:
+    """포트폴리오 배당 분석 — FDR 베스트에포트 + Redis 캐시 (SPEC-STOCK-019)"""
+    result = await calculate_portfolio_dividends(
+        portfolio_id=portfolio_id,
+        user_id=current_user.id,
+        db=db,
+        redis=redis,
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="포트폴리오를 찾을 수 없습니다",
+        )
+    return result

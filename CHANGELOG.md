@@ -7,6 +7,62 @@
 
 ---
 
+## [0.19.0] - 2026-06-15
+
+### Added (Phase 19: 배당 포트폴리오 분석 — SPEC-STOCK-019)
+
+#### 백엔드: 배당 데이터 조회 및 집계
+- **배당 서비스** (`portfolio/dividends.py` 신규)
+  - `get_holding_dividends()`: FinanceDataReader 베스트에포트로 개별 종목 배당 조회
+  - Redis 캐시 `dividends:{krx_code}`, TTL 86400초 (24시간)
+  - Graceful degradation: 배당 데이터 미제공 종목은 `dividend_available=False`
+
+- **배당 집계 서비스** (`portfolio/dividends.py`)
+  - `aggregate_portfolio_dividends()`: 보유 종목 배당을 포트폴리오 단위로 집계
+  - 지표: 연간배당수입, 가중평균 배당수익률, 배당 캘린더 (지급월별)
+  - 지급월 미상 종목은 캘린더에서 제외
+
+- **배당 응답 스키마** (`portfolio/schemas.py`)
+  - `HoldingDividend`: 종목별 배당 정보 (DPS, 배당수익률, 지급월, 원화금액)
+  - `DividendCalendarMonth`: 월별 배당 지급 기대액
+  - `PortfolioDividends`: 포트폴리오 배당 집계 (총액, 수익률, 캘린더)
+
+#### 백엔드: API 확장
+- **배당 분석 엔드포인트** (`GET /portfolios/{id}/dividends`)
+  - 인증·소유권 확인 (404 if not found or not owned)
+  - 응답: 포트폴리오 배당 요약 + 종목별 테이블 + 12개월 캘린더
+
+#### 프론트엔드: 배당 UI
+- **DividendsSection 컴포넌트** (신규)
+  - 요약 카드 (연간수입, 가중평균 수익률, 최고 배당 종목)
+  - 종목별 테이블 (종목명, DPS, 수익률, 지급월, 예상금액)
+  - 12개월 배당 캘린더 (월별 지급액 시각화)
+  - N/A 상태 처리 (배당 데이터 없는 포트폴리오)
+
+- **Portfolio.tsx 강화**
+  - 배당 분석 탭 추가 (성과 분석 / AI 조언 / 배당 분석)
+  - 로딩 및 오류 상태 처리
+
+#### 테스트 및 품질 보증
+- **백엔드 테스트**: 16개 신규 (dividend_service.py)
+  - FinanceDataReader 조회, Redis 캐시, 배당 없는 종목 처리
+  - 포트폴리오 집계, 지급월 필터링
+  - **총 테스트**: 231개 (이전 215개)
+
+- **프론트엔드 테스트**: 7개 신규 (portfolio_dividend.test.tsx)
+  - 배당 섹션 렌더링, 요약 카드, 캘린더 표시
+  - **총 테스트**: 222개 (이전 215개)
+
+- **테스트 커버리지**: 93.2%
+
+### Design Decisions
+- **DB 테이블 추가 없음**: 배당 데이터는 보유 종목 단위 실시간 조회 + Redis 캐시
+- **데이터 출처**: FinanceDataReader 베스트에포트만 사용 (신규 공급자 미추가)
+- **지급월 처리**: 미상 종목은 추측 단언 금지 (캘린더에서 제외)
+- **기존 엔드포인트 불변**: POST /portfolios/{id}/ai-analysis, GET /performance 미수정
+
+---
+
 ## [0.18.0] - 2026-06-15
 
 ### Added

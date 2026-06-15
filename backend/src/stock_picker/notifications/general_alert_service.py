@@ -18,9 +18,10 @@ from sqlalchemy import insert, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from stock_picker.db.models import Alert, Notification
+from stock_picker.db.models import Alert, EmailSubscription, Notification, TelegramSubscription
 from stock_picker.mapping.prices import get_avg_volume, get_stock_price_data
-from stock_picker.notifications.email_service import _get_smtp_config
+from stock_picker.notifications.email_service import send_general_alert_email
+from stock_picker.telegram.notifier import _send_message_sync
 
 log = structlog.get_logger()
 
@@ -527,8 +528,9 @@ async def check_and_trigger_all_alerts(session: AsyncSession) -> int:
             triggered_count += 1
             log.info("알림 발동", alert_id=alert.id, type=alert.alert_type, code=alert.krx_code)
 
-            # 이메일 발송 (best-effort, 실패 무시)
-            _try_send_alert_email(alert, msg)
+            # 이메일·텔레그램 채널 발송 (best-effort, 실패 무시)
+            await _try_send_alert_email(alert, msg, session)
+            await _try_send_telegram(alert, msg, session)
 
         except Exception:
             log.exception("알림 점검 오류", alert_id=alert.id)
@@ -537,22 +539,45 @@ async def check_and_trigger_all_alerts(session: AsyncSession) -> int:
     return triggered_count
 
 
-def _try_send_alert_email(alert: Any, message: str) -> None:
-    """이메일 발송 시도 (실패해도 예외 전파 없음).
+async def _try_send_alert_email(alert: Any, message: str, session: AsyncSession) -> None:
+    """이메일 구독자에게 알림 이메일 발송 (best-effort).
 
     Args:
         alert: Alert ORM 모델.
-        message: 알림 메시지.
+        message: 알림 메시지 본문.
+        session: AsyncSession.
     """
     try:
-        smtp_conf = _get_smtp_config()
-        if smtp_conf is None:
-            return
+        result = await session.execute(
+            select(EmailSubscription).where(
+                EmailSubscription.user_id == alert.user_id,
+                EmailSubscription.is_active.is_(True),
+            )
+        )
+        sub = result.scalar_one_or_none()
+        if sub:
+            send_general_alert_email(sub.email, alert.krx_code, alert.alert_type, message)
+    except Exception as e:
+        log.error("알림 이메일 발송 실패 user_id=%s: %s", alert.user_id, e)
 
-        # 사용자 이메일 조회는 비동기 세션이 필요하므로 여기서는 생략.
-        # 실제 운영 환경에서는 alert.user.email 또는 별도 쿼리로 조회 필요.
-        # @MX:TODO: [AUTO] 이메일 발송 시 사용자 이메일 조회 구현 필요
-        # @MX:PRIORITY: LOW
-        log.debug("이메일 발송 스킵 (사용자 이메일 미조회)", alert_id=alert.id)
-    except Exception:
-        log.exception("이메일 발송 실패 (무시)", alert_id=alert.id)
+
+async def _try_send_telegram(alert: Any, message: str, session: AsyncSession) -> None:
+    """텔레그램 구독자에게 알림 메시지 발송 (best-effort).
+
+    Args:
+        alert: Alert ORM 모델.
+        message: 알림 메시지 본문.
+        session: AsyncSession.
+    """
+    try:
+        result = await session.execute(
+            select(TelegramSubscription).where(
+                TelegramSubscription.user_id == alert.user_id,
+                TelegramSubscription.is_active.is_(True),
+            )
+        )
+        sub = result.scalar_one_or_none()
+        if sub:
+            _send_message_sync(sub.chat_id, f"[{alert.krx_code}] {message}")
+    except Exception as e:
+        log.error("텔레그램 발송 실패 user_id=%s: %s", alert.user_id, e)

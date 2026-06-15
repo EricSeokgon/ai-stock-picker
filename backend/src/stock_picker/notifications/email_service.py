@@ -5,7 +5,6 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from stock_picker.db.models import EmailSubscription
@@ -104,6 +103,31 @@ def send_price_alert_email(
         f"  - 현재가: {current_price:,.0f}원\n\n"
         f"{DISCLAIMER}"
     )
+    return _send_email(to_email, subject, body)
+
+
+def send_general_alert_email(
+    to_email: str,
+    krx_code: str,
+    alert_type: str,
+    message: str,
+) -> bool:
+    """일반 알림(목표가·급등락·거래량 급증·추천 변동) 이메일 발송.
+
+    # @MX:ANCHOR: [AUTO] 일반 알림 이메일 발송 공통 진입점
+    # @MX:REASON: general_alert_service, rec_change 등 다수 경로에서 호출
+
+    Args:
+        to_email: 수신자 이메일.
+        krx_code: KRX 종목코드.
+        alert_type: 알림 유형 문자열 (예: "target_price", "rec_new").
+        message: 알림 메시지 본문.
+
+    Returns:
+        발송 성공 여부.
+    """
+    subject = f"[주식 알림] {krx_code} {alert_type} 발동"
+    body = f"안녕하세요.\n\n{message}\n\n※ 투자는 본인 책임입니다."
     return _send_email(to_email, subject, body)
 
 

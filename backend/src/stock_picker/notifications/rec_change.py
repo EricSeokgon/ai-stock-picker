@@ -5,8 +5,17 @@ from datetime import date
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from stock_picker.db.models import Notification, Recommendation, User, WatchlistItem
+from stock_picker.db.models import (
+    EmailSubscription,
+    Notification,
+    Recommendation,
+    TelegramSubscription,
+    User,
+    WatchlistItem,
+)
 from stock_picker.db.session import SyncSessionLocal
+from stock_picker.notifications.email_service import send_general_alert_email
+from stock_picker.telegram.notifier import _send_message_sync
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +129,10 @@ def check_rec_score_changes() -> None:
 
             changed_count += 1
             user_ids = _get_users_watching(db, krx_code)
+            body_text = (
+                f"추천 점수: {prev_score:.2f} → {new_score:.2f} ({delta:+.2f}), "
+                f"기준일: {new_date}"
+            )
             for uid in user_ids:
                 _insert_notification_safe(
                     db,
@@ -127,13 +140,32 @@ def check_rec_score_changes() -> None:
                     ntype="rec_score_change",
                     krx_code=krx_code,
                     title=f"[점수 변화] {krx_code} 추천 점수가 {delta:+.2f} 변경됐습니다.",
-                    body=(
-                        f"추천 점수: {prev_score:.2f} → {new_score:.2f} ({delta:+.2f}), "
-                        f"기준일: {new_date}"
-                    ),
+                    body=body_text,
                     ref_date=new_date,
                 )
                 created += 1
+
+                # 이메일 채널 발송 (best-effort)
+                try:
+                    email_sub = db.query(EmailSubscription).filter(
+                        EmailSubscription.user_id == uid,
+                        EmailSubscription.is_active.is_(True),
+                    ).first()
+                    if email_sub:
+                        send_general_alert_email(email_sub.email, krx_code, "rec_score_change", body_text)
+                except Exception as e:
+                    logger.error("rec_score_change 이메일 발송 실패 user_id=%s: %s", uid, e)
+
+                # 텔레그램 채널 발송 (best-effort)
+                try:
+                    tg_sub = db.query(TelegramSubscription).filter(
+                        TelegramSubscription.user_id == uid,
+                        TelegramSubscription.is_active.is_(True),
+                    ).first()
+                    if tg_sub:
+                        _send_message_sync(tg_sub.chat_id, f"[{krx_code}] {body_text}")
+                except Exception as e:
+                    logger.error("rec_score_change 텔레그램 발송 실패 user_id=%s: %s", uid, e)
 
         db.commit()
 
@@ -177,6 +209,7 @@ def check_rec_changes() -> None:
 
         for krx_code in added:
             user_ids = _get_users_watching(db, krx_code)
+            body_text = f"기준일: {new_date}"
             for uid in user_ids:
                 _insert_notification_safe(
                     db,
@@ -184,13 +217,36 @@ def check_rec_changes() -> None:
                     ntype="rec_new",
                     krx_code=krx_code,
                     title=f"[신규 추천] {krx_code} 종목이 추천 목록에 추가됐습니다.",
-                    body=f"기준일: {new_date}",
+                    body=body_text,
                     ref_date=new_date,
                 )
                 created += 1
 
+                # 이메일 채널 발송 (best-effort)
+                try:
+                    email_sub = db.query(EmailSubscription).filter(
+                        EmailSubscription.user_id == uid,
+                        EmailSubscription.is_active.is_(True),
+                    ).first()
+                    if email_sub:
+                        send_general_alert_email(email_sub.email, krx_code, "rec_new", body_text)
+                except Exception as e:
+                    logger.error("rec_change 이메일 발송 실패 user_id=%s: %s", uid, e)
+
+                # 텔레그램 채널 발송 (best-effort)
+                try:
+                    tg_sub = db.query(TelegramSubscription).filter(
+                        TelegramSubscription.user_id == uid,
+                        TelegramSubscription.is_active.is_(True),
+                    ).first()
+                    if tg_sub:
+                        _send_message_sync(tg_sub.chat_id, f"[{krx_code}] {body_text}")
+                except Exception as e:
+                    logger.error("rec_change 텔레그램 발송 실패 user_id=%s: %s", uid, e)
+
         for krx_code in dropped:
             user_ids = _get_users_watching(db, krx_code)
+            body_text = f"기준일: {new_date}"
             for uid in user_ids:
                 _insert_notification_safe(
                     db,
@@ -198,10 +254,32 @@ def check_rec_changes() -> None:
                     ntype="rec_dropped",
                     krx_code=krx_code,
                     title=f"[추천 탈락] {krx_code} 종목이 추천 목록에서 제외됐습니다.",
-                    body=f"기준일: {new_date}",
+                    body=body_text,
                     ref_date=new_date,
                 )
                 created += 1
+
+                # 이메일 채널 발송 (best-effort)
+                try:
+                    email_sub = db.query(EmailSubscription).filter(
+                        EmailSubscription.user_id == uid,
+                        EmailSubscription.is_active.is_(True),
+                    ).first()
+                    if email_sub:
+                        send_general_alert_email(email_sub.email, krx_code, "rec_dropped", body_text)
+                except Exception as e:
+                    logger.error("rec_change 이메일 발송 실패 user_id=%s: %s", uid, e)
+
+                # 텔레그램 채널 발송 (best-effort)
+                try:
+                    tg_sub = db.query(TelegramSubscription).filter(
+                        TelegramSubscription.user_id == uid,
+                        TelegramSubscription.is_active.is_(True),
+                    ).first()
+                    if tg_sub:
+                        _send_message_sync(tg_sub.chat_id, f"[{krx_code}] {body_text}")
+                except Exception as e:
+                    logger.error("rec_change 텔레그램 발송 실패 user_id=%s: %s", uid, e)
 
         db.commit()
 

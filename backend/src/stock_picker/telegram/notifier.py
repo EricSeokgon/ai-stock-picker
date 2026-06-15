@@ -1,7 +1,9 @@
 # 텔레그램 알림 발송 — 활성 구독자에게 추천 종목 전송
 import logging
+import os
 from typing import Any
 
+import requests
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -37,10 +39,8 @@ def notify_subscribers_sync(db: Session, recommendations: list[dict[str, Any]]) 
     # 추천 메시지 생성
     message = _format_recommendations(recommendations)
 
-    # 봇 인스턴스를 통해 발송 (봇이 실행 중인 경우만)
+    # 봇 인스턴스를 통해 발송
     try:
-        import telegram
-
         for sub in subscriptions:
             _send_message_sync(sub.chat_id, message)
             logger.info("알림 발송 완료 — chat_id=%s", sub.chat_id)
@@ -58,12 +58,37 @@ def _format_recommendations(recommendations: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _send_message_sync(chat_id: int, message: str) -> None:
-    """동기 방식으로 텔레그램 메시지 발송 — asyncio 없이 requests 직접 사용.
+def _send_message_sync(chat_id: int, message: str) -> bool:
+    """동기 방식으로 텔레그램 메시지 발송 — Telegram Bot API HTTP 직접 호출.
 
-    # @MX:NOTE: [AUTO] python-telegram-bot Bot.send_message는 비동기이므로
-    # 동기 컨텍스트에서는 Bot.send_message를 asyncio.run()으로 래핑하거나
-    # HTTPBot 직접 사용 필요 — 현재 구현은 로깅만 수행 (프로덕션 연동 필요)
+    # @MX:ANCHOR: [AUTO] 텔레그램 단건 메시지 발송 — 일반 알림·추천 변동 경로에서 호출
+    # @MX:REASON: general_alert_service._try_send_telegram, rec_change 채널 발송에서 호출
+
+    TELEGRAM_BOT_TOKEN 미설정 시 False 반환 (발송 skip).
+    HTTP 오류 발생 시 로깅 후 False 반환 (예외 미전파).
+
+    Args:
+        chat_id: 텔레그램 채팅 ID.
+        message: 발송할 메시지 본문.
+
+    Returns:
+        발송 성공 여부.
     """
-    # TODO: 프로덕션에서는 실제 봇 토큰으로 HTTP API 직접 호출
-    logger.info("메시지 발송 예정 — chat_id=%s, length=%d", chat_id, len(message))
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    if not token:
+        logger.warning("TELEGRAM_BOT_TOKEN 미설정 — 텔레그램 발송 skip (chat_id=%s)", chat_id)
+        return False
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    try:
+        resp = requests.post(
+            url,
+            json={"chat_id": chat_id, "text": message},
+            timeout=5,
+        )
+        resp.raise_for_status()
+        logger.info("텔레그램 발송 완료 — chat_id=%s", chat_id)
+        return True
+    except Exception as e:
+        logger.error("텔레그램 발송 실패 chat_id=%s: %s", chat_id, e)
+        return False

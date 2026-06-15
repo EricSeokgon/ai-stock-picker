@@ -264,3 +264,43 @@ class FeedbackSummaryResponse(BaseModel):
     krx_code: str
     up: int
     down: int
+
+
+# ---------------------------------------------------------------------------
+# 뉴스피드·AI 시장 템포 스키마 (SPEC-STOCK-021)
+# ---------------------------------------------------------------------------
+
+
+class MarketSentimentResponse(BaseModel):
+    """시장 감성 집계 응답 (REQ-NEWS-SENT-*)"""
+
+    # 24시간 분석 기사 평균 감성 점수 (-1~1), 기사 없으면 None
+    avg_score: float | None = None
+    # score_to_label() 결과: "매우긍정"/"긍정"/"중립"/"부정"/"매우부정"/None
+    label: str | None = None
+    positive: int = 0
+    negative: int = 0
+    neutral: int = 0
+    total: int = 0
+    as_of: datetime
+
+
+class NewsFetchResult(BaseModel):
+    """수동 뉴스 수집·분석 트리거 결과 (REQ-NEWS-FETCH-*)"""
+
+    collected: int = 0
+    analyzed: int = 0
+
+
+class StockNewsItem(BaseModel):
+    """종목별 뉴스 항목 (REQ-NEWS-FEED-002)"""
+
+    id: int
+    title: str
+    source: str
+    published_at: datetime
+    url: str
+    sentiment: str | None = None
+    sentiment_score: float | None = None
+    sentiment_label: str | None = None
+    ai_summary: str | None = None

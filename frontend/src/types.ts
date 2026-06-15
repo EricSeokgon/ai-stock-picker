@@ -99,3 +99,21 @@ export interface NewsResponse {
   news: NewsItem[];
   total: number;
 }
+
+// SPEC-STOCK-021: 시장 감성 집계 타입
+export interface MarketSentimentResponse {
+  avg_score: number | null;
+  // score_to_label 결과: "매우긍정"/"긍정"/"중립"/"부정"/"매우부정"/null
+  label: string | null;
+  positive: number;
+  negative: number;
+  neutral: number;
+  total: number;
+  as_of: string;
+}
+
+// SPEC-STOCK-021: 수동 수집·분석 트리거 결과
+export interface NewsFetchResult {
+  collected: number;
+  analyzed: number;
+}

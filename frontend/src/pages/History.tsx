@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { getRecommendationHistory } from '../api/recommendations';
 import type { RecommendationHistoryResponse, DailyRecommendations } from '../api/recommendations';
 import type { RecommendationItem } from '../types';
+import { MarketSentimentWidget } from '../components/MarketSentimentWidget';
 
 // 기간 선택 옵션
 const PERIOD_OPTIONS: { label: string; days: number }[] = [
@@ -167,6 +168,11 @@ export default function History() {
       <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1.25rem', color: '#212121' }}>
         추천 히스토리
       </h1>
+
+      {/* AI 시장 템포 위젯 (SPEC-STOCK-021) */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <MarketSentimentWidget />
+      </div>
 
       {/* 기간 선택 탭 */}
       <div

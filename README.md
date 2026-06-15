@@ -4,6 +4,13 @@
 
 ## 핵심 기능
 
+### Phase 23: 주식 알림 강화 (v0.23.0)
+- **거래량 급증 알림 (`volume_spike`)**: 당일 거래량이 30일 평균의 N배 이상일 때 알림 발동 (배수 조건 설정 가능)
+- **추천 점수 변화 알림 (`rec_score_change`)**: 관심 종목 추천 점수(total_score) 변동이 ±0.2 이상일 때 인박스 알림 생성
+- **장중 시간 게이팅**: 가격·거래량 알림을 09:00~15:30 KST 장중에만 점검 (환경변수 `ALERT_MARKET_HOURS_GATE`로 토글)
+- **기존 알림 인프라 재사용**: 신규 DB 테이블·마이그레이션 없음, UNIQUE 제약 멱등성 유지
+- **파이프라인 연동**: `run_daily_pipeline` + `run_intraday_pipeline` 완료 후 자동으로 추천 점수 변화 감지
+
 ### Phase 21: 뉴스피드·AI 시장 템포 (v0.21.0)
 - GET /news/market-sentiment — 24시간 시장 감성 집계 (강세/중립/약세 3단계)
 - GET /news?krx_code= — 종목별 뉴스 필터 (기존 /news 확장, 기준일 기반)

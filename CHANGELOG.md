@@ -7,6 +7,64 @@
 
 ---
 
+## [0.23.0] - 2026-06-15
+
+### Added (Phase 23: 주식 알림 강화 — SPEC-STOCK-023)
+
+#### 백엔드: 거래량 급증 알림 (`volume_spike`)
+- **`get_avg_volume()` / `_fetch_avg_volume()`** (`mapping/prices.py` 신규)
+  - 30일 평균 거래량 + 당일 거래량 산출 (FinanceDataReader executor 격리)
+  - asyncio run_in_executor로 동기 라이브러리 스레드 풀 격리
+  - @MX:ANCHOR / @MX:WARN 태그 적용
+
+- **`check_volume_spike(alert, volume_data)`** (`notifications/general_alert_service.py` 신규)
+  - 순수 판정 함수 (사이드 이펙트 없음) — 평균 0 가드, 배수 초과 시 발동
+  - 발동 메시지: `{종목} 거래량 급증 알림: 오늘 {N}주 (30일 평균 {M}주의 {R:.1f}배)`
+  - `_VALID_ALERT_TYPES`에 `"volume_spike"` 추가
+
+- **`check_and_trigger_all_alerts` `volume_spike` 분기 추가**
+  - 거래량 데이터 조회 → 판정 → notifications 적재 → 채널 베스트에포트
+
+#### 백엔드: 추천 점수 변화 알림 (`rec_score_change`)
+- **`_get_scores_for_date()` / `check_rec_score_changes()`** (`notifications/rec_change.py` 신규)
+  - 가장 최근 두 trade_date 간 `total_score` 비교 (|delta| ≥ 0.2 임계값)
+  - 관심목록 보유자에게 `rec_score_change` 인박스 알림 생성
+  - 첫 실행(trade_date 1개) 안전 처리, UNIQUE 제약 멱등성 보장
+  - @MX:ANCHOR 태그 적용 (scheduler/jobs.py에서 호출)
+
+- **파이프라인 연동** (`scheduler/jobs.py`)
+  - `run_daily_pipeline` + `run_intraday_pipeline` 양쪽에서 `check_rec_score_changes()` 호출
+  - 예외 격리: 점수 변화 감지 실패 시 파이프라인 계속 진행
+
+#### 백엔드: 장중 시간 게이팅
+- **`_is_market_open(now_kst)` 헬퍼** (`notifications/general_alert_service.py`)
+  - 한국 장 시간 09:00~15:30 (Asia/Seoul, ZoneInfo)
+  - `ALERT_MARKET_HOURS_GATE` 환경변수로 비활성화 가능 (기본 활성)
+- **`check_and_trigger_all_alerts` 게이트 적용**
+  - 장 마감 시간에는 외부 시세 호출 없이 0건 반환
+
+#### 테스트
+- **`backend/tests/unit/test_volume_spike.py`** (신규, 16개 테스트)
+  - `_is_market_open` 정확성 검증 (장중/장외/경계)
+  - `check_volume_spike` 발동/미발동/0 나누기 방지 검증
+  - `check_rec_score_changes` 정상/첫 실행/중복 방어 검증
+- **`backend/tests/unit/test_general_alerts.py`** (패치)
+  - `_is_market_open` mock 추가 (장 마감 게이팅으로 인한 기존 테스트 실패 방어)
+
+### Design Decisions
+- **순수 판정 함수 패턴**: `check_volume_spike`는 DB·외부 호출 없는 순수 함수 — 단위 테스트 용이
+- **executor 격리**: FinanceDataReader 동기 라이브러리를 asyncio 루프와 분리
+- **UNIQUE 멱등성**: SPEC-STOCK-013의 `uq_notification_user_type_code_date` 재사용, 신규 마이그레이션 없음
+- **장중 게이팅**: 운영 환경에서 장외 시세 호출 방지, 환경변수로 테스트 우회 가능
+
+### Non-Goals (제외 항목)
+- 자동 매매 / 매수·매도 주문 (영구 제외)
+- 웹 푸시 / SMS / 모바일 푸시 신규 채널
+- 신규 DB 테이블 / Alembic 마이그레이션 (최신 0017 유지)
+- 프론트엔드 신규 페이지
+
+---
+
 ## [0.22.0] - 2026-06-15
 
 ### Added (Phase 22: Docker 컨테이너화 완성 + 운영 환경 검증 — SPEC-STOCK-022)

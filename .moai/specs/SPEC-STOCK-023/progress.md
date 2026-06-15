@@ -1,37 +1,39 @@
 # SPEC-STOCK-023 — 진행 상황 (progress.md)
 
 - **SPEC**: SPEC-STOCK-023 — 주식 알림 강화 (조건별 가격/거래량/추천 알림)
-- **상태**: draft
+- **상태**: completed
 - **작성일**: 2026-06-15
+- **완료일**: 2026-06-15
 - **개발 방법론**: TDD (RED-GREEN-REFACTOR)
 - **마이그레이션**: 신규 없음 (최신 0017 유지)
+- **커밋**: `259844f`
 
 ---
 
 ## 태스크 체크리스트
 
 ### M1 — 거래량 급증 알림 (`volume_spike`) — Priority High
-- [ ] T1-1: `prices.py` 30일 평균 거래량 + 당일 거래량 산출 함수 추가 (executor 격리, 기존 함수 불변)
-- [ ] T1-2: `general_alert_service._VALID_ALERT_TYPES`에 `volume_spike` 추가 + `AlertCreate` 검증 통과
-- [ ] T1-3: 순수 판정 함수 `check_volume_spike(alert, volume_data)` 구현 (평균 0 가드, 발동 메시지)
-- [ ] T1-4: `check_and_trigger_all_alerts`에 `volume_spike` 분기 + notifications 적재 + 채널 베스트에포트
+- [x] T1-1: `prices.py` 30일 평균 거래량 + 당일 거래량 산출 함수 추가 (executor 격리, 기존 함수 불변)
+- [x] T1-2: `general_alert_service._VALID_ALERT_TYPES`에 `volume_spike` 추가 + `AlertCreate` 검증 통과
+- [x] T1-3: 순수 판정 함수 `check_volume_spike(alert, volume_data)` 구현 (평균 0 가드, 발동 메시지)
+- [x] T1-4: `check_and_trigger_all_alerts`에 `volume_spike` 분기 + notifications 적재 + 채널 베스트에포트
 
 ### M2 — 추천 점수 변화 알림 (`rec_score_change`) — Priority High
-- [ ] T2-1: `rec_change.py`에 두 trade_date 공통 종목 `total_score` 변동 산출 로직 추가
-- [ ] T2-2: 임계값(0.2) 이상 변동 → 관심목록 보유자 `rec_score_change` 인박스 알림 생성
-- [ ] T2-3: 첫 실행(직전 날짜 없음)·중복 실행(UNIQUE) 안전 처리
-- [ ] T2-4: 파이프라인(`run_daily_pipeline`·`run_intraday_pipeline`) 연동 (예외 격리)
+- [x] T2-1: `rec_change.py`에 두 trade_date 공통 종목 `total_score` 변동 산출 로직 추가
+- [x] T2-2: 임계값(0.2) 이상 변동 → 관심목록 보유자 `rec_score_change` 인박스 알림 생성
+- [x] T2-3: 첫 실행(직전 날짜 없음)·중복 실행(UNIQUE) 안전 처리
+- [x] T2-4: 파이프라인(`run_daily_pipeline`·`run_intraday_pipeline`) 연동 (예외 격리)
 
 ### M3 — 장중 시간 게이팅 — Priority Medium
-- [ ] T3-1: `_is_market_open(now_kst)` 게이트 헬퍼 (09:00~15:30 Asia/Seoul)
-- [ ] T3-2: 가격·거래량 알림 점검 루프 진입부 게이트 적용 (장외 시 외부 호출 생략)
-- [ ] T3-3: 환경 변수 토글 `ALERT_MARKET_HOURS_GATE` (기본 활성)
+- [x] T3-1: `_is_market_open(now_kst)` 게이트 헬퍼 (09:00~15:30 Asia/Seoul)
+- [x] T3-2: 가격·거래량 알림 점검 루프 진입부 게이트 적용 (장외 시 외부 호출 생략)
+- [x] T3-3: 환경 변수 토글 `ALERT_MARKET_HOURS_GATE` (기본 활성)
 
 ### M4 — 채널 일관성 + 검증 — Priority Medium
-- [ ] T4-1: 신규 type 인박스 알림이 기존 인박스 API에서 조회·읽음 처리 검증
-- [ ] T4-2: 채널 발송 실패 시 인박스 적재·루프 지속 동작 검증
-- [ ] T4-3: 신규 판정 함수 단위 테스트 + 점검 루프/게이팅 통합 테스트 (커버리지 85%+)
-- [ ] T4-4: 면책·자동매매 제외·신규 채널/마이그레이션 미추가 최종 확인
+- [x] T4-1: 신규 type 인박스 알림이 기존 인박스 API에서 조회·읽음 처리 검증
+- [x] T4-2: 채널 발송 실패 시 인박스 적재·루프 지속 동작 검증
+- [x] T4-3: 신규 판정 함수 단위 테스트 + 점검 루프/게이팅 통합 테스트 (커버리지 85%+)
+- [x] T4-4: 면책·자동매매 제외·신규 채널/마이그레이션 미추가 최종 확인
 
 ---
 
@@ -111,3 +113,4 @@
 
 ## 변경 이력
 - 2026-06-15: SPEC 초안 작성 (spec/research/progress 3파일). 모든 태스크 pending.
+- 2026-06-15: 구현 완료 (커밋 259844f). M1~M4 전 태스크 완료. 신규 테스트 16개 (test_volume_spike.py), 기존 test_general_alerts.py 패치. 총 575개 단위 테스트 통과.

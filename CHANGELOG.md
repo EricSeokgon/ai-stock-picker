@@ -7,6 +7,59 @@
 
 ---
 
+## [0.24.0] - 2026-06-16
+
+### Added (Phase 24: 알림 채널 연결 — SPEC-STOCK-024)
+
+#### 텔레그램 실제 발송 구현
+- **`_send_message_sync(chat_id, message)`** (`telegram/notifier.py` 수정)
+  - `requests.post` 로 Telegram Bot API (`/sendMessage`) 실제 HTTP 호출
+  - `TELEGRAM_BOT_TOKEN` 미설정 시 경고 로그 후 `False` 반환 (graceful degradation)
+  - 네트워크 오류·4xx·5xx 예외 격리, 실패 시 `False` 반환
+
+#### 이메일 범용 알림 함수
+- **`send_general_alert_email(to_email, krx_code, alert_type, message)`** (`notifications/email_service.py` 신규)
+  - 제목 포맷: `[주식 알림] {krx_code} {alert_type} 발동`
+  - 기존 `_send_email()` 내부 함수 재사용 (SMTP 설정·graceful degradation 상속)
+
+#### alerts 경로 이메일·텔레그램 배선
+- **`_try_send_alert_email()` stub 완성** (`notifications/general_alert_service.py`)
+  - `EmailSubscription` 조회 후 `send_general_alert_email()` 호출 (AsyncSession 패턴)
+- **`_try_send_telegram()` 신규 추가** (`notifications/general_alert_service.py`)
+  - `TelegramSubscription` 조회 후 `_send_message_sync()` 호출
+- **`check_and_trigger_all_alerts()`** — Notification 적재 후 두 채널 함수 awaiting
+  - 채널 실패가 인박스 적재를 차단하지 않는 best-effort 패턴
+
+#### rec_change 경로 이메일·텔레그램 배선
+- **`check_rec_changes()`** (`notifications/rec_change.py` 수정)
+  - `_insert_notification_safe()` 호출 후 이메일·텔레그램 채널 best-effort 발송
+  - `SyncSession` 패턴 사용 (동기 세션 일관성 유지)
+- **`check_rec_score_changes()`** (`notifications/rec_change.py` 수정)
+  - 동일 best-effort 채널 발송 추가
+- 채널 실패 시 루프 지속 (인박스 정상, 예외 격리)
+
+#### 테스트
+- **`backend/tests/unit/test_channel_dispatch.py`** (신규, 12개 테스트)
+  - `TestSendMessageSync`: 실제 발송, 토큰 미설정, 발송 실패
+  - `TestTrySendAlertEmail`: 구독 있음/없음
+  - `TestTrySendTelegram`: 구독 있음/없음
+  - `TestCheckAlertsChannelIntegration`: 이메일 발송, 채널 실패 격리
+  - `TestRecChangeChannelDispatch`: rec_new 발송, rec_score_change 발송, 실패 격리
+
+### Design Decisions
+- **세션 타입 일관성**: `general_alert_service.py`(AsyncSession) vs `rec_change.py`(SyncSession) 각 파일의 기존 세션 타입을 그대로 유지 — 채널 추상화 불필요
+- **best-effort 원칙**: 이메일·텔레그램 채널 실패 시 인박스 적재 차단 없음, 예외 로그만 기록
+- **Graceful degradation**: `TELEGRAM_BOT_TOKEN` 또는 `SMTP_HOST` 미설정 시 해당 채널 silent skip
+- **신규 마이그레이션 없음**: 기존 `email_subscriptions`, `telegram_subscriptions` 테이블 재사용 (0017 유지)
+
+### Non-Goals (제외 항목)
+- SMS·슬랙·디스코드 등 신규 채널 추가 — 별도 SPEC
+- 채널 추상화 레이어 (Channel ABC) — 불필요한 복잡도
+- 사용자별 채널 선택 UI — 별도 SPEC
+- 자동매매 — 영구 제외
+
+---
+
 ## [0.23.0] - 2026-06-15
 
 ### Added (Phase 23: 주식 알림 강화 — SPEC-STOCK-023)

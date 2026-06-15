@@ -4,6 +4,13 @@
 
 ## 핵심 기능
 
+### Phase 24: 알림 채널 연결 — 이메일·텔레그램 (v0.24.0)
+- **텔레그램 실제 발송**: `_send_message_sync` 가 Telegram Bot API HTTP POST 호출 (`TELEGRAM_BOT_TOKEN` 미설정 시 silent skip)
+- **이메일 범용 알림**: `send_general_alert_email(to_email, krx_code, alert_type, message)` — 제목 자동 포맷
+- **alerts 경로 배선**: `check_and_trigger_all_alerts()` 내 `_try_send_alert_email()` + `_try_send_telegram()` 완성
+- **rec_change 경로 배선**: `check_rec_changes()` / `check_rec_score_changes()` 이메일·텔레그램 best-effort 발송
+- **채널 실패 격리**: 이메일·텔레그램 실패 시 인박스 알림 차단 없음, 예외 로그 기록만
+
 ### Phase 23: 주식 알림 강화 (v0.23.0)
 - **거래량 급증 알림 (`volume_spike`)**: 당일 거래량이 30일 평균의 N배 이상일 때 알림 발동 (배수 조건 설정 가능)
 - **추천 점수 변화 알림 (`rec_score_change`)**: 관심 종목 추천 점수(total_score) 변동이 ±0.2 이상일 때 인박스 알림 생성
@@ -261,7 +268,9 @@ docker pull ghcr.io/{owner}/ai-stock-picker-backend:sha-abc123
 | **테스트** | pytest 7.x, Playwright, @testing-library/react |
 | **배포** | Docker, docker-compose |
 
-## 주요 업데이트 (최신: Phase 21 - 뉴스피드·AI 시장 템포)
+## 주요 업데이트 (최신: Phase 24 - 알림 채널 연결)
+
+**[0.24.0] - 2026-06-16** (SPEC-STOCK-024): 알림 채널 연결 — 이메일·텔레그램을 alerts·rec_change 경로에 배선, 텔레그램 Bot API 실제 발송 구현
 
 **[0.21.0] - 2026-06-15** (SPEC-STOCK-021): 뉴스피드·AI 시장 템포 — 시장 감성 집계 + 종목별 뉴스 필터 + 무인증 수동 트리거
 

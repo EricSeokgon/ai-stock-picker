@@ -7,6 +7,83 @@
 
 ---
 
+## [0.20.0] - 2026-06-15
+
+### Added (Phase 20: 알림 시스템 — SPEC-STOCK-020)
+
+#### 백엔드: 알림 시스템 확장
+- **Alert 모델 및 마이그레이션 0017**
+  - `alerts` 테이블 신규 생성
+  - 컬럼: id, user_id(FK→users, CASCADE), krx_code, stock_name?, alert_type(String(20)), condition_value(Float), condition_direction(String(8)?), is_active, is_triggered, triggered_at?, triggered_message(String(500)?), created_at
+  - Integer PK 규약 준수 (UUID 불사용)
+  - 알림 유형: target_price, surge_drop, ex_dividend
+
+- **알림 CRUD 서비스** (`notifications/general_alert_service.py` 신규)
+  - `create_alert()`: 알림 생성 (krx_code, alert_type, condition_value, condition_direction)
+  - `get_alerts()`: 사용자 알림 목록 조회 (is_active 필터 옵션)
+  - `update_alert()`: 알림 수정 (PUT)
+  - `delete_alert()`: 알림 삭제
+  - 소유권 확인 (404 if not found or not owned)
+
+- **알림 점검 로직** (`notifications/general_alert_service.py`)
+  - `check_and_trigger_all_alerts()`: 모든 활성 알림 점검 + 발동 시 notifications 테이블 적재
+  - 목표가 알림: close_price vs condition_value (above/below)
+  - 급등락 알림: change_rate(%) vs condition_value (above/below/either)
+  - 배당일 알림: today == ex_dividend_date - N일 (기준일 미제공 시 미발동)
+  - 멱등 처리: UNIQUE(user_id, type, krx_code, ref_date)로 notifications 중복 방지
+  - 발동 시 메일 발송 (email_service.py 재사용)
+
+- **알림 라우터** (`notifications/general_alert_router.py` 신규, prefix `/alerts`, JWT 인증 필수)
+  - `POST /alerts`: 알림 생성
+  - `GET /alerts`: 사용자 알림 목록 조회
+  - `PUT /alerts/{id}`: 알림 수정
+  - `DELETE /alerts/{id}`: 알림 삭제
+  - `POST /alerts/check`: 수동 알림 점검 트리거 (무인증)
+
+- **스케줄러 통합** (`scheduler/jobs.py` 수정)
+  - `check_alerts`: IntervalTrigger 10분 주기 (설정 가능)
+  - 예외 격리 (점검 실패 시 파이프라인 계속)
+
+#### 프론트엔드: 알림 설정 페이지
+- **Alerts.tsx 컴포넌트** (신규, `/alerts` 라우트)
+  - 알림 목록 (활성/비활성, 조건 표시)
+  - 알림 생성 폼 (krx_code, alert_type, condition_value, condition_direction)
+  - 알림 수정/삭제 기능
+  - 로딩/오류 상태 처리
+  - 빈 상태 메시지
+
+- **NavBar 벨 아이콘** (재사용, `/alerts` 라우트 링크 추가)
+
+- **API 클라이언트** (`api/alerts.ts` 신규)
+  - `createAlert()`, `getAlerts()`, `updateAlert()`, `deleteAlert()`, `checkAlerts()`
+
+- **App.tsx 라우팅 강화**
+  - `/alerts` 보호된 라우트 추가
+  - NavBar "알림" 링크 추가
+
+#### 테스트 및 품질 보증
+- **백엔드 테스트**: 23개 신규 (총 551개+ 통과)
+  - Alert 모델 및 마이그레이션: CRUD, 소유권, 유효성
+  - 점검 로직: target_price, surge_drop, ex_dividend, 멱등성
+  - 라우터: 인증, 소유권, 오류 처리
+  - **총 테스트**: 574개 (이전 551개)
+
+- **프론트엔드 테스트**: 17개 신규 (총 217개 통과)
+  - Alerts 페이지: 렌더링, 폼 상태, CRUD 동작
+  - API 클라이언트: 요청 구조, 응답 처리
+  - **총 테스트**: 234개 (이전 217개)
+
+- **테스트 커버리지**: 93%+
+
+### Design Decisions
+- **기존 인프라 재사용**: notifications 테이블 (마이그 0014) 발동 알림 적재, inbox_router 재사용
+- **분리된 라우트**: /watchlist/alerts (기존 가격 알림) vs /alerts (신규 통합 알림 시스템)
+- **DB 테이블**: 신규 alerts 테이블만 추가 (Integer PK)
+- **점검 주기**: 기본 10분 (scheduler 설정으로 변경 가능)
+- **데이터 출처**: 시세는 mapping/prices.py, 배당일은 portfolio/dividends.py Redis 캐시 재사용
+
+---
+
 ## [0.19.0] - 2026-06-15
 
 ### Added (Phase 19: 배당 포트폴리오 분석 — SPEC-STOCK-019)

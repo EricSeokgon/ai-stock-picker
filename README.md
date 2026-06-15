@@ -4,6 +4,12 @@
 
 ## 핵심 기능
 
+### Phase 20: 알림 시스템 (v0.20.0)
+- POST/GET/PUT/DELETE /alerts 알림 CRUD — 목표가(target_price)·급등락(surge_drop)·배당일(ex_dividend) 알림 유형
+- 알림 점검 서비스 — 목표가·급등락·배당일 조건 체크 + 멱등 알림 적재 (기존 notifications 테이블 재사용)
+- APScheduler 10분 주기 check_alerts 스케줄러 + POST /alerts/check 수동 트리거
+- 프론트엔드 /alerts 알림 설정 페이지 + NavBar 벨 아이콘 링크
+
 ### Phase 19: 배당 포트폴리오 분석 (v0.19.0)
 - GET /portfolios/{id}/dividends API — 포트폴리오 배당 분석 엔드포인트
 - 배당 서비스 — FinanceDataReader 베스트에포트 조회 + Redis TTL 86400s 캐시

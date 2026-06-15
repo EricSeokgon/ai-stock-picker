@@ -1,7 +1,7 @@
 # SPEC-STOCK-020 진행 상황 (Progress)
 
 - **SPEC**: SPEC-STOCK-020 — 알림·알림 설정 (Price Alert & Notification System, Phase 20)
-- **상태**: DONE
+- **상태**: SYNC COMPLETE
 - **생성일**: 2026-06-15
 - **작성자**: ircp
 - **개발 방법론**: TDD (RED-GREEN-REFACTOR) — quality.yaml 기준
@@ -33,6 +33,7 @@
 | M5 | `POST /alerts/check` + 스케줄러 잡 `check_alerts` | ✅ 완료 |
 | M6 | 프론트 `/alerts` 페이지 + 라우트/링크 (벨 재사용) | ✅ 완료 |
 | M7 | 테스트 & 품질 게이트 (커버리지 ≥85%, 회귀 보호) | ✅ 완료 |
+| SYNC | README·CHANGELOG·progress 동기화 — v0.20.0 | ✅ 완료 |
 
 ---
 

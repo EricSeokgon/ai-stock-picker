@@ -7,6 +7,75 @@
 
 ---
 
+## [0.21.0] - 2026-06-15
+
+### Added (Phase 21: 뉴스피드·AI 시장 템포 — SPEC-STOCK-021)
+
+#### 백엔드: 시장 감성 집계 및 종목 뉴스 필터
+- **시장 감성 서비스** (`news/sentiment_service.py` 신규)
+  - `get_market_sentiment()`: 24시간 뉴스 집계 → sentiment_level (강세/중립/약세)
+  - `get_stock_news()`: 종목별 뉴스 필터 (krx_code, days=7 기본)
+  - Redis 캐시 `market_sentiment`, TTL 1800s (30분)
+  - Graceful degradation (Redis 미제공 시 DB 직접 조회)
+
+- **시장 감성 집계 로직**
+  - 관련 뉴스 sentiment_score 기반 강/중/약 분류
+  - 각 단계별 기사 개수 카운트
+  - sentiment_level: "강세" (≥0.3) / "중립" (>-0.3) / "약세" (else)
+
+- **종목별 뉴스 필터**
+  - `GET /news?krx_code={code}` 기존 엔드포인트 확장
+  - stock_mentions 테이블 기반 종목 연결
+  - 기준일(trade_date) 필터 옵션
+
+#### 백엔드: API 확장
+- **GET /news/market-sentiment** (신규)
+  - 응답: `{date, timestamp, sentiment, sentiment_level, total_articles, positive_count, neutral_count, negative_count, news: [...]}`
+  - Redis 캐시 + TTL 1800s
+  - 캐시 미스 시 DB 집계 및 저장
+
+- **POST /news/fetch** (신규, 무인증)
+  - 수동 뉴스 수집 트리거
+  - CollectorService.collect_news() 호출
+  - 응답: `{status: "started"|"failed", message}`
+
+#### 프론트엔드: 시장 감성 위젯
+- **MarketSentimentWidget.tsx** (신규)
+  - 시장 감성 게이지 (강세/중립/약세 3단계 시각화)
+  - 관련 뉴스 리스트 (종목별 연결)
+  - 즉시 갱신 버튼
+  - 로딩/오류 상태 처리
+
+- **History.tsx 강화**
+  - MarketSentimentWidget 통합
+  - 종목별 뉴스 연계 표시
+
+- **API 클라이언트** (`api/news.ts` 신규)
+  - `fetchMarketSentiment()`, `fetchNewsByStock()`, `triggerNewsFetch()`
+
+- **타입 정의** (`types.ts` 신규)
+  - `MarketSentimentResponse`, `NewsFetchResult`, `StockNewsItem`
+
+#### 테스트 및 품질 보증
+- **백엔드 테스트**: 14개 신규 (총 588개 통과)
+  - sentiment_service: 감성 집계, 종목 뉴스, 수동 트리거 로직
+  - **총 테스트**: 588개 (이전 574개)
+
+- **프론트엔드 테스트**: 6개 신규 (총 240개 통과)
+  - MarketSentimentWidget: 렌더링, 감성 표시, 뉴스 리스트
+  - **총 테스트**: 240개 (이전 234개)
+
+- **테스트 커버리지**: 93%+
+
+### Design Decisions
+- **기존 인프라 재사용**: articles·analysis_results·stock_mentions 테이블 + ClaudeAnalysisClient(haiku-4-5)
+- **신규 마이그레이션 없음**: 마이그 0017 유지 (news_articles 테이블 거부)
+- **Redis 캐시**: `market_sentiment` 키, TTL 1800s (30분)
+- **무인증 트리거**: `/news/fetch` POST 누구나 호출 가능
+- **기존 /news 호환성**: `?krx_code` 파라미터 추가, 기존 쿼리 유지
+
+---
+
 ## [0.20.0] - 2026-06-15
 
 ### Added (Phase 20: 알림 시스템 — SPEC-STOCK-020)

@@ -4,6 +4,14 @@
 
 ## 핵심 기능
 
+### Phase 21: 뉴스피드·AI 시장 템포 (v0.21.0)
+- GET /news/market-sentiment — 24시간 시장 감성 집계 (강세/중립/약세 3단계)
+- GET /news?krx_code= — 종목별 뉴스 필터 (기존 /news 확장, 기준일 기반)
+- POST /news/fetch — 수동 뉴스 수집 트리거 (무인증)
+- MarketSentimentWidget — 시장 감성 게이지 + 뉴스 리스트 + 즉시 갱신 (History.tsx 통합)
+- Redis TTL 1800s 캐시 + graceful degradation
+- 기존 articles 테이블·ClaudeAnalysisClient 재사용 (신규 마이그레이션 없음)
+
 ### Phase 20: 알림 시스템 (v0.20.0)
 - POST/GET/PUT/DELETE /alerts 알림 CRUD — 목표가(target_price)·급등락(surge_drop)·배당일(ex_dividend) 알림 유형
 - 알림 점검 서비스 — 목표가·급등락·배당일 조건 체크 + 멱등 알림 적재 (기존 notifications 테이블 재사용)
@@ -246,7 +254,9 @@ docker pull ghcr.io/{owner}/ai-stock-picker-backend:sha-abc123
 | **테스트** | pytest 7.x, Playwright, @testing-library/react |
 | **배포** | Docker, docker-compose |
 
-## 주요 업데이트 (최신: Phase 9 - 피드백 기반 점수 투명성)
+## 주요 업데이트 (최신: Phase 21 - 뉴스피드·AI 시장 템포)
+
+**[0.21.0] - 2026-06-15** (SPEC-STOCK-021): 뉴스피드·AI 시장 템포 — 시장 감성 집계 + 종목별 뉴스 필터 + 무인증 수동 트리거
 
 **[0.10.0] - 2026-06-10** (SPEC-STOCK-009): 추천 품질 개선 — 피드백 기반 가중치 + 스코어 투명성
 
@@ -469,11 +479,13 @@ curl -X POST http://localhost:8000/health
 | `sort` | str | 정렬 순서: score \| sentiment \| volume (기본값: score) |
 | `min_score` | float>=0 | 최소 종합 점수 (0~1) |
 
-### 뉴스 및 트렌드
+### 뉴스 및 시장 감성 (Phase 21 신규)
 
 | 메서드 | 경로 | 설명 | 응답 |
 |--------|------|------|------|
-| `GET` | `/news?limit=N` | 분석 완료 뉴스 피드 | `{ news: [ { title, summary, sentiment, sentiment_label, source, ... } ], total }` |
+| `GET` | `/news/market-sentiment` | 시장 감성 집계 (24h) | `{ date, timestamp, sentiment, sentiment_level, total_articles, positive_count, neutral_count, negative_count, news: [...]  }` |
+| `GET` | `/news?limit=N&krx_code=` | 뉴스 필터 (기존 + 종목 필터) | `{ news: [ { title, summary, sentiment, sentiment_label, source, krx_code, ... } ], total }` |
+| `POST` | `/news/fetch` | 수동 뉴스 수집 트리거 (무인증) | `{ status: "started"\|"failed", message }` |
 | `GET` | `/sectors/trends?days=N` | 섹터별 트렌드 시계열 | `{ trends: [ { sector, volume, sentiment, timestamp } ] }` |
 
 ### 헬스 체크

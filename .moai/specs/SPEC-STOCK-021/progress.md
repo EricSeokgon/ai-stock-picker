@@ -1,7 +1,7 @@
 # SPEC-STOCK-021 진행 상황 (Progress)
 
 - **SPEC**: SPEC-STOCK-021 — 뉴스피드·AI 시장 템포 (News Feed & AI Market Sentiment, Phase 21)
-- **상태(status)**: DONE
+- **상태(status)**: SYNC COMPLETE
 - **작성일**: 2026-06-15
 - **작성자**: ircp
 - **우선순위**: medium

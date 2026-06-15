@@ -583,3 +583,47 @@ class ScreenerPreset(Base):
         # 동일 사용자·이름 중복 방지 (REQ-SCR-PRESET-006)
         UniqueConstraint("user_id", "name", name="uq_screener_preset_user_name"),
     )
+
+
+# ── Phase J: 일반 알림 설정 (SPEC-STOCK-020) ─────────────────────────────────
+
+
+class Alert(Base):
+    """사용자 정의 알림 설정 — 목표가·급등락 조건 기반 알림 (SPEC-STOCK-020).
+
+    # @MX:ANCHOR: [AUTO] 알림 설정 핵심 엔티티 — 라우터·서비스·스케줄러에서 참조
+    # @MX:REASON: general_alert_router, general_alert_service, scheduler/jobs 3개 이상에서 사용
+    # @MX:SPEC: SPEC-STOCK-020 REQ-ALERT-001
+    """
+
+    __tablename__ = "alerts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    krx_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    stock_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # target_price | surge_drop | ex_dividend
+    alert_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    # 목표가(원) 또는 급등락 임계값(%)
+    condition_value: Mapped[float] = mapped_column(Float, nullable=False)
+    # above | below | either (surge_drop 기본값 either)
+    condition_direction: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_triggered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    triggered_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMPTZ(timezone=True), nullable=True
+    )
+    triggered_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        Index("ix_alerts_user_active", "user_id", "is_active"),
+    )
+
+    user: Mapped["User"] = relationship("User", lazy="noload")

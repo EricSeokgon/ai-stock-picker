@@ -16,6 +16,7 @@ from stock_picker.notifications.alert_router import router as alert_router
 from stock_picker.notifications.email_router import router as email_router
 from stock_picker.advice.router import router as advice_router
 from stock_picker.notifications.inbox_router import router as inbox_router
+from stock_picker.notifications.general_alert_router import router as general_alert_router
 from stock_picker.screener.router import router as screener_router
 from stock_picker.portfolio.router import router as portfolio_router
 from stock_picker.realtime.ws_router import router as ws_router
@@ -99,6 +100,7 @@ def create_app() -> FastAPI:
     app.include_router(inbox_router, prefix="/notifications", tags=["notifications"])
     app.include_router(advice_router)
     app.include_router(screener_router)
+    app.include_router(general_alert_router, prefix="/alerts", tags=["alerts"])
 
     # 텔레그램 봇 선택적 시작 — TELEGRAM_BOT_TOKEN 환경변수 필요
     _start_telegram_bot_if_configured(app)

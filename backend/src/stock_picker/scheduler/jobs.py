@@ -381,4 +381,28 @@ def setup_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
+    # 일반 알림 점검: 10분마다 목표가·급등락 알림 확인 (SPEC-STOCK-020 REQ-ALERT-010)
+    _scheduler.add_job(
+        _run_general_alert_check,
+        IntervalTrigger(minutes=10),
+        id="check_alerts",
+        replace_existing=True,
+    )
+
     return _scheduler
+
+
+async def _run_general_alert_check() -> None:
+    """일반 알림(목표가·급등락) 점검 잡 — 10분 주기 실행.
+
+    예외 발생 시 로그 기록 후 종료 (graceful degradation).
+    """
+    from stock_picker.db.session import AsyncSessionLocal
+    from stock_picker.notifications.general_alert_service import check_and_trigger_all_alerts
+
+    try:
+        async with AsyncSessionLocal() as session:
+            count = await check_and_trigger_all_alerts(session=session)
+            log.info("일반 알림 점검 완료", triggered=count)
+    except Exception:
+        log.exception("일반 알림 점검 잡 오류 — 다음 주기에 재시도")

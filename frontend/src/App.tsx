@@ -29,6 +29,7 @@ import Sectors from './pages/Sectors';
 import NotificationsPage from './pages/Notifications';
 import AdviceHistory from './pages/AdviceHistory';
 import Screener from './pages/Screener';
+import AlertsPage from './pages/Alerts';
 import { fetchUnreadCount } from './api/notifications';
 
 const API_BASE_DASHBOARD = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
@@ -148,6 +149,7 @@ function NavBar() {
         {isAuthenticated && <Link to="/watchlist" style={linkStyle} onClick={handleLinkClick}>관심 목록</Link>}
         {isAuthenticated && <Link to="/settings" style={linkStyle} onClick={handleLinkClick}>설정</Link>}
         {isAuthenticated && <Link to="/advice/history" style={linkStyle} onClick={handleLinkClick}>AI 조언</Link>}
+        {isAuthenticated && <Link to="/alerts" style={linkStyle} onClick={handleLinkClick}>알림 설정</Link>}
         {isAuthenticated && (
           <Link
             to="/notifications"
@@ -497,6 +499,9 @@ export default function App() {
           <ProtectedRoute><AdviceHistoryWrapper /></ProtectedRoute>
         } />
         <Route path="/screener" element={<Screener />} />
+        <Route path="/alerts" element={
+          <ProtectedRoute><AlertsPage /></ProtectedRoute>
+        } />
       </Routes>
     </div>
   );

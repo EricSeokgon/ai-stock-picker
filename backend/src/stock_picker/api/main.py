@@ -27,10 +27,12 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """FastAPI lifespan — 브로드캐스트 루프를 백그라운드 태스크로 시작/종료.
+    """FastAPI lifespan — 브로드캐스트 루프 및 APScheduler를 시작/종료.
 
     # @MX:WARN: [AUTO] asyncio 백그라운드 태스크 — task.cancel() 로만 종료
     # @MX:REASON: CancelledError를 catch하지 않으면 종료 시 예외가 로그에 남음
+    # @MX:NOTE: [AUTO] ENABLE_SCHEDULER=false 시 스케줄러 비활성화 (멀티워커/테스트 환경)
+    # @MX:SPEC: SPEC-STOCK-022
     """
     from stock_picker.realtime.price_broadcast import price_broadcast_loop
     from stock_picker.realtime.ws_router import manager
@@ -49,9 +51,33 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     logger.info("가격 브로드캐스트 백그라운드 루프 시작")
 
+    # APScheduler — ENABLE_SCHEDULER=false/0/no 시 비활성화
+    scheduler = None
+    enable_scheduler = os.getenv("ENABLE_SCHEDULER", "true").lower() not in ("false", "0", "no")
+    if enable_scheduler:
+        try:
+            from stock_picker.scheduler.jobs import setup_scheduler
+            scheduler = setup_scheduler()
+            scheduler.start()
+            logger.info("APScheduler 시작 완료 — 등록 잡 수=%d", len(scheduler.get_jobs()))
+        except Exception:
+            logger.exception("APScheduler 시작 실패 — 서비스는 계속 실행됩니다")
+            scheduler = None
+    else:
+        logger.info("ENABLE_SCHEDULER=%s — 스케줄러 비활성화", os.getenv("ENABLE_SCHEDULER"))
+
     try:
         yield
     finally:
+        # APScheduler 종료
+        if scheduler is not None:
+            try:
+                scheduler.shutdown()
+                logger.info("APScheduler 종료 완료")
+            except Exception:
+                logger.exception("APScheduler 종료 중 오류 — 무시하고 계속")
+
+        # 가격 브로드캐스트 루프 종료
         task.cancel()
         try:
             await task

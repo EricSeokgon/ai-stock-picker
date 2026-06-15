@@ -144,6 +144,67 @@ def _fetch_price_history(krx_code: str, days: int) -> list[dict]:
     return result
 
 
+async def get_avg_volume(krx_code: str, days: int = 30) -> dict[str, Any] | None:
+    """30일 평균 거래량 + 오늘 거래량 조회 (executor로 동기 라이브러리 격리).
+
+    # @MX:ANCHOR: [AUTO] 거래량 급증 판정용 평균 거래량 조회 진입점
+    # @MX:REASON: check_volume_spike에서 호출되는 공개 함수 — volume_spike 알림 핵심 데이터 소스
+    # @MX:WARN: [AUTO] run_in_executor 사용 — 스레드 풀 자원 소비
+    # @MX:REASON: FinanceDataReader는 동기 라이브러리이므로 스레드 풀 격리 필수
+
+    Args:
+        krx_code: KRX 종목코드 (예: "005930")
+        days: 평균 계산 기간 (일수, 기본 30)
+
+    Returns:
+        {"avg_volume": float, "today_volume": int} 딕셔너리.
+        조회 실패 시 None 반환.
+    """
+    loop = asyncio.get_event_loop()
+    try:
+        return await loop.run_in_executor(None, _fetch_avg_volume, krx_code, days)
+    except Exception as e:
+        log.warning("평균 거래량 조회 실패", krx_code=krx_code, error=str(e))
+        return None
+
+
+def _fetch_avg_volume(krx_code: str, days: int) -> dict[str, Any] | None:
+    """동기 평균 거래량 조회 (스레드 풀에서 실행).
+
+    Args:
+        krx_code: KRX 종목코드
+        days: 평균 계산 기간 (일수)
+
+    Returns:
+        {"avg_volume": float, "today_volume": int} 딕셔너리.
+        데이터 없으면 None.
+    """
+    import FinanceDataReader as fdr  # noqa: N813
+
+    end = datetime.now()
+    start = end - timedelta(days=days)
+
+    try:
+        df = fdr.DataReader(krx_code, start, end)
+    except Exception:
+        return None
+
+    if df is None or df.empty:
+        return None
+
+    vol_col = "Volume" if "Volume" in df.columns else ("volume" if "volume" in df.columns else None)
+    if vol_col is None:
+        return None
+
+    volumes = df[vol_col].dropna()
+    if volumes.empty:
+        return None
+
+    avg_volume = float(volumes.mean())
+    today_volume = int(volumes.iloc[-1])
+    return {"avg_volume": avg_volume, "today_volume": today_volume}
+
+
 def _fetch_price(krx_code: str) -> dict[str, Any] | None:
     """동기 시세 조회 (스레드 풀에서 실행).
 

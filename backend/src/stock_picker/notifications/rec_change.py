@@ -70,6 +70,82 @@ def _insert_notification_safe(
     db.execute(stmt)
 
 
+def _get_scores_for_date(db: Session, trade_date: date) -> dict[str, float]:
+    """특정 trade_date의 {krx_code: total_score} 매핑 반환."""
+    result = db.execute(
+        select(Recommendation.krx_code, Recommendation.total_score).where(
+            Recommendation.trade_date == trade_date
+        )
+    )
+    return {row[0]: float(row[1]) for row in result if row[1] is not None}
+
+
+def check_rec_score_changes() -> None:
+    """가장 최근 두 trade_date 간 추천 점수 변화(|delta| >= 0.2)를 감지해 알림 생성.
+
+    # @MX:ANCHOR: [AUTO] 추천 점수 변화 감지 진입점 — scheduler/jobs.py에서 호출
+    # @MX:REASON: run_daily_pipeline, run_intraday_pipeline에서 직접 호출되는 공개 함수
+    # @MX:SPEC: SPEC-STOCK-023 REQ-023-013~019
+
+    REQ-023-013~019:
+    - 두 날짜 모두에 존재하는 종목만 비교 (REQ-023-014)
+    - |delta| >= 0.2 이상만 알림 발송 (REQ-023-015)
+    - 관심종목 등록자만 알림 수신 (REQ-023-016)
+    - UNIQUE 제약으로 intraday 중복 실행 안전 (REQ-023-019)
+    - trade_date 가 2개 미만이면 조용히 종료 (REQ-023-018)
+    """
+    _SCORE_DELTA_THRESHOLD = 0.2
+
+    with SyncSessionLocal() as db:
+        dates = _get_latest_two_trade_dates(db)
+
+        if len(dates) < 2:
+            logger.info("rec_score_change: trade_date 가 2개 미만 — 비교 건너뜀")
+            return
+
+        new_date, prev_date = dates[0], dates[1]
+        new_scores = _get_scores_for_date(db, new_date)
+        prev_scores = _get_scores_for_date(db, prev_date)
+
+        created = 0
+        changed_count = 0
+
+        for krx_code, new_score in new_scores.items():
+            if krx_code not in prev_scores:
+                continue
+            prev_score = prev_scores[krx_code]
+            delta = new_score - prev_score
+            if abs(delta) < _SCORE_DELTA_THRESHOLD:
+                continue
+
+            changed_count += 1
+            user_ids = _get_users_watching(db, krx_code)
+            for uid in user_ids:
+                _insert_notification_safe(
+                    db,
+                    user_id=uid,
+                    ntype="rec_score_change",
+                    krx_code=krx_code,
+                    title=f"[점수 변화] {krx_code} 추천 점수가 {delta:+.2f} 변경됐습니다.",
+                    body=(
+                        f"추천 점수: {prev_score:.2f} → {new_score:.2f} ({delta:+.2f}), "
+                        f"기준일: {new_date}"
+                    ),
+                    ref_date=new_date,
+                )
+                created += 1
+
+        db.commit()
+
+    logger.info(
+        "rec_score_change: %s→%s 비교 완료 — 변화 종목 %d개 알림 %d건 생성",
+        prev_date,
+        new_date,
+        changed_count,
+        created,
+    )
+
+
 def check_rec_changes() -> None:
     """가장 최근 두 trade_date 를 비교해 신규/탈락 알림을 인박스에 생성.
 

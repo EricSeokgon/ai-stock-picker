@@ -383,9 +383,15 @@ class TestCheckAndTriggerAllAlerts:
 
         price_data = {"close_price": 75000.0, "change_rate": 2.0}
 
-        with patch(
-            "stock_picker.notifications.general_alert_service.get_stock_price_data",
-            new=AsyncMock(return_value=price_data),
+        with (
+            patch(
+                "stock_picker.notifications.general_alert_service.get_stock_price_data",
+                new=AsyncMock(return_value=price_data),
+            ),
+            patch(
+                "stock_picker.notifications.general_alert_service._is_market_open",
+                return_value=True,
+            ),
         ):
             triggered_count = await check_and_trigger_all_alerts(session=mock_session)
 

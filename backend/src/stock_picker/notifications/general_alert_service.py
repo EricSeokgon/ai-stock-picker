@@ -6,8 +6,10 @@
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import os
+from datetime import datetime, time, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import structlog
 from fastapi import HTTPException, status
@@ -17,15 +19,20 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from stock_picker.db.models import Alert, Notification
-from stock_picker.mapping.prices import get_stock_price_data
+from stock_picker.mapping.prices import get_avg_volume, get_stock_price_data
 from stock_picker.notifications.email_service import _get_smtp_config
 
 log = structlog.get_logger()
 
 # 지원 알림 유형
-_VALID_ALERT_TYPES = {"target_price", "surge_drop", "ex_dividend"}
+_VALID_ALERT_TYPES = {"target_price", "surge_drop", "ex_dividend", "volume_spike"}
 # 지원 방향
 _VALID_DIRECTIONS = {"above", "below", "either"}
+
+# 장중 시간 게이팅 상수
+_KST = ZoneInfo("Asia/Seoul")
+_MARKET_OPEN = time(9, 0)
+_MARKET_CLOSE = time(15, 30)
 
 
 # ══════════════════════════════════════════════════════════
@@ -181,6 +188,64 @@ def check_surge_drop(
     return False, ""
 
 
+def _is_market_open(now_kst: datetime | None = None) -> bool:
+    """주식 시장 개장 여부 반환 (09:00~15:30 KST).
+
+    # @MX:NOTE: [AUTO] 장중 시간 게이팅 헬퍼 — ALERT_MARKET_HOURS_GATE 환경변수로 비활성화 가능
+    # @MX:SPEC: SPEC-STOCK-023 REQ-023-020~024
+
+    Args:
+        now_kst: 기준 시각 (KST). None이면 현재 시각 사용.
+
+    Returns:
+        True이면 장중 (09:00 이상 15:30 이하).
+    """
+    if now_kst is None:
+        now_kst = datetime.now(_KST)
+    t = now_kst.time()
+    return _MARKET_OPEN <= t <= _MARKET_CLOSE
+
+
+def check_volume_spike(
+    alert: Any,
+    volume_data: dict[str, Any] | None,
+) -> tuple[bool, str]:
+    """거래량 급증 여부 판정.
+
+    # @MX:ANCHOR: [AUTO] 거래량 급증 점검 순수 함수 — 서비스·테스트에서 직접 호출
+    # @MX:REASON: check_and_trigger_all_alerts, 유닛 테스트에서 직접 import
+    # @MX:SPEC: SPEC-STOCK-023 REQ-023-005~012
+
+    Args:
+        alert: Alert ORM 모델 (condition_value: 배수 임계값, 예: 2.0).
+        volume_data: {"avg_volume": float, "today_volume": int} 또는 None.
+
+    Returns:
+        (triggered: bool, message: str) 튜플.
+    """
+    if volume_data is None:
+        return False, ""
+
+    avg_volume = volume_data.get("avg_volume", 0.0)
+    today_volume = volume_data.get("today_volume", 0)
+
+    if avg_volume <= 0:
+        return False, ""
+
+    multiplier = alert.condition_value
+    ratio = today_volume / avg_volume
+
+    if ratio >= multiplier:
+        msg = (
+            f"{alert.krx_code} 거래량 급증 알림: "
+            f"오늘 거래량 {today_volume:,}주 "
+            f"(30일 평균 {avg_volume:,.0f}주의 {ratio:.1f}배)"
+        )
+        return True, msg
+
+    return False, ""
+
+
 def build_notification_payload(
     alert: Any,
     message: str,
@@ -202,6 +267,7 @@ def build_notification_payload(
         "target_price": "목표가 알림",
         "surge_drop": "급등락 알림",
         "ex_dividend": "배당락 알림",
+        "volume_spike": "거래량 급증 알림",
     }
     title = f"[{type_label_map.get(alert.alert_type, '알림')}] {alert.krx_code}"
     if hasattr(alert, "stock_name") and alert.stock_name:
@@ -392,8 +458,9 @@ async def check_and_trigger_all_alerts(session: AsyncSession) -> int:
     # @MX:REASON: 종목마다 FinanceDataReader 호출하므로 알림 수 증가 시 지연 발생 가능. 향후 배치 최적화 고려.
 
     이미 발동된 알림(is_triggered=True)은 건너뜁니다.
-    가격 조회 실패 시 해당 알림만 건너뜁니다 (graceful degradation).
+    가격/거래량 조회 실패 시 해당 알림만 건너뜁니다 (graceful degradation).
     notifications 적재 시 UNIQUE 제약으로 중복 삽입을 무시합니다.
+    ALERT_MARKET_HOURS_GATE=true(기본)이면 장중(09:00~15:30 KST)에만 외부 API 호출.
 
     Args:
         session: AsyncSession.
@@ -401,6 +468,12 @@ async def check_and_trigger_all_alerts(session: AsyncSession) -> int:
     Returns:
         발동된 알림 건수.
     """
+    # 장중 시간 게이팅 (REQ-023-020~024)
+    gate_enabled = os.getenv("ALERT_MARKET_HOURS_GATE", "true").lower() not in ("false", "0", "no")
+    if gate_enabled and not _is_market_open():
+        log.info("장 마감 시간 — 알림 점검 건너뜀")
+        return 0
+
     stmt = select(Alert).where(Alert.is_active == True, Alert.is_triggered == False)  # noqa: E712
     result = await session.execute(stmt)
     active_alerts = result.scalars().all()
@@ -413,15 +486,19 @@ async def check_and_trigger_all_alerts(session: AsyncSession) -> int:
         if getattr(alert, "is_triggered", False):
             continue
         try:
-            price_data = await get_stock_price_data(alert.krx_code)
-
-            if alert.alert_type == "target_price":
-                triggered, msg = check_target_price(alert, price_data)
-            elif alert.alert_type == "surge_drop":
-                triggered, msg = check_surge_drop(alert, price_data)
+            if alert.alert_type == "volume_spike":
+                volume_data = await get_avg_volume(alert.krx_code)
+                triggered, msg = check_volume_spike(alert, volume_data)
             else:
-                # ex_dividend 등 미구현 유형은 건너뜀
-                continue
+                price_data = await get_stock_price_data(alert.krx_code)
+
+                if alert.alert_type == "target_price":
+                    triggered, msg = check_target_price(alert, price_data)
+                elif alert.alert_type == "surge_drop":
+                    triggered, msg = check_surge_drop(alert, price_data)
+                else:
+                    # ex_dividend 등 미구현 유형은 건너뜀
+                    continue
 
             if not triggered:
                 continue

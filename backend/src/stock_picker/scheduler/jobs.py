@@ -128,7 +128,7 @@ async def run_daily_pipeline() -> None:
     오전 6시에 APScheduler가 호출한다.
     각 단계는 순서대로 실행되며, 섹터 집계 단계 실패 시 이후 단계도 계속된다.
     """
-    from stock_picker.notifications.rec_change import check_rec_changes
+    from stock_picker.notifications.rec_change import check_rec_changes, check_rec_score_changes
 
     log.info("일일 파이프라인 시작")
     try:
@@ -141,6 +141,11 @@ async def run_daily_pipeline() -> None:
             check_rec_changes()
         except Exception:
             log.exception("추천 변동 알림 생성 실패 — 파이프라인 계속 진행")
+        # REQ-023-013: 추천 점수 변화 감지
+        try:
+            check_rec_score_changes()
+        except Exception:
+            log.exception("추천 점수 변화 알림 생성 실패 — 파이프라인 계속 진행")
         log.info("일일 파이프라인 완료")
     except Exception:
         log.exception("일일 파이프라인 오류 발생")
@@ -153,7 +158,7 @@ async def run_intraday_pipeline() -> None:
     09:00~15:30 매 30분마다 APScheduler가 호출한다.
     증분 수집 → 분석 → 섹터집계 → 추천 재계산 → 추천 변동 알림 순서로 실행한다.
     """
-    from stock_picker.notifications.rec_change import check_rec_changes
+    from stock_picker.notifications.rec_change import check_rec_changes, check_rec_score_changes
 
     log.info("장중 증분 파이프라인 시작")
     try:
@@ -166,6 +171,11 @@ async def run_intraday_pipeline() -> None:
             check_rec_changes()
         except Exception:
             log.exception("추천 변동 알림 생성 실패 — 파이프라인 계속 진행")
+        # REQ-023-013: 추천 점수 변화 감지 (UNIQUE 제약으로 intraday 중복 안전)
+        try:
+            check_rec_score_changes()
+        except Exception:
+            log.exception("추천 점수 변화 알림 생성 실패 — 파이프라인 계속 진행")
         log.info("장중 증분 파이프라인 완료")
     except Exception:
         log.exception("장중 증분 파이프라인 오류 발생")

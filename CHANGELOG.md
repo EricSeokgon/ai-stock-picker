@@ -7,6 +7,52 @@
 
 ---
 
+## [0.22.0] - 2026-06-15
+
+### Added (Phase 22: Docker 컨테이너화 완성 + 운영 환경 검증 — SPEC-STOCK-022)
+
+#### 백엔드: APScheduler Lifespan 연동
+- **Lifespan Context Manager** (`api/main.py` 수정)
+  - `setup_scheduler()` 앱 시작 시점에 호출 (기존 미호출 결함 해결)
+  - `scheduler.start()` 명시적 호출
+  - `scheduler.shutdown()` 앱 종료 시 graceful shutdown
+  - **ENABLE_SCHEDULER** 환경변수 토글 (기본값: true, false/0/no로 비활성화)
+  - 예외 격리: scheduler 시작 실패 시 앱 크래시 방지
+  
+- **스케줄러 작업 5개 정상 작동**
+  - daily_collection (일일 뉴스 수집, 06:00 KST)
+  - intraday_collection (장중 갱신, 30분 주기 09:00~15:30)
+  - check_price_alerts (가격 알림 점검, 10분 주기)
+  - weekly_email_summary (주간 이메일 요약, 월요일 07:00 KST)
+  - check_alerts (일반 알림 점검, 10분 주기)
+
+#### 환경변수 확장
+- **ENABLE_SCHEDULER**: APScheduler 활성화 여부 (기본: true)
+- **REALTIME_PRICE_MOCK**: 실시간 가격 모킹 모드 (기본: false)
+- **REALTIME_POLL_INTERVAL**: 실시간 가격 폴링 간격(초) (기본: 10)
+- `.env.example` 파일에 신규 3개 환경변수 추가 및 설명 기재
+
+#### 테스트 및 품질 보증
+- **백엔드 테스트**: 4개 신규 (test_lifespan_scheduler.py)
+  - scheduler 활성화/비활성화 토글 검증
+  - lifespan 정상 작동 및 작업 등록 검증
+  - scheduler 시작 실패 시 앱 생존 검증
+  - 모든 5개 스케줄 작업 등록 검증
+  - **총 테스트**: 통과 (정확한 개수는 실행 결과 참고)
+
+### Design Decisions
+- **Lifespan 시점**: FastAPI 표준 패턴 준수 (startup/shutdown context manager)
+- **ENABLE_SCHEDULER**: 다중 워커 배포 시 단일 인스턴스에서만 scheduler 활성화 가능
+- **예외 격리**: scheduler 시작 실패가 전체 앱을 내려가지 않도록 설계
+- **기존 price_broadcast_loop 공존**: 둘 다 lifespan에서 시작
+
+### Non-Goals (제외 항목)
+- 스케줄러 다중 인스턴스 분산 처리 (APScheduler MySQL/Redis 락 미사용)
+- 스케줄 동적 변경 API
+- 스케줄러 메트릭 수집/모니터링
+
+---
+
 ## [0.21.0] - 2026-06-15
 
 ### Added (Phase 21: 뉴스피드·AI 시장 템포 — SPEC-STOCK-021)

@@ -504,7 +504,9 @@ curl -X POST http://localhost:8000/health
 | `REDIS_URL` | - | redis://localhost:6379/0 | Redis 연결 문자열 |
 | `TELEGRAM_BOT_TOKEN` | - | - | 텔레그램 봇 토큰 |
 | `LOG_LEVEL` | - | INFO | 로그 레벨 (DEBUG, INFO, WARNING, ERROR) |
-| `ENABLE_SCHEDULER` | - | true | 스케줄러 활성화 여부 |
+| `ENABLE_SCHEDULER` | - | true | APScheduler 활성화 여부 (false, 0, no로 비활성화) |
+| `REALTIME_PRICE_MOCK` | - | false | 실시간 가격 모킹 모드 (개발 환경용, true로 시뮬레이션 활성화) |
+| `REALTIME_POLL_INTERVAL` | - | 10 | 실시간 가격 폴링 간격 (초) |
 | `SCHEDULER_DAILY_HOUR` | - | 6 | 일일 배치 시간 (0~23) |
 | `SCHEDULER_INTRADAY_INTERVAL` | - | 30 | 장중 갱신 간격 (분) |
 | `SMTP_HOST` | - | - | SMTP 서버 호스트 (예: smtp.gmail.com) |
@@ -512,6 +514,7 @@ curl -X POST http://localhost:8000/health
 | `SMTP_USER` | - | - | SMTP 사용자명 (이메일 주소) |
 | `SMTP_PASSWORD` | - | - | SMTP 비밀번호 (앱 비밀번호 권장) |
 | `SMTP_FROM` | - | - | 발신 이메일 주소 |
+| `CORS_ORIGINS` | - | http://localhost:3000 | 프론트엔드 오리진 (Docker Compose 내부에서는 localhost, 운영 환경에서는 실제 도메인) |
 
 **예제:**
 ```bash
@@ -522,8 +525,11 @@ REDIS_URL="redis://localhost:6379/0"
 TELEGRAM_BOT_TOKEN="123456789:ABCDefGHIjklmNOpqrsTUVwxyzABC123"
 LOG_LEVEL="INFO"
 ENABLE_SCHEDULER="true"
+REALTIME_PRICE_MOCK="false"
+REALTIME_POLL_INTERVAL="10"
 SCHEDULER_DAILY_HOUR="6"
 SCHEDULER_INTRADAY_INTERVAL="30"
+CORS_ORIGINS="http://localhost:3000"
 ```
 
 ## 프로젝트 구조

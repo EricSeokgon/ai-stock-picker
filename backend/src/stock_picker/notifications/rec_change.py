@@ -15,6 +15,7 @@ from stock_picker.db.models import (
 )
 from stock_picker.db.session import SyncSessionLocal
 from stock_picker.notifications.email_service import send_general_alert_email
+from stock_picker.notifications.preferences import is_channel_enabled_sync
 from stock_picker.telegram.notifier import _send_message_sync
 
 logger = logging.getLogger(__name__)
@@ -145,27 +146,29 @@ def check_rec_score_changes() -> None:
                 )
                 created += 1
 
-                # 이메일 채널 발송 (best-effort)
-                try:
-                    email_sub = db.query(EmailSubscription).filter(
-                        EmailSubscription.user_id == uid,
-                        EmailSubscription.is_active.is_(True),
-                    ).first()
-                    if email_sub:
-                        send_general_alert_email(email_sub.email, krx_code, "rec_score_change", body_text)
-                except Exception as e:
-                    logger.error("rec_score_change 이메일 발송 실패 user_id=%s: %s", uid, e)
+                # 이메일 채널 발송 (best-effort, REQ-PREF-DISPATCH-003)
+                if is_channel_enabled_sync(db, uid, "rec_score_change", "email"):
+                    try:
+                        email_sub = db.query(EmailSubscription).filter(
+                            EmailSubscription.user_id == uid,
+                            EmailSubscription.is_active.is_(True),
+                        ).first()
+                        if email_sub:
+                            send_general_alert_email(email_sub.email, krx_code, "rec_score_change", body_text)
+                    except Exception as e:
+                        logger.error("rec_score_change 이메일 발송 실패 user_id=%s: %s", uid, e)
 
-                # 텔레그램 채널 발송 (best-effort)
-                try:
-                    tg_sub = db.query(TelegramSubscription).filter(
-                        TelegramSubscription.user_id == uid,
-                        TelegramSubscription.is_active.is_(True),
-                    ).first()
-                    if tg_sub:
-                        _send_message_sync(tg_sub.chat_id, f"[{krx_code}] {body_text}")
-                except Exception as e:
-                    logger.error("rec_score_change 텔레그램 발송 실패 user_id=%s: %s", uid, e)
+                # 텔레그램 채널 발송 (best-effort, REQ-PREF-DISPATCH-004)
+                if is_channel_enabled_sync(db, uid, "rec_score_change", "telegram"):
+                    try:
+                        tg_sub = db.query(TelegramSubscription).filter(
+                            TelegramSubscription.user_id == uid,
+                            TelegramSubscription.is_active.is_(True),
+                        ).first()
+                        if tg_sub:
+                            _send_message_sync(tg_sub.chat_id, f"[{krx_code}] {body_text}")
+                    except Exception as e:
+                        logger.error("rec_score_change 텔레그램 발송 실패 user_id=%s: %s", uid, e)
 
         db.commit()
 
@@ -222,27 +225,29 @@ def check_rec_changes() -> None:
                 )
                 created += 1
 
-                # 이메일 채널 발송 (best-effort)
-                try:
-                    email_sub = db.query(EmailSubscription).filter(
-                        EmailSubscription.user_id == uid,
-                        EmailSubscription.is_active.is_(True),
-                    ).first()
-                    if email_sub:
-                        send_general_alert_email(email_sub.email, krx_code, "rec_new", body_text)
-                except Exception as e:
-                    logger.error("rec_change 이메일 발송 실패 user_id=%s: %s", uid, e)
+                # 이메일 채널 발송 (best-effort, REQ-PREF-DISPATCH-003)
+                if is_channel_enabled_sync(db, uid, "rec_new", "email"):
+                    try:
+                        email_sub = db.query(EmailSubscription).filter(
+                            EmailSubscription.user_id == uid,
+                            EmailSubscription.is_active.is_(True),
+                        ).first()
+                        if email_sub:
+                            send_general_alert_email(email_sub.email, krx_code, "rec_new", body_text)
+                    except Exception as e:
+                        logger.error("rec_change 이메일 발송 실패 user_id=%s: %s", uid, e)
 
-                # 텔레그램 채널 발송 (best-effort)
-                try:
-                    tg_sub = db.query(TelegramSubscription).filter(
-                        TelegramSubscription.user_id == uid,
-                        TelegramSubscription.is_active.is_(True),
-                    ).first()
-                    if tg_sub:
-                        _send_message_sync(tg_sub.chat_id, f"[{krx_code}] {body_text}")
-                except Exception as e:
-                    logger.error("rec_change 텔레그램 발송 실패 user_id=%s: %s", uid, e)
+                # 텔레그램 채널 발송 (best-effort, REQ-PREF-DISPATCH-004)
+                if is_channel_enabled_sync(db, uid, "rec_new", "telegram"):
+                    try:
+                        tg_sub = db.query(TelegramSubscription).filter(
+                            TelegramSubscription.user_id == uid,
+                            TelegramSubscription.is_active.is_(True),
+                        ).first()
+                        if tg_sub:
+                            _send_message_sync(tg_sub.chat_id, f"[{krx_code}] {body_text}")
+                    except Exception as e:
+                        logger.error("rec_change 텔레그램 발송 실패 user_id=%s: %s", uid, e)
 
         for krx_code in dropped:
             user_ids = _get_users_watching(db, krx_code)
@@ -259,27 +264,29 @@ def check_rec_changes() -> None:
                 )
                 created += 1
 
-                # 이메일 채널 발송 (best-effort)
-                try:
-                    email_sub = db.query(EmailSubscription).filter(
-                        EmailSubscription.user_id == uid,
-                        EmailSubscription.is_active.is_(True),
-                    ).first()
-                    if email_sub:
-                        send_general_alert_email(email_sub.email, krx_code, "rec_dropped", body_text)
-                except Exception as e:
-                    logger.error("rec_change 이메일 발송 실패 user_id=%s: %s", uid, e)
+                # 이메일 채널 발송 (best-effort, REQ-PREF-DISPATCH-003)
+                if is_channel_enabled_sync(db, uid, "rec_dropped", "email"):
+                    try:
+                        email_sub = db.query(EmailSubscription).filter(
+                            EmailSubscription.user_id == uid,
+                            EmailSubscription.is_active.is_(True),
+                        ).first()
+                        if email_sub:
+                            send_general_alert_email(email_sub.email, krx_code, "rec_dropped", body_text)
+                    except Exception as e:
+                        logger.error("rec_change 이메일 발송 실패 user_id=%s: %s", uid, e)
 
-                # 텔레그램 채널 발송 (best-effort)
-                try:
-                    tg_sub = db.query(TelegramSubscription).filter(
-                        TelegramSubscription.user_id == uid,
-                        TelegramSubscription.is_active.is_(True),
-                    ).first()
-                    if tg_sub:
-                        _send_message_sync(tg_sub.chat_id, f"[{krx_code}] {body_text}")
-                except Exception as e:
-                    logger.error("rec_change 텔레그램 발송 실패 user_id=%s: %s", uid, e)
+                # 텔레그램 채널 발송 (best-effort, REQ-PREF-DISPATCH-004)
+                if is_channel_enabled_sync(db, uid, "rec_dropped", "telegram"):
+                    try:
+                        tg_sub = db.query(TelegramSubscription).filter(
+                            TelegramSubscription.user_id == uid,
+                            TelegramSubscription.is_active.is_(True),
+                        ).first()
+                        if tg_sub:
+                            _send_message_sync(tg_sub.chat_id, f"[{krx_code}] {body_text}")
+                    except Exception as e:
+                        logger.error("rec_change 텔레그램 발송 실패 user_id=%s: %s", uid, e)
 
         db.commit()
 

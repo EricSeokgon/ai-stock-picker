@@ -627,3 +627,45 @@ class Alert(Base):
     )
 
     user: Mapped["User"] = relationship("User", lazy="noload")
+
+
+# ── Phase K: 알림 채널·유형별 수신 설정 (SPEC-STOCK-025) ──────────────────────
+
+
+class NotificationPreference(Base):
+    """사용자별 알림 유형·채널 ON/OFF 설정 테이블 (SPEC-STOCK-025).
+
+    # @MX:ANCHOR: [AUTO] 알림 채널 게이팅 핵심 엔티티 — preferences 서비스·라우터에서 참조
+    # @MX:REASON: preferences.py(is_channel_enabled), preferences_router.py, general_alert_service.py 3곳 이상
+    # @MX:SPEC: SPEC-STOCK-025 REQ-PREF-001, REQ-PREF-002
+
+    하위 호환(opt-out) 모델:
+    - 설정 행이 없으면 email_enabled=True, telegram_enabled=True로 간주
+    - (user_id, alert_type) 단위 UNIQUE 제약으로 유형당 1행 유지
+    """
+
+    __tablename__ = "notification_preferences"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    # 지원 유형: target_price|surge_drop|volume_spike|ex_dividend|rec_new|rec_dropped|rec_score_change
+    alert_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    # 이메일 채널 활성 여부 (기본값 True)
+    email_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # 텔레그램 채널 활성 여부 (기본값 True)
+    telegram_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        onupdate=func.now(),
+    )
+
+    __table_args__ = (
+        # (user_id, alert_type) 조합 UNIQUE — 유형당 1행 유지
+        UniqueConstraint("user_id", "alert_type", name="uq_pref_user_type"),
+    )
+
+    user: Mapped["User"] = relationship("User", lazy="noload")

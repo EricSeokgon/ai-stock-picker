@@ -19,6 +19,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from stock_picker.db.models import Alert, EmailSubscription, Notification, TelegramSubscription
+from stock_picker.notifications.preferences import is_channel_enabled_async
 from stock_picker.mapping.prices import get_avg_volume, get_stock_price_data
 from stock_picker.notifications.email_service import send_general_alert_email
 from stock_picker.telegram.notifier import _send_message_sync
@@ -542,11 +543,16 @@ async def check_and_trigger_all_alerts(session: AsyncSession) -> int:
 async def _try_send_alert_email(alert: Any, message: str, session: AsyncSession) -> None:
     """이메일 구독자에게 알림 이메일 발송 (best-effort).
 
+    채널 설정 확인 후 이메일이 활성인 경우에만 발송 (REQ-PREF-DISPATCH-001).
+
     Args:
         alert: Alert ORM 모델.
         message: 알림 메시지 본문.
         session: AsyncSession.
     """
+    # 이메일 채널 활성 여부 확인 (설정 없거나 예외 시 기본 활성)
+    if not await is_channel_enabled_async(session, alert.user_id, alert.alert_type, "email"):
+        return
     try:
         result = await session.execute(
             select(EmailSubscription).where(
@@ -564,11 +570,16 @@ async def _try_send_alert_email(alert: Any, message: str, session: AsyncSession)
 async def _try_send_telegram(alert: Any, message: str, session: AsyncSession) -> None:
     """텔레그램 구독자에게 알림 메시지 발송 (best-effort).
 
+    채널 설정 확인 후 텔레그램이 활성인 경우에만 발송 (REQ-PREF-DISPATCH-002).
+
     Args:
         alert: Alert ORM 모델.
         message: 알림 메시지 본문.
         session: AsyncSession.
     """
+    # 텔레그램 채널 활성 여부 확인 (설정 없거나 예외 시 기본 활성)
+    if not await is_channel_enabled_async(session, alert.user_id, alert.alert_type, "telegram"):
+        return
     try:
         result = await session.execute(
             select(TelegramSubscription).where(

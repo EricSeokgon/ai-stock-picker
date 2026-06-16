@@ -111,3 +111,40 @@ export async function markAllNotificationsRead(
   if (!res.ok) throw new Error(`전체 읽음 실패: ${res.status}`);
   return res.json() as Promise<{ updated: number }>;
 }
+
+// ── 알림 채널 설정 API (SPEC-STOCK-025) ───────────────────────────────────────
+
+// 알림 유형별 채널(이메일/텔레그램) 활성화 여부를 나타내는 항목
+export interface PreferenceItem {
+  alert_type: string;
+  email_enabled: boolean;
+  telegram_enabled: boolean;
+}
+
+// @MX:ANCHOR: [AUTO] 알림 채널 설정 API 진입점 — Settings 페이지와 테스트에서 공유
+// @MX:REASON: getNotificationPreferences, updateNotificationPreferences 두 함수가 Settings에서 함께 호출됨
+
+// 알림 채널 설정 조회
+export async function getNotificationPreferences(
+  token: string,
+): Promise<PreferenceItem[]> {
+  const res = await fetch(`${API_BASE}/notifications/preferences`, {
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error(`채널 설정 조회 실패: ${res.status}`);
+  return res.json() as Promise<PreferenceItem[]>;
+}
+
+// 알림 채널 설정 저장
+export async function updateNotificationPreferences(
+  token: string,
+  items: PreferenceItem[],
+): Promise<PreferenceItem[]> {
+  const res = await fetch(`${API_BASE}/notifications/preferences`, {
+    method: 'PUT',
+    headers: authHeaders(token),
+    body: JSON.stringify(items),
+  });
+  if (!res.ok) throw new Error(`채널 설정 저장 실패: ${res.status}`);
+  return res.json() as Promise<PreferenceItem[]>;
+}

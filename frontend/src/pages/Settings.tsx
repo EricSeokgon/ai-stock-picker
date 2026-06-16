@@ -1,17 +1,32 @@
-// 설정 페이지 — 이메일 알림 구독 관리
+// 설정 페이지 — 이메일 알림 구독 관리 + 알림 채널 설정
 // - 구독 상태 표시
 // - 이메일 입력 + 구독 버튼
 // - 구독 중이면 이메일 + 해지 버튼
 // - 미인증 시 /login 리다이렉트
+// - 알림 채널 설정: 알림 유형별 이메일/텔레그램 활성화 여부
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import {
   subscribeEmail,
   unsubscribeEmail,
+  getNotificationPreferences,
+  updateNotificationPreferences,
   type EmailSubscription,
+  type PreferenceItem,
 } from '../api/notifications';
+
+// 알림 유형 메타데이터 — 백엔드 alert_type 값과 한국어 레이블 매핑
+const ALERT_TYPES: { key: string; label: string }[] = [
+  { key: 'target_price',      label: '목표가 도달' },
+  { key: 'surge_drop',        label: '급등락' },
+  { key: 'volume_spike',      label: '거래량 급증' },
+  { key: 'ex_dividend',       label: '배당일' },
+  { key: 'rec_new',           label: '신규 추천 진입' },
+  { key: 'rec_dropped',       label: '추천 이탈' },
+  { key: 'rec_score_change',  label: '추천 점수 변화' },
+];
 
 export default function Settings() {
   const { isAuthenticated, token } = useAuth();
@@ -20,10 +35,40 @@ export default function Settings() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // 알림 채널 설정 상태
+  const [preferences, setPreferences] = useState<PreferenceItem[]>([]);
+  const [prefLoading, setPrefLoading] = useState(true);
+  const [prefSaving, setPrefSaving] = useState(false);
+  const [prefMessage, setPrefMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   // 미인증 시 로그인 페이지로 이동
   if (!isAuthenticated || !token) {
     return <Navigate to="/login" replace />;
   }
+
+  // 알림 채널 설정 초기 로드 — 컴포넌트 마운트 시 서버에서 설정 조회
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    if (!token) return;
+    void (async () => {
+      try {
+        const data = await getNotificationPreferences(token);
+        // 서버 응답에 없는 알림 유형은 기본값(모두 비활성)으로 채움
+        const merged = ALERT_TYPES.map((at) => {
+          const found = data.find((d) => d.alert_type === at.key);
+          return found ?? { alert_type: at.key, email_enabled: false, telegram_enabled: false };
+        });
+        setPreferences(merged);
+      } catch {
+        // 조회 실패 시 모든 항목을 기본값으로 초기화
+        setPreferences(
+          ALERT_TYPES.map((at) => ({ alert_type: at.key, email_enabled: false, telegram_enabled: false })),
+        );
+      } finally {
+        setPrefLoading(false);
+      }
+    })();
+  }, [token]);
 
   // @MX:WARN: [AUTO] 422 에러는 특정 메시지로 처리 — 서버 응답 파싱 필요
   // @MX:REASON: 이메일 유효성 에러(422)와 일반 에러를 구분해야 함
@@ -59,6 +104,36 @@ export default function Settings() {
       setError(err instanceof Error ? err.message : '요청 실패. 다시 시도해주세요.');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  // 알림 채널 체크박스 변경 핸들러 — 해당 행의 특정 채널 값을 토글
+  function handlePrefChange(alertType: string, channel: 'email_enabled' | 'telegram_enabled', value: boolean) {
+    setPreferences((prev) =>
+      prev.map((p) =>
+        p.alert_type === alertType ? { ...p, [channel]: value } : p,
+      ),
+    );
+  }
+
+  // 알림 채널 설정 저장 핸들러
+  async function handleSavePreferences() {
+    if (!token) return;
+    setPrefSaving(true);
+    setPrefMessage(null);
+    try {
+      const saved = await updateNotificationPreferences(token, preferences);
+      // 저장 성공 시 서버 응답값으로 상태 동기화
+      const merged = ALERT_TYPES.map((at) => {
+        const found = saved.find((d) => d.alert_type === at.key);
+        return found ?? { alert_type: at.key, email_enabled: false, telegram_enabled: false };
+      });
+      setPreferences(merged);
+      setPrefMessage({ type: 'success', text: '알림 채널 설정이 저장되었습니다.' });
+    } catch (err) {
+      setPrefMessage({ type: 'error', text: err instanceof Error ? err.message : '저장에 실패했습니다.' });
+    } finally {
+      setPrefSaving(false);
     }
   }
 
@@ -139,6 +214,119 @@ export default function Settings() {
               {submitting ? '처리 중...' : '구독'}
             </button>
           </form>
+        )}
+      </section>
+
+      {/* ── 알림 채널 설정 섹션 (SPEC-STOCK-025 T4-2) ── */}
+      <section aria-labelledby="pref-section-title" style={{ marginTop: '2.5rem' }}>
+        <h3 id="pref-section-title" style={{ fontSize: '1rem', marginBottom: '1rem', color: '#333' }}>
+          알림 채널 설정
+        </h3>
+
+        {/* 저장 결과 메시지 */}
+        {prefMessage && (
+          <p
+            role="alert"
+            style={{
+              color: prefMessage.type === 'success' ? '#2e7d32' : '#c62828',
+              fontSize: '0.875rem',
+              marginBottom: '0.75rem',
+            }}
+          >
+            {prefMessage.text}
+          </p>
+        )}
+
+        {prefLoading ? (
+          <p style={{ color: '#666', fontSize: '0.9rem' }}>불러오는 중...</p>
+        ) : (
+          <>
+            {/* 알림 채널 선택 테이블 */}
+            <table
+              aria-label="알림 채널 설정 테이블"
+              style={{
+                borderCollapse: 'collapse',
+                fontSize: '0.9rem',
+                minWidth: '360px',
+              }}
+            >
+              <thead>
+                <tr>
+                  <th
+                    style={{
+                      textAlign: 'left',
+                      padding: '0.5rem 1rem 0.5rem 0',
+                      fontWeight: 600,
+                      color: '#555',
+                      borderBottom: '1px solid #ddd',
+                    }}
+                  >
+                    알림 유형
+                  </th>
+                  <th
+                    style={{
+                      padding: '0.5rem 1.5rem',
+                      fontWeight: 600,
+                      color: '#555',
+                      borderBottom: '1px solid #ddd',
+                    }}
+                  >
+                    이메일
+                  </th>
+                  <th
+                    style={{
+                      padding: '0.5rem 1.5rem',
+                      fontWeight: 600,
+                      color: '#555',
+                      borderBottom: '1px solid #ddd',
+                    }}
+                  >
+                    텔레그램
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {ALERT_TYPES.map((at) => {
+                  const pref = preferences.find((p) => p.alert_type === at.key);
+                  return (
+                    <tr key={at.key}>
+                      <td style={{ padding: '0.45rem 1rem 0.45rem 0', color: '#333' }}>
+                        {at.label}
+                      </td>
+                      <td style={{ textAlign: 'center', padding: '0.45rem 1.5rem' }}>
+                        <input
+                          type="checkbox"
+                          checked={pref?.email_enabled ?? false}
+                          onChange={(e) => handlePrefChange(at.key, 'email_enabled', e.target.checked)}
+                          aria-label={`${at.label} 이메일 알림`}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </td>
+                      <td style={{ textAlign: 'center', padding: '0.45rem 1.5rem' }}>
+                        <input
+                          type="checkbox"
+                          checked={pref?.telegram_enabled ?? false}
+                          onChange={(e) => handlePrefChange(at.key, 'telegram_enabled', e.target.checked)}
+                          aria-label={`${at.label} 텔레그램 알림`}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* 저장 버튼 */}
+            <button
+              onClick={() => void handleSavePreferences()}
+              disabled={prefSaving}
+              style={{ ...btnStyle, marginTop: '1rem' }}
+              aria-label="알림 채널 설정 저장"
+            >
+              {prefSaving ? '저장 중...' : '저장'}
+            </button>
+          </>
         )}
       </section>
     </div>

@@ -1,5 +1,6 @@
-# 포트폴리오 AI 분석 — Claude API를 사용한 포트폴리오 진단
+# 포트폴리오 AI 분석 — Claude API를 사용한 포트폴리오 진단 및 최적화
 # REQ-AI-PORTFOLIO: 보유 종목 구성 분석, 리스크 평가, 개선 제안 제공
+# SPEC-STOCK-026: 비동기 클라이언트 전환, optimize_portfolio_with_claude 추가
 import json
 import logging
 from typing import Any
@@ -17,8 +18,9 @@ logger = logging.getLogger(__name__)
 _DISCLAIMER = "본 분석은 투자 권유가 아닌 정보 제공 목적입니다."
 
 
-def analyze_portfolio(portfolio_id: int, user_id: int, db: Session) -> dict[str, Any]:
-    """포트폴리오 AI 분석 실행.
+# @MX:NOTE: [AUTO] SPEC-STOCK-026: 비동기 클라이언트로 전환 — 이벤트 루프 블로킹 해결
+async def analyze_portfolio(portfolio_id: int, user_id: int, db: Session) -> dict[str, Any]:
+    """포트폴리오 AI 분석 실행 (비동기).
 
     # @MX:ANCHOR: [AUTO] 포트폴리오 AI 분석 단일 진입점
     # @MX:REASON: portfolio/router.py에서 호출, Claude API 연동 담당
@@ -26,7 +28,7 @@ def analyze_portfolio(portfolio_id: int, user_id: int, db: Session) -> dict[str,
     1. 포트폴리오 + holdings 조회 (소유권 검증, 403)
     2. 보유 종목 없으면 Claude 미호출
     3. 보유 종목별 섹터, 비중, 수익률 계산
-    4. Claude API(claude-haiku-4-5) 호출
+    4. Claude API(claude-haiku-4-5) 비동기 호출
     5. 면책 문구 추가
     6. Claude 실패 시 오류 딕셔너리 반환 (500 대신)
 
@@ -59,9 +61,9 @@ def analyze_portfolio(portfolio_id: int, user_id: int, db: Session) -> dict[str,
     # 포트폴리오 구성 계산
     portfolio_data = _build_portfolio_data(holdings)
 
-    # Claude API 호출
+    # Claude API 비동기 호출
     try:
-        analysis = _call_claude(portfolio_data)
+        analysis = await _call_claude_async(portfolio_data)
     except Exception:
         logger.exception("Claude AI 분석 실패 — portfolio_id=%s", portfolio_id)
         return {"error": "AI 분석을 일시적으로 사용할 수 없습니다."}
@@ -92,13 +94,10 @@ def _build_portfolio_data(holdings: list[PortfolioHolding]) -> list[dict[str, An
     return result
 
 
-def _call_claude(portfolio_data: list[dict[str, Any]]) -> dict[str, Any]:
-    """Claude API 동기 호출 — 포트폴리오 분석 요청.
+async def _call_claude_async(portfolio_data: list[dict[str, Any]]) -> dict[str, Any]:
+    """Claude API 비동기 호출 — 포트폴리오 분석 요청.
 
-    # @MX:WARN: [AUTO] 외부 API 동기 호출 — 응답 지연 가능
-    # @MX:REASON: anthropic.Anthropic() 동기 클라이언트 사용;
-    #             FastAPI 라우터에서 직접 호출 시 이벤트 루프 블로킹 발생 가능.
-    #             고부하 환경에서는 run_in_executor 또는 비동기 클라이언트 전환 필요.
+    SPEC-STOCK-026: anthropic.AsyncAnthropic 사용으로 이벤트 루프 블로킹 해결.
 
     Returns:
         {"diversification": str, "risk": str, "suggestions": str}
@@ -108,7 +107,7 @@ def _call_claude(portfolio_data: list[dict[str, Any]]) -> dict[str, Any]:
     if not api_key:
         raise RuntimeError("ANTHROPIC_API_KEY가 설정되지 않았습니다")
 
-    client = anthropic.Anthropic(api_key=api_key)
+    client = anthropic.AsyncAnthropic(api_key=api_key)
 
     prompt = (
         "다음 포트폴리오 구성을 분석하고 한국어로 답변해 주세요.\n\n"
@@ -119,7 +118,7 @@ def _call_claude(portfolio_data: list[dict[str, Any]]) -> dict[str, Any]:
         '"suggestions": "개선 제안 (2-3문장)"}'
     )
 
-    message = client.messages.create(
+    message = await client.messages.create(
         model="claude-haiku-4-5",
         max_tokens=512,
         messages=[{"role": "user", "content": prompt}],
@@ -132,6 +131,70 @@ def _call_claude(portfolio_data: list[dict[str, Any]]) -> dict[str, Any]:
         return json.loads(response_text)
     except json.JSONDecodeError:
         # JSON 블록 추출 시도
+        start = response_text.find("{")
+        end = response_text.rfind("}") + 1
+        if start >= 0 and end > start:
+            return json.loads(response_text[start:end])
+        raise
+
+
+async def optimize_portfolio_with_claude(
+    holdings_data: list[dict[str, Any]],
+    portfolio_codes: list[str],
+    db: Session,
+) -> dict[str, Any]:
+    """Claude API를 사용한 포트폴리오 최적화 분석 (비동기).
+
+    # @MX:ANCHOR: [AUTO] 포트폴리오 최적화 Claude 호출 진입점
+    # @MX:REASON: service.optimize_portfolio, 테스트에서 2곳 이상 참조
+
+    Args:
+        holdings_data: 보유 종목 데이터 목록 (krx_code, weight_pct, sector 포함)
+        portfolio_codes: 포트폴리오 보유 종목 코드 목록 (new_stocks 필터용)
+        db: DB 세션 (recommendations 테이블 조회용)
+
+    Returns:
+        {"score_breakdown": {...}, "target_weights": [...], "new_stocks": [...], "summary": str}
+    """
+    import os
+    from stock_picker.db.models import Recommendation  # noqa: F401
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    # api_key가 없어도 AsyncAnthropic 인스턴스는 생성 가능 (테스트 환경)
+    client = anthropic.AsyncAnthropic(api_key=api_key if api_key else None)
+
+    prompt = (
+        "다음 포트폴리오를 분석하여 최적화 방안을 제시해 주세요.\n\n"
+        f"현재 보유 종목:\n{json.dumps(holdings_data, ensure_ascii=False, indent=2)}\n\n"
+        "아래 JSON 형식으로만 응답하세요 (다른 텍스트 없이):\n"
+        "{\n"
+        '  "score_breakdown": {\n'
+        '    "diversification": 70,\n'
+        '    "risk_balance": 65,\n'
+        '    "momentum": 75\n'
+        "  },\n"
+        '  "target_weights": [\n'
+        '    {"krx_code": "005930", "current_pct": 50.0, "target_pct": 45.0}\n'
+        "  ],\n"
+        '  "new_stocks": [\n'
+        '    {"krx_code": "035420", "name": "NAVER", "sector": "IT서비스", "reason": "추천 이유"}\n'
+        "  ],\n"
+        '  "summary": "포트폴리오 종합 평가 3-4 문장. 본 분석은 투자 권유가 아닌 정보 제공 목적입니다."\n'
+        "}"
+    )
+
+    message = await client.messages.create(
+        model="claude-haiku-4-5",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    response_text = message.content[0].text.strip()
+
+    # JSON 파싱 시도
+    try:
+        return json.loads(response_text)
+    except json.JSONDecodeError:
         start = response_text.find("{")
         end = response_text.rfind("}") + 1
         if start >= 0 and end > start:

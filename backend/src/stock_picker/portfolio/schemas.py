@@ -149,3 +149,42 @@ class PortfolioDividends(BaseModel):
     calendar: list[DividendCalendarMonth] # 지급월 확인된 종목만 포함
     coverage_count: int                   # dividend_available=True 인 보유 수
     total_holdings: int                   # 전체 보유 수
+
+
+# ── SPEC-STOCK-026 포트폴리오 AI 최적화 스키마 ────────────────────────────────
+
+class TargetWeightItem(BaseModel):
+    """리밸런싱 목표 비중 항목 (SPEC-STOCK-026 REQ-OPT-001)"""
+    krx_code: str
+    current_pct: float          # 현재 비중(%)
+    target_pct: float           # 목표 비중(%)
+    action: Literal["buy", "sell", "hold"]  # 2% 임계값 기반 서버 재계산
+    delta_shares: int           # 조정 주수 (음수=매도)
+
+
+class NewStockItem(BaseModel):
+    """추가 추천 종목 항목 (SPEC-STOCK-026 REQ-OPT-002)"""
+    krx_code: str
+    name: str
+    sector: str
+    reason: str                 # 추천 이유 (Claude 생성)
+
+
+class ScoreBreakdown(BaseModel):
+    """포트폴리오 점수 세부 항목 (SPEC-STOCK-026 REQ-OPT-003)"""
+    diversification: int        # 분산도 점수 (0-100)
+    risk_balance: int           # 위험 균형 점수 (0-100)
+    momentum: int               # 모멘텀 점수 (0-100)
+
+
+class OptimizeResult(BaseModel):
+    """포트폴리오 AI 최적화 분석 응답 (SPEC-STOCK-026)
+
+    # @MX:ANCHOR: [AUTO] 포트폴리오 최적화 API 응답 스키마
+    # @MX:REASON: router, service, 프론트 API 래퍼, 테스트에서 3곳 이상 참조
+    """
+    score: int                          # 0-100, ScoreBreakdown 평균
+    score_breakdown: ScoreBreakdown     # 세부 점수
+    target_weights: list[TargetWeightItem]  # 리밸런싱 목표 비중 목록
+    new_stocks: list[NewStockItem]      # 추가 추천 종목 (최대 5개, 비보유)
+    summary: str                        # 3-4 한국어 문장 + 면책 문구

@@ -7,10 +7,15 @@ import {
   apiListHoldings,
   apiAddHolding,
   apiGetPerformance,
+  apiOptimizePortfolio,
   type Portfolio,
   type Holding,
   type PortfolioPerformance,
+  type OptimizeResult,
 } from '../api/portfolio';
+import PortfolioScoreCard from '../components/PortfolioScoreCard';
+import RebalancingTable from '../components/RebalancingTable';
+import NewStockSuggestions from '../components/NewStockSuggestions';
 import { getPortfolioDividends, type PortfolioDividends } from '../api/dividends';
 import { LivePriceBadge } from '../components/LivePriceBadge';
 import { PerformanceDonutChart } from '../components/PerformanceDonutChart';
@@ -371,6 +376,102 @@ function AiAnalysisSection({ portfolioId, token }: { portfolioId: number; token:
   );
 }
 
+// AI 최적화 분석 섹션 (SPEC-STOCK-026)
+function OptimizeSection({ portfolioId, token }: { portfolioId: number; token: string }) {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<OptimizeResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleOptimize(refresh = false) {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await apiOptimizePortfolio(token, portfolioId, refresh);
+      setResult(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'AI 최적화 분석 실패');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const sectionStyle: React.CSSProperties = {
+    marginTop: '1rem',
+    padding: '0.75rem',
+    border: '1px solid #ede9fe',
+    borderRadius: '4px',
+    background: '#faf5ff',
+  };
+
+  return (
+    <div style={sectionStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+        <strong style={{ fontSize: '0.875rem' }}>AI 최적화 분석</strong>
+        <button
+          onClick={() => void handleOptimize(false)}
+          disabled={loading}
+          style={{
+            padding: '0.3rem 0.7rem', background: '#7c3aed', color: '#fff',
+            border: 'none', borderRadius: '4px', cursor: loading ? 'default' : 'pointer',
+            fontSize: '0.8rem', opacity: loading ? 0.7 : 1,
+          }}
+        >
+          {loading ? '분석 중...' : '최적화 분석 실행'}
+        </button>
+        {result && (
+          <button
+            onClick={() => void handleOptimize(true)}
+            disabled={loading}
+            style={{
+              padding: '0.3rem 0.7rem', background: 'none', border: '1px solid #7c3aed',
+              color: '#7c3aed', borderRadius: '4px', cursor: loading ? 'default' : 'pointer',
+              fontSize: '0.8rem', opacity: loading ? 0.7 : 1,
+            }}
+          >
+            새로 분석
+          </button>
+        )}
+      </div>
+
+      {error && (
+        <p style={{ color: '#c62828', fontSize: '0.8rem', margin: '0.25rem 0' }}>{error}</p>
+      )}
+
+      {result && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* 점수 카드 */}
+          <PortfolioScoreCard score={result.score} breakdown={result.score_breakdown} />
+
+          {/* 리밸런싱 테이블 */}
+          <div>
+            <p style={{ margin: '0 0 8px', fontWeight: 600, fontSize: '13px', color: '#374151' }}>
+              리밸런싱 제안
+            </p>
+            <RebalancingTable items={result.target_weights} />
+          </div>
+
+          {/* 신규 종목 추천 */}
+          {result.new_stocks.length > 0 && (
+            <div>
+              <p style={{ margin: '0 0 8px', fontWeight: 600, fontSize: '13px', color: '#374151' }}>
+                신규 종목 추천
+              </p>
+              <NewStockSuggestions stocks={result.new_stocks} />
+            </div>
+          )}
+
+          {/* 종합 요약 */}
+          {result.summary && (
+            <p style={{ fontSize: '0.8rem', color: '#4b5563', lineHeight: 1.6, margin: 0 }}>
+              {result.summary}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // AI 투자 조언 섹션 — 리밸런싱·리스크·브리핑 (SPEC-STOCK-014)
 // @MX:NOTE: [AUTO] 3종 조언을 탭으로 전환하는 단일 섹션 컴포넌트
 function AdviceSection({ token }: { token: string }) {
@@ -705,6 +806,9 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
 
       {/* AI 분석 섹션 (REQ-FE-005) */}
       <AiAnalysisSection portfolioId={portfolioId} token={token} />
+
+      {/* AI 최적화 분석 섹션 (SPEC-STOCK-026) */}
+      <OptimizeSection portfolioId={portfolioId} token={token} />
 
       {/* AI 투자 조언 섹션 (SPEC-STOCK-014) */}
       <AdviceSection token={token} />

@@ -1,9 +1,11 @@
-# 포트폴리오 서비스 레이어 — CRUD + 성과 계산 (SPEC-STOCK-017 확장)
+# 포트폴리오 서비스 레이어 — CRUD + 성과 계산 + AI 최적화 (SPEC-STOCK-017·026 확장)
 import logging
 from collections import defaultdict
+from datetime import date
 from decimal import Decimal
 from typing import Any
 
+import redis.asyncio as aioredis
 from sqlalchemy.orm import Session
 
 from stock_picker.db.models import Portfolio, PortfolioHolding
@@ -226,3 +228,157 @@ def calculate_performance(
         "classification_summary": summary,
         "sector_performance": sector_perf,
     }
+
+
+# @MX:ANCHOR: [AUTO] 포트폴리오 AI 최적화 단일 진입점
+# @MX:REASON: router.py 및 테스트에서 호출
+async def optimize_portfolio(
+    portfolio_id: int,
+    user_id: int,
+    db: Session,
+    redis: aioredis.Redis,
+    refresh: bool = False,
+) -> Any:
+    """포트폴리오 AI 최적화 분석 (SPEC-STOCK-026 REQ-OPT-001~005).
+
+    1. 포트폴리오 소유권 확인 (403)
+    2. Redis 캐시 확인 (key: portfolio_optimize:{portfolio_id}:{today})
+    3. 보유 종목 없으면 메시지 반환
+    4. Claude AI로 최적화 분석
+    5. action 서버 재계산 (2% 임계값), score 계산
+    6. 결과 Redis 캐싱 (TTL=3600s)
+
+    Returns:
+        OptimizeResult 또는 {"message": str}
+    """
+    from stock_picker.portfolio.ai_analysis import optimize_portfolio_with_claude
+    from stock_picker.portfolio.schemas import (
+        NewStockItem,
+        OptimizeResult,
+        ScoreBreakdown,
+        TargetWeightItem,
+    )
+
+    # 포트폴리오 소유권 확인
+    portfolio = (
+        db.query(Portfolio)
+        .filter(Portfolio.id == portfolio_id, Portfolio.user_id == user_id)
+        .first()
+    )
+    if portfolio is None:
+        from fastapi import HTTPException, status
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="포트폴리오에 접근할 수 없습니다",
+        )
+
+    # Redis 캐시 확인
+    today = date.today().isoformat()
+    cache_key = f"portfolio_optimize:{portfolio_id}:{today}"
+
+    if not refresh:
+        cached = await redis.get(cache_key)
+        if cached:
+            return OptimizeResult.model_validate_json(cached)
+
+    # 보유 종목 조회
+    holdings = (
+        db.query(PortfolioHolding)
+        .filter(PortfolioHolding.portfolio_id == portfolio_id)
+        .all()
+    )
+
+    if not holdings:
+        return {"message": "분석할 보유 종목이 없습니다."}
+
+    # 현재 비중 계산
+    total_value = sum(float(h.avg_buy_price) * h.quantity for h in holdings)
+    holdings_data = []
+    portfolio_codes = [h.krx_code for h in holdings]
+
+    for h in holdings:
+        invested = float(h.avg_buy_price) * h.quantity
+        weight_pct = round((invested / total_value * 100), 2) if total_value > 0 else 0.0
+        holdings_data.append({
+            "krx_code": h.krx_code,
+            "quantity": h.quantity,
+            "avg_buy_price": float(h.avg_buy_price),
+            "invested_amount": round(invested, 2),
+            "weight_pct": weight_pct,
+            "sector": get_sector(h.krx_code),
+        })
+
+    # Claude AI 최적화 분석 호출
+    raw = await optimize_portfolio_with_claude(holdings_data, portfolio_codes, db)
+
+    # score_breakdown 파싱
+    bd = raw.get("score_breakdown", {})
+    diversification = int(bd.get("diversification", 50))
+    risk_balance = int(bd.get("risk_balance", 50))
+    momentum = int(bd.get("momentum", 50))
+    # 범위 클램핑
+    diversification = max(0, min(100, diversification))
+    risk_balance = max(0, min(100, risk_balance))
+    momentum = max(0, min(100, momentum))
+    score = int(round((diversification + risk_balance + momentum) / 3))
+
+    # target_weights — action 서버 재계산 (2% 임계값)
+    current_pct_map = {item["krx_code"]: item["weight_pct"] for item in holdings_data}
+    target_weight_items = []
+    for tw in raw.get("target_weights", []):
+        krx_code = tw["krx_code"]
+        current_pct = float(tw.get("current_pct", current_pct_map.get(krx_code, 0.0)))
+        target_pct = float(tw["target_pct"])
+        delta_pct = target_pct - current_pct
+
+        if delta_pct > 2.0:
+            action = "buy"
+        elif delta_pct < -2.0:
+            action = "sell"
+        else:
+            action = "hold"
+
+        # delta_shares: 단순 비중 차이 기반 (avg_buy_price 사용)
+        holding_map = {h.krx_code: h for h in holdings}
+        h = holding_map.get(krx_code)
+        if h and float(h.avg_buy_price) > 0 and total_value > 0:
+            delta_value = (delta_pct / 100) * total_value
+            delta_shares = int(delta_value / float(h.avg_buy_price))
+        else:
+            delta_shares = 0
+
+        target_weight_items.append(TargetWeightItem(
+            krx_code=krx_code,
+            current_pct=current_pct,
+            target_pct=target_pct,
+            action=action,
+            delta_shares=delta_shares,
+        ))
+
+    # new_stocks — 포트폴리오 보유 종목 제외, 최대 5개
+    new_stock_items = []
+    for ns in raw.get("new_stocks", [])[:5]:
+        if ns["krx_code"] not in portfolio_codes:
+            new_stock_items.append(NewStockItem(
+                krx_code=ns["krx_code"],
+                name=ns.get("name", ""),
+                sector=ns.get("sector", "기타"),
+                reason=ns.get("reason", ""),
+            ))
+
+    result = OptimizeResult(
+        score=score,
+        score_breakdown=ScoreBreakdown(
+            diversification=diversification,
+            risk_balance=risk_balance,
+            momentum=momentum,
+        ),
+        target_weights=target_weight_items,
+        new_stocks=new_stock_items,
+        summary=raw.get("summary", ""),
+    )
+
+    # Redis 캐싱 (TTL=3600s)
+    await redis.setex(cache_key, 3600, result.model_dump_json())
+
+    return result

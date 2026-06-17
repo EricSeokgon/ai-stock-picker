@@ -12,10 +12,11 @@ from stock_picker.portfolio.dividends import calculate_portfolio_dividends
 from stock_picker.portfolio.schemas import (
     HoldingCreate,
     HoldingResponse,
+    OptimizeResult,
     PortfolioCreate,
+    PortfolioDividends,
     PortfolioPerformance,
     PortfolioResponse,
-    PortfolioDividends,
 )
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
@@ -104,13 +105,38 @@ def remove_holding(
 
 
 @router.post("/{portfolio_id}/ai-analysis")
-def ai_analysis(
+async def ai_analysis(
     portfolio_id: int,
     db: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ) -> dict:
     """포트폴리오 AI 분석 — Claude API로 분산투자/리스크/개선 제안 제공"""
-    return analyze_portfolio(portfolio_id=portfolio_id, user_id=current_user.id, db=db)
+    return await analyze_portfolio(portfolio_id=portfolio_id, user_id=current_user.id, db=db)
+
+
+# @MX:NOTE: [AUTO] SPEC-STOCK-026 — POST /portfolios/{id}/optimize, Redis 캐시 TTL=3600s
+@router.post("/{portfolio_id}/optimize", response_model=OptimizeResult)
+async def optimize_portfolio(
+    portfolio_id: int,
+    refresh: bool = False,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    redis: aioredis.Redis = Depends(get_redis_client),
+) -> OptimizeResult:
+    """포트폴리오 AI 최적화 분석 — 리밸런싱 제안 + 신규 종목 추천 (SPEC-STOCK-026)"""
+    result = await service.optimize_portfolio(
+        portfolio_id=portfolio_id,
+        user_id=current_user.id,
+        db=db,
+        redis=redis,
+        refresh=refresh,
+    )
+    if isinstance(result, dict) and "message" in result:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=result["message"],
+        )
+    return result
 
 
 @router.get("/{portfolio_id}/performance", response_model=PortfolioPerformance)

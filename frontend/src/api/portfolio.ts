@@ -131,3 +131,52 @@ export async function apiGetPerformance(token: string, portfolioId: number): Pro
   if (!res.ok) throw new Error(`성과 조회 실패: ${res.status}`);
   return res.json() as Promise<PortfolioPerformance>;
 }
+
+// ── SPEC-STOCK-026 포트폴리오 AI 최적화 타입 및 API ─────────────────────────
+
+export interface TargetWeightItem {
+  krx_code: string;
+  current_pct: number;
+  target_pct: number;
+  action: 'buy' | 'sell' | 'hold';
+  delta_shares: number;
+}
+
+export interface NewStockItem {
+  krx_code: string;
+  name: string;
+  sector: string;
+  reason: string;
+}
+
+export interface ScoreBreakdown {
+  diversification: number;
+  risk_balance: number;
+  momentum: number;
+}
+
+export interface OptimizeResult {
+  score: number;
+  score_breakdown: ScoreBreakdown;
+  target_weights: TargetWeightItem[];
+  new_stocks: NewStockItem[];
+  summary: string;
+}
+
+// 포트폴리오 AI 최적화 분석 호출 (SPEC-STOCK-026)
+export async function apiOptimizePortfolio(
+  token: string,
+  portfolioId: number,
+  refresh = false,
+): Promise<OptimizeResult> {
+  const url = `${API_BASE}/portfolios/${portfolioId}/optimize${refresh ? '?refresh=true' : ''}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: authHeaders(token),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { detail?: string };
+    throw new Error(err.detail ?? `최적화 분석 실패: ${res.status}`);
+  }
+  return res.json() as Promise<OptimizeResult>;
+}

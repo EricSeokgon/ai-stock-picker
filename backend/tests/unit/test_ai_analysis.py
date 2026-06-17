@@ -1,6 +1,8 @@
 # 포트폴리오 AI 분석 유닛 테스트
+# asyncio_mode = "auto" — @pytest.mark.asyncio 데코레이터 불필요
+import inspect
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -75,9 +77,9 @@ class TestBuildPortfolioData:
 
 
 class TestAnalyzePortfolio:
-    """analyze_portfolio 통합 테스트 (DB + Claude mock)"""
+    """analyze_portfolio 통합 테스트 (DB + Claude mock) — async로 전환"""
 
-    def test_empty_portfolio_returns_message_without_claude_call(self):
+    async def test_empty_portfolio_returns_message_without_claude_call(self):
         """빈 포트폴리오 — Claude 미호출, 메시지 반환"""
         db = MagicMock()
         portfolio = _make_portfolio()
@@ -87,24 +89,27 @@ class TestAnalyzePortfolio:
         # holdings 없음
         db.query.return_value.filter.return_value.all.return_value = []
 
-        with patch("stock_picker.portfolio.ai_analysis._call_claude") as mock_claude:
-            result = analyze_portfolio(portfolio_id=1, user_id=1, db=db)
+        with patch(
+            "stock_picker.portfolio.ai_analysis._call_claude_async",
+            new=AsyncMock(),
+        ) as mock_claude:
+            result = await analyze_portfolio(portfolio_id=1, user_id=1, db=db)
 
         mock_claude.assert_not_called()
         assert "message" in result
         assert result["message"] == "분석할 보유 종목이 없습니다."
 
-    def test_portfolio_not_found_raises_403(self):
+    async def test_portfolio_not_found_raises_403(self):
         """포트폴리오 없음 또는 소유권 불일치 — 403"""
         db = MagicMock()
         db.query.return_value.filter.return_value.first.return_value = None
 
         with pytest.raises(HTTPException) as exc_info:
-            analyze_portfolio(portfolio_id=99, user_id=1, db=db)
+            await analyze_portfolio(portfolio_id=99, user_id=1, db=db)
 
         assert exc_info.value.status_code == 403
 
-    def test_claude_error_returns_error_dict(self):
+    async def test_claude_error_returns_error_dict(self):
         """Claude API 실패 시 오류 딕셔너리 반환 (500 아님)"""
         db = MagicMock()
         portfolio = _make_portfolio()
@@ -113,14 +118,16 @@ class TestAnalyzePortfolio:
         db.query.return_value.filter.return_value.first.return_value = portfolio
         db.query.return_value.filter.return_value.all.return_value = [holding]
 
-        with patch("stock_picker.portfolio.ai_analysis._call_claude") as mock_claude:
-            mock_claude.side_effect = Exception("API 장애")
-            result = analyze_portfolio(portfolio_id=1, user_id=1, db=db)
+        with patch(
+            "stock_picker.portfolio.ai_analysis._call_claude_async",
+            new=AsyncMock(side_effect=Exception("API 장애")),
+        ):
+            result = await analyze_portfolio(portfolio_id=1, user_id=1, db=db)
 
         assert "error" in result
         assert "일시적" in result["error"]
 
-    def test_valid_portfolio_includes_disclaimer(self):
+    async def test_valid_portfolio_includes_disclaimer(self):
         """정상 분석 결과에 면책 문구 포함"""
         db = MagicMock()
         portfolio = _make_portfolio()
@@ -135,9 +142,11 @@ class TestAnalyzePortfolio:
             "suggestions": "분산 필요",
         }
 
-        with patch("stock_picker.portfolio.ai_analysis._call_claude") as mock_claude:
-            mock_claude.return_value = mock_analysis
-            result = analyze_portfolio(portfolio_id=1, user_id=1, db=db)
+        with patch(
+            "stock_picker.portfolio.ai_analysis._call_claude_async",
+            new=AsyncMock(return_value=mock_analysis),
+        ):
+            result = await analyze_portfolio(portfolio_id=1, user_id=1, db=db)
 
         assert result["disclaimer"] == "본 분석은 투자 권유가 아닌 정보 제공 목적입니다."
         assert result["diversification"] == "분산투자 평가"

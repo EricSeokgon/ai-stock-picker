@@ -7,6 +7,61 @@
 
 ---
 
+## [0.25.0] - 2026-06-17
+
+### Added (Phase 25: 알림 채널 설정 — SPEC-STOCK-025)
+
+#### `notification_preferences` 테이블 + 마이그레이션 0018
+- **`NotificationPreference` 모델** (`db/models.py` 추가)
+  - `(user_id, alert_type)` UNIQUE 복합키, `email_enabled` · `telegram_enabled` Boolean 컬럼
+  - `down_revision=0017` (alerts 테이블 이후)
+- **마이그레이션 `0018_notification_preferences.py`** — 신규 테이블 DDL
+
+#### 알림 채널 설정 서비스 (`notifications/preferences.py` 신규)
+- **`is_channel_enabled_async(session, user_id, alert_type, channel)`** — fail-open 설계: 설정 행 없으면 True (opt-out 모델), 예외 시 True (발송 누락 방지)
+- **`is_channel_enabled_sync(session, user_id, alert_type, channel)`** — 동기 세션 동일 로직
+- **`get_preferences(session, user_id)`** — 7개 알림 유형 전체 설정 반환 (미설정 유형은 기본값 채움)
+- **`upsert_preferences(session, user_id, items)`** — ON CONFLICT DO UPDATE, 미지원 유형 ValueError 거부
+
+#### 설정 API (`/notifications/preferences`)
+- **`GET /notifications/preferences`** — `get_current_user` 인증 보호, 7개 유형 현재 설정 반환
+- **`PUT /notifications/preferences`** — 설정 일괄 upsert, 미지원 유형 422 오류
+- `main.py` 라우터 마운트
+
+#### 디스패치 게이팅 — 채널 발송 전 설정 확인
+- **`_try_send_alert_email()`** (`general_alert_service.py`) — `is_channel_enabled_async`로 이메일 게이트 적용 (target_price·surge_drop·volume_spike)
+- **`_try_send_telegram()`** (`general_alert_service.py`) — 텔레그램 게이트 적용
+- **`check_rec_changes()`** (`rec_change.py`) — rec_new·rec_dropped 이메일·텔레그램 게이트
+- **`check_rec_score_changes()`** (`rec_change.py`) — rec_score_change 게이트
+- 인박스(인앱) 알림은 게이트 없이 무조건 생성 (하위 호환 유지)
+
+#### 프론트엔드 설정 UI (`frontend/src/pages/Settings.js` + `api/notifications.js` 확장)
+- **알림 유형 × 채널 매트릭스** — 7개 알림 유형 × 이메일·텔레그램 체크박스 ON/OFF
+- **`getNotificationPreferences(token)` / `updateNotificationPreferences(token, items)`** API 함수 추가
+- 기존 이메일 구독 섹션 보존 (하위 호환)
+
+#### 단위 테스트 (`tests/unit/test_notification_preferences.py` 신규, 20개)
+- `TestIsChannelEnabledAsync` / `TestIsChannelEnabledSync`: 기본활성·비활성·게이트조회실패 시 기본발송
+- `TestGetPreferences`: 7유형 기본값 채움, 설정 없으면 전부 기본값
+- `TestUpsertPreferences`: 생성·갱신 멱등성·미지원유형 거부
+- `TestPreferencesEndpointAuth`: GET/PUT 미인증 401
+- `TestAlertsEmailGating`: 이메일OFF skip·텔레그램ON 발송·인박스 무조건 생성
+- `TestRecChangeEmailGating`: rec_change 이메일OFF skip·텔레그램OFF skip
+
+### Design Decisions
+- **opt-out 모델**: 설정 행 없는 기존 사용자는 SPEC-024 동작 그대로 — 모든 채널 활성
+- **fail-open**: `is_channel_enabled_*` 예외 시 True 반환 → 발송 누락보다 중복 발송 선호
+- **인앱 인박스 비침투적**: 인박스 알림은 항상 생성, 외부 채널(이메일·텔레그램)만 게이팅
+- **세션 타입 일관성**: `general_alert_service`(AsyncSession) vs `rec_change`(SyncSession) 기존 패턴 유지
+
+### Non-Goals (제외 항목)
+- 인앱 인박스 토글 — 비침투적·무료이므로 항상 생성
+- 종목별 세분화 (per-stock 프리퍼런스) — 별도 SPEC
+- 신규 채널(웹 푸시·SMS·슬랙) — 별도 SPEC
+- 자동매매 — 영구 제외
+
+---
+
 ## [0.24.0] - 2026-06-16
 
 ### Added (Phase 24: 알림 채널 연결 — SPEC-STOCK-024)

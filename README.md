@@ -4,6 +4,14 @@
 
 ## 핵심 기능
 
+### Phase 25: 알림 채널 설정 — 유형별 ON/OFF (v0.25.0)
+- **`notification_preferences` 테이블**: `(user_id, alert_type)` UNIQUE, `email_enabled`·`telegram_enabled` Boolean (마이그레이션 0018)
+- **채널 게이팅 서비스**: `is_channel_enabled_async/sync()` — opt-out 모델 (설정 없으면 활성), fail-open (예외 시 발송 허용)
+- **설정 API**: `GET/PUT /notifications/preferences` — 7개 알림 유형 × 채널 설정 (인증 보호)
+- **디스패치 게이팅**: alerts(target_price·surge_drop·volume_spike) + rec_change(rec_new·rec_dropped·rec_score_change) 이메일·텔레그램 발송 전 설정 확인
+- **프론트 매트릭스 UI**: Settings 페이지 — 알림 유형 × 이메일·텔레그램 체크박스 ON/OFF
+- **하위 호환**: 기존 인박스 알림 무조건 생성 유지, 설정 없는 사용자 SPEC-024 동작 그대로
+
 ### Phase 24: 알림 채널 연결 — 이메일·텔레그램 (v0.24.0)
 - **텔레그램 실제 발송**: `_send_message_sync` 가 Telegram Bot API HTTP POST 호출 (`TELEGRAM_BOT_TOKEN` 미설정 시 silent skip)
 - **이메일 범용 알림**: `send_general_alert_email(to_email, krx_code, alert_type, message)` — 제목 자동 포맷

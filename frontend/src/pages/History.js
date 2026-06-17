@@ -2,6 +2,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 // 추천 히스토리 페이지
 import { useState, useEffect } from 'react';
 import { getRecommendationHistory } from '../api/recommendations';
+import { MarketSentimentWidget } from '../components/MarketSentimentWidget';
 // 기간 선택 옵션
 const PERIOD_OPTIONS = [
     { label: '7일', days: 7 },
@@ -88,7 +89,7 @@ export default function History() {
             cancelled = true;
         };
     }, [selectedDays]);
-    return (_jsxs("div", { children: [_jsx("h1", { style: { fontSize: '1.5rem', fontWeight: 700, marginBottom: '1.25rem', color: '#212121' }, children: "\uCD94\uCC9C \uD788\uC2A4\uD1A0\uB9AC" }), _jsx("div", { role: "tablist", "aria-label": "\uAE30\uAC04 \uC120\uD0DD", style: { display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }, children: PERIOD_OPTIONS.map((opt) => (_jsx("button", { role: "tab", "aria-selected": selectedDays === opt.days, onClick: () => setSelectedDays(opt.days), style: {
+    return (_jsxs("div", { children: [_jsx("h1", { style: { fontSize: '1.5rem', fontWeight: 700, marginBottom: '1.25rem', color: '#212121' }, children: "\uCD94\uCC9C \uD788\uC2A4\uD1A0\uB9AC" }), _jsx("div", { style: { marginBottom: '1.5rem' }, children: _jsx(MarketSentimentWidget, {}) }), _jsx("div", { role: "tablist", "aria-label": "\uAE30\uAC04 \uC120\uD0DD", style: { display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }, children: PERIOD_OPTIONS.map((opt) => (_jsx("button", { role: "tab", "aria-selected": selectedDays === opt.days, onClick: () => setSelectedDays(opt.days), style: {
                         padding: '0.4rem 1rem',
                         border: '1px solid',
                         borderColor: selectedDays === opt.days ? '#1976d2' : '#ccc',

@@ -1,15 +1,15 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 // 관심 목록 관리 페이지 (REQ-FE-003)
-// - 관심 목록 종목 표시 + LivePriceBadge
+// - 관심 목록 종목 표시 + 멀티플렉스 LivePrice (SPEC-STOCK-016 M5)
 // - 삭제 버튼(✕)
 // - 목표가 알림 추가/삭제
 // - 미인증 시 /login 리다이렉트
 // - 빈 목록 안내 메시지
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { getWatchlist, removeFromWatchlist, getAlerts, createAlert, deleteAlert, } from '../api/watchlist';
-import { LivePriceBadge } from '../components/LivePriceBadge';
+import { useLivePrices } from '../hooks/useLivePrices';
 const initialAlertForm = {
     krxCode: '',
     targetPrice: '',
@@ -19,6 +19,9 @@ export default function Watchlist() {
     const { isAuthenticated, token } = useAuth();
     const [items, setItems] = useState([]);
     const [alerts, setAlerts] = useState([]);
+    // 멀티플렉스 WS — items가 바뀔 때만 심볼 목록 재계산 (REQ-FE-010)
+    const symbols = useMemo(() => items.map((i) => i.krx_code), [items]);
+    const livePrices = useLivePrices(symbols);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     // 열린 알림 폼 — krxCode를 키로 사용, '' 이면 닫힘
@@ -134,7 +137,11 @@ export default function Watchlist() {
         color: '#666',
     };
     const activeAlerts = alerts.filter((a) => a.is_active);
-    return (_jsxs("div", { children: [_jsx("h2", { style: { color: '#0d47a1', marginBottom: '1.5rem' }, children: "\uAD00\uC2EC \uBAA9\uB85D" }), loading && _jsx("p", { style: { color: '#666' }, children: "\uBD88\uB7EC\uC624\uB294 \uC911..." }), error && (_jsxs("p", { role: "alert", style: { color: '#c62828', fontSize: '0.875rem' }, children: ["\uC624\uB958: ", error] })), !loading && items.length === 0 && (_jsx("p", { style: { color: '#666', fontSize: '0.9rem' }, children: "\uAD00\uC2EC \uBAA9\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uCD94\uCC9C \uC885\uBAA9\uC5D0\uC11C \uBCC4\uD45C\uB97C \uB20C\uB7EC \uCD94\uAC00\uD558\uC138\uC694." })), items.length > 0 && (_jsx("div", { style: { border: '1px solid #ddd', borderRadius: '6px', overflow: 'hidden', marginBottom: '2rem' }, children: items.map((item) => (_jsxs("div", { children: [_jsxs("div", { style: rowStyle, children: [_jsxs("div", { style: { display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }, children: [_jsx("span", { style: { fontWeight: 600, fontSize: '0.95rem' }, children: item.krx_code }), _jsx(LivePriceBadge, { krxCode: item.krx_code })] }), _jsxs("div", { style: { display: 'flex', gap: '0.5rem' }, children: [_jsx("button", { onClick: () => handleOpenAlertForm(item.krx_code), "aria-label": `${item.krx_code} 알림 추가`, style: { ...btnStyle, color: '#1976d2', borderColor: '#1976d2' }, children: "\uC54C\uB9BC \uCD94\uAC00" }), _jsx("button", { onClick: () => void handleRemove(item.krx_code), "aria-label": `${item.krx_code} 관심 목록에서 삭제`, style: btnStyle, children: "\u2715" })] })] }), openAlertForm === item.krx_code && (_jsxs("form", { onSubmit: (e) => void handleAlertSubmit(e), style: {
+    return (_jsxs("div", { children: [_jsx("h2", { style: { color: '#0d47a1', marginBottom: '1.5rem' }, children: "\uAD00\uC2EC \uBAA9\uB85D" }), loading && _jsx("p", { style: { color: '#666' }, children: "\uBD88\uB7EC\uC624\uB294 \uC911..." }), error && (_jsxs("p", { role: "alert", style: { color: '#c62828', fontSize: '0.875rem' }, children: ["\uC624\uB958: ", error] })), !loading && items.length === 0 && (_jsx("p", { style: { color: '#666', fontSize: '0.9rem' }, children: "\uAD00\uC2EC \uBAA9\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uCD94\uCC9C \uC885\uBAA9\uC5D0\uC11C \uBCC4\uD45C\uB97C \uB20C\uB7EC \uCD94\uAC00\uD558\uC138\uC694." })), items.length > 0 && (_jsx("div", { style: { border: '1px solid #ddd', borderRadius: '6px', overflow: 'hidden', marginBottom: '2rem' }, children: items.map((item) => (_jsxs("div", { children: [_jsxs("div", { style: rowStyle, children: [_jsxs("div", { style: { display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }, children: [_jsx("span", { style: { fontWeight: 600, fontSize: '0.95rem' }, children: item.krx_code }), livePrices[item.krx_code] ? (_jsxs("span", { style: {
+                                                fontSize: '0.85rem',
+                                                color: (livePrices[item.krx_code].change_pct ?? 0) >= 0 ? '#c62828' : '#1565c0',
+                                                fontWeight: 500,
+                                            }, "aria-label": `${item.krx_code} 현재가`, children: [livePrices[item.krx_code].price.toLocaleString(), "\uC6D0", ' ', "(", livePrices[item.krx_code].change_pct >= 0 ? '+' : '', livePrices[item.krx_code].change_pct.toFixed(2), "%)"] })) : (_jsx("span", { style: { fontSize: '0.8rem', color: '#999' }, children: "\uB85C\uB529 \uC911..." }))] }), _jsxs("div", { style: { display: 'flex', gap: '0.5rem' }, children: [_jsx("button", { onClick: () => handleOpenAlertForm(item.krx_code), "aria-label": `${item.krx_code} 알림 추가`, style: { ...btnStyle, color: '#1976d2', borderColor: '#1976d2' }, children: "\uC54C\uB9BC \uCD94\uAC00" }), _jsx("button", { onClick: () => void handleRemove(item.krx_code), "aria-label": `${item.krx_code} 관심 목록에서 삭제`, style: btnStyle, children: "\u2715" })] })] }), openAlertForm === item.krx_code && (_jsxs("form", { onSubmit: (e) => void handleAlertSubmit(e), style: {
                                 display: 'flex',
                                 gap: '0.5rem',
                                 padding: '0.5rem 0.8rem',

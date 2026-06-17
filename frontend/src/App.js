@@ -1,6 +1,7 @@
 import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "react/jsx-runtime";
 // 메인 앱 — 라우팅 및 네비게이션 포함
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useLivePrices } from './hooks/useLivePrices';
 import { Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
 import { fetchRecommendations, fetchNews, fetchSectorTrends } from './api/client';
 import { DataPreparingState } from './components/DataPreparingState';
@@ -23,6 +24,11 @@ import Watchlist from './pages/Watchlist';
 import Settings from './pages/Settings';
 import History from './pages/History';
 import Sectors from './pages/Sectors';
+import NotificationsPage from './pages/Notifications';
+import AdviceHistory from './pages/AdviceHistory';
+import Screener from './pages/Screener';
+import AlertsPage from './pages/Alerts';
+import { fetchUnreadCount } from './api/notifications';
 const API_BASE_DASHBOARD = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 // KRX ETF 코드 패턴: 0으로 시작하는 6자리 숫자 중 ETF로 분류된 코드들
 // Phase 2 MVP: recommendations에서 ETF로 알려진 코드 패턴으로 분류
@@ -44,9 +50,25 @@ function ProtectedRoute({ children }) {
 }
 // 모바일 반응형 NavBar — 768px 미만에서 햄버거 메뉴 표시
 function NavBar() {
-    const { isAuthenticated, user, logout } = useAuth();
+    const { isAuthenticated, user, logout, token } = useAuth();
     const navigate = useNavigate();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    // 미읽음 알림 수 — 30초마다 폴링 (REQ-FE-001)
+    const [unreadCount, setUnreadCount] = useState(0);
+    useEffect(() => {
+        if (!isAuthenticated || !token) {
+            setUnreadCount(0);
+            return;
+        }
+        const load = () => {
+            fetchUnreadCount(token)
+                .then(setUnreadCount)
+                .catch(() => { });
+        };
+        load();
+        const interval = setInterval(load, 30000);
+        return () => clearInterval(interval);
+    }, [isAuthenticated, token]);
     function handleLogout() {
         logout();
         setMobileMenuOpen(false);
@@ -74,7 +96,23 @@ function NavBar() {
                             lineHeight: 1,
                             color: '#1976d2',
                             padding: '0.25rem',
-                        }, children: mobileMenuOpen ? '✕' : '☰' })] }), _jsxs("div", { className: `nav-links${mobileMenuOpen ? ' nav-links--open' : ''}`, style: { display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }, children: [_jsx(Link, { to: "/", style: linkStyle, onClick: handleLinkClick, children: "\uD648" }), _jsx(Link, { to: "/history", style: linkStyle, onClick: handleLinkClick, children: "\uD788\uC2A4\uD1A0\uB9AC" }), _jsx(Link, { to: "/sectors", style: linkStyle, onClick: handleLinkClick, children: "\uC139\uD130 \uBD84\uC11D" }), _jsx(Link, { to: "/portfolio", style: linkStyle, onClick: handleLinkClick, children: "\uD3EC\uD2B8\uD3F4\uB9AC\uC624" }), _jsx(Link, { to: "/backtest", style: linkStyle, onClick: handleLinkClick, children: "\uBC31\uD14C\uC2A4\uD2B8" }), isAuthenticated && _jsx(Link, { to: "/watchlist", style: linkStyle, onClick: handleLinkClick, children: "\uAD00\uC2EC \uBAA9\uB85D" }), isAuthenticated && _jsx(Link, { to: "/settings", style: linkStyle, onClick: handleLinkClick, children: "\uC124\uC815" }), _jsx("div", { style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }, children: isAuthenticated ? (_jsxs(_Fragment, { children: [_jsx("span", { style: { fontSize: '0.8rem', color: '#666' }, children: user?.email }), _jsx("button", { onClick: handleLogout, style: {
+                        }, children: mobileMenuOpen ? '✕' : '☰' })] }), _jsxs("div", { className: `nav-links${mobileMenuOpen ? ' nav-links--open' : ''}`, style: { display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }, children: [_jsx(Link, { to: "/", style: linkStyle, onClick: handleLinkClick, children: "\uD648" }), _jsx(Link, { to: "/history", style: linkStyle, onClick: handleLinkClick, children: "\uD788\uC2A4\uD1A0\uB9AC" }), _jsx(Link, { to: "/sectors", style: linkStyle, onClick: handleLinkClick, children: "\uC139\uD130 \uBD84\uC11D" }), _jsx(Link, { to: "/portfolio", style: linkStyle, onClick: handleLinkClick, children: "\uD3EC\uD2B8\uD3F4\uB9AC\uC624" }), _jsx(Link, { to: "/backtest", style: linkStyle, onClick: handleLinkClick, children: "\uBC31\uD14C\uC2A4\uD2B8" }), _jsx(Link, { to: "/screener", style: linkStyle, onClick: handleLinkClick, children: "\uC2A4\uD06C\uB9AC\uB108" }), isAuthenticated && _jsx(Link, { to: "/watchlist", style: linkStyle, onClick: handleLinkClick, children: "\uAD00\uC2EC \uBAA9\uB85D" }), isAuthenticated && _jsx(Link, { to: "/settings", style: linkStyle, onClick: handleLinkClick, children: "\uC124\uC815" }), isAuthenticated && _jsx(Link, { to: "/advice/history", style: linkStyle, onClick: handleLinkClick, children: "AI \uC870\uC5B8" }), isAuthenticated && _jsx(Link, { to: "/alerts", style: linkStyle, onClick: handleLinkClick, children: "\uC54C\uB9BC \uC124\uC815" }), isAuthenticated && (_jsxs(Link, { to: "/notifications", onClick: handleLinkClick, "aria-label": `알림${unreadCount > 0 ? ` (미읽음 ${unreadCount}개)` : ''}`, style: { ...linkStyle, position: 'relative', display: 'inline-flex', alignItems: 'center' }, children: ["\uD83D\uDD14", unreadCount > 0 && (_jsx("span", { style: {
+                                    position: 'absolute',
+                                    top: '-6px',
+                                    right: '-8px',
+                                    background: '#e53935',
+                                    color: '#fff',
+                                    borderRadius: '50%',
+                                    fontSize: '0.65rem',
+                                    fontWeight: 700,
+                                    minWidth: '16px',
+                                    height: '16px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    lineHeight: 1,
+                                    padding: '0 2px',
+                                }, children: unreadCount > 99 ? '99+' : unreadCount }))] })), _jsx("div", { style: { marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }, children: isAuthenticated ? (_jsxs(_Fragment, { children: [_jsx("span", { style: { fontSize: '0.8rem', color: '#666' }, children: user?.email }), _jsx("button", { onClick: handleLogout, style: {
                                         padding: '0.3rem 0.7rem', border: '1px solid #ccc', borderRadius: '4px',
                                         background: '#fff', cursor: 'pointer', fontSize: '0.8rem',
                                     }, children: "\uB85C\uADF8\uC544\uC6C3" })] })) : (_jsx(Link, { to: "/login", onClick: handleLinkClick, style: { ...linkStyle, padding: '0.3rem 0.7rem', border: '1px solid #1976d2', borderRadius: '4px' }, children: "\uB85C\uADF8\uC778" })) })] }), _jsx("style", { children: `
@@ -170,6 +208,12 @@ function Dashboard() {
         : [];
     const stockItems = allRecommendations.filter((item) => !isEtfCode(item.krx_code));
     const etfItems = allRecommendations.filter((item) => isEtfCode(item.krx_code));
+    // 멀티플렉스 WS — 대시보드 추천 종목 실시간 가격 (SPEC-STOCK-016 M5)
+    const dashboardSymbols = useMemo(() => allRecommendations.map((i) => i.krx_code), [allRecommendations]);
+    // livePrices는 RecommendationList props로 전달 가능하지만 현재는 대시보드 수준에서만 구독
+    // 실제 UI 표시는 RecommendationList 내부의 LivePriceBadge가 담당 (하위 호환 유지)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _dashboardLivePrices = useLivePrices(dashboardSymbols);
     // 현재 추천 목록에서 고유 섹터 추출 (RecommendationItem에 sector 필드가 있을 경우)
     const availableSectors = Array.from(new Set(allRecommendations
         .map((item) => item.sector)
@@ -202,11 +246,16 @@ function Dashboard() {
             }
           ` })] })), _jsx(Disclaimer, { text: disclaimerText }), selectedKrxCode && (_jsx(StockDetail, { krxCode: selectedKrxCode, onClose: () => setSelectedKrxCode(null) }))] }));
 }
+// AdviceHistory는 token prop을 받으므로 AuthContext에서 주입하는 래퍼 필요
+function AdviceHistoryWrapper() {
+    const { token } = useAuth();
+    return _jsx(AdviceHistory, { token: token });
+}
 export default function App() {
     return (_jsxs("div", { style: {
             maxWidth: '1100px',
             margin: '0 auto',
             padding: '1.5rem',
             fontFamily: "'Segoe UI', 'Apple SD Gothic Neo', sans-serif",
-        }, children: [_jsx(NavBar, {}), _jsxs(Routes, { children: [_jsx(Route, { path: "/", element: _jsx(Dashboard, {}) }), _jsx(Route, { path: "/login", element: _jsx(Login, {}) }), _jsx(Route, { path: "/portfolio", element: _jsx(ProtectedRoute, { children: _jsx(Portfolio, {}) }) }), _jsx(Route, { path: "/backtest", element: _jsx(ProtectedRoute, { children: _jsx(Backtest, {}) }) }), _jsx(Route, { path: "/watchlist", element: _jsx(ProtectedRoute, { children: _jsx(Watchlist, {}) }) }), _jsx(Route, { path: "/settings", element: _jsx(ProtectedRoute, { children: _jsx(Settings, {}) }) }), _jsx(Route, { path: "/history", element: _jsx(History, {}) }), _jsx(Route, { path: "/sectors", element: _jsx(Sectors, {}) }), _jsx(Route, { path: "/stocks/:krxCode", element: _jsx(StockDetailPage, {}) })] })] }));
+        }, children: [_jsx(NavBar, {}), _jsxs(Routes, { children: [_jsx(Route, { path: "/", element: _jsx(Dashboard, {}) }), _jsx(Route, { path: "/login", element: _jsx(Login, {}) }), _jsx(Route, { path: "/portfolio", element: _jsx(ProtectedRoute, { children: _jsx(Portfolio, {}) }) }), _jsx(Route, { path: "/backtest", element: _jsx(ProtectedRoute, { children: _jsx(Backtest, {}) }) }), _jsx(Route, { path: "/watchlist", element: _jsx(ProtectedRoute, { children: _jsx(Watchlist, {}) }) }), _jsx(Route, { path: "/settings", element: _jsx(ProtectedRoute, { children: _jsx(Settings, {}) }) }), _jsx(Route, { path: "/history", element: _jsx(History, {}) }), _jsx(Route, { path: "/sectors", element: _jsx(Sectors, {}) }), _jsx(Route, { path: "/stocks/:krxCode", element: _jsx(StockDetailPage, {}) }), _jsx(Route, { path: "/notifications", element: _jsx(ProtectedRoute, { children: _jsx(NotificationsPage, {}) }) }), _jsx(Route, { path: "/advice/history", element: _jsx(ProtectedRoute, { children: _jsx(AdviceHistoryWrapper, {}) }) }), _jsx(Route, { path: "/screener", element: _jsx(Screener, {}) }), _jsx(Route, { path: "/alerts", element: _jsx(ProtectedRoute, { children: _jsx(AlertsPage, {}) }) })] })] }));
 }

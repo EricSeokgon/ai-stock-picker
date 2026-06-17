@@ -4,6 +4,14 @@
 
 ## 핵심 기능
 
+### Phase 26: 포트폴리오 AI 최적화 (v0.26.0)
+- **AI 최적화 엔드포인트**: `POST /portfolios/{id}/optimize?refresh={bool}` — 포트폴리오 종합 점수(0-100)·리밸런싱 액션·신규 추천 종목 반환, Redis TTL=3600s 캐시
+- **처방형 분석**: `OptimizeResult` — 종합 점수 + `ScoreBreakdown`(분산도·리스크균형·모멘텀 각 0-100) + 목표비중(`TargetWeightItem`) + 신규 추천(`NewStockItem` 최대 5종목)
+- **리밸런싱 액션**: 목표비중과 현재비중 차이 ±2% 임계값 기준 buy/sell/hold + 거래 주수 계산
+- **신규 종목 추천**: `recommendations` 테이블 최신 trade_date 기준, 미보유 종목 중 점수 상위 최대 5종목
+- **AsyncAnthropic 전환 버그 수정**: `ai_analysis.py` 동기 클라이언트(`anthropic.Anthropic()`)를 비동기(`AsyncAnthropic()`)로 교체 — FastAPI 이벤트 루프 블로킹 해결
+- **프론트엔드 AI 최적화 탭**: `PortfolioScoreCard`(점수 시각화) + `RebalancingTable`(리밸런싱 테이블) + `NewStockSuggestions`(신규 추천 리스트) 신규 컴포넌트
+
 ### Phase 25: 알림 채널 설정 — 유형별 ON/OFF (v0.25.0)
 - **`notification_preferences` 테이블**: `(user_id, alert_type)` UNIQUE, `email_enabled`·`telegram_enabled` Boolean (마이그레이션 0018)
 - **채널 게이팅 서비스**: `is_channel_enabled_async/sync()` — opt-out 모델 (설정 없으면 활성), fail-open (예외 시 발송 허용)

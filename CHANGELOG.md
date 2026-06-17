@@ -7,6 +7,57 @@
 
 ---
 
+## [0.26.0] - 2026-06-17
+
+### Added (Phase 26: 포트폴리오 AI 최적화 — SPEC-STOCK-026)
+
+#### 포트폴리오 AI 최적화 엔드포인트 (`POST /portfolios/{id}/optimize`)
+- **`OptimizeResult` 응답 스키마** (`schemas.py` 추가)
+  - `TargetWeightItem`: `krx_code`, `current_pct`, `target_pct`, `action`(buy/sell/hold), `delta_shares`
+  - `NewStockItem`: `krx_code`, `name`, `sector`, `reason`
+  - `ScoreBreakdown`: `diversification`, `risk_balance`, `momentum` (각 0-100)
+  - `OptimizeResult`: `score`(0-100 종합), `score_breakdown`, `target_weights`, `new_stocks`(최대 5), `summary`
+
+#### 포트폴리오 최적화 서비스 (`service.py`)
+- **`async optimize_portfolio(portfolio_id, user_id, db, redis, refresh=False)`** 신규
+  - Redis 캐시: 키=`portfolio_optimize:{portfolio_id}:{date}`, TTL=3600s, graceful degradation
+  - 2% 임계값 리밸런싱 로직: `target_pct - current_pct > 2%` → buy, `< -2%` → sell, 이외 → hold
+  - 신규 종목: `recommendations` 테이블 최신 `trade_date` 기준, 미보유 종목 중 최대 5종목
+  - 종합 점수: `int(round(mean(diversification, risk_balance, momentum)))`
+
+#### AsyncAnthropic 전환 버그 수정 (`ai_analysis.py`)
+- **동기 클라이언트(`anthropic.Anthropic()`) 제거** — FastAPI 이벤트 루프 블로킹 버그 수정
+- **`async def _call_claude_async()`** 신규: `AsyncAnthropic()` + `await` 사용
+- **`async def analyze_portfolio()`** 전환: 기존 동기 함수 비동기화, 라우터 엔드포인트도 `async def` 전환
+- **`async def optimize_portfolio_with_claude()`** 신규: claude-haiku-4-5, max_tokens=1024
+
+#### 포트폴리오 최적화 라우터 (`router.py`)
+- **`POST /portfolios/{portfolio_id}/optimize?refresh={bool}`** 엔드포인트 신규 추가
+- `ai_analysis` 엔드포인트 `async def` 전환 (동기 래퍼 제거)
+
+#### 프론트엔드 AI 최적화 탭 (React)
+- **`PortfolioScoreCard.tsx`** 신규: 종합 점수(0-100) 시각화 + 분산도·리스크균형·모멘텀 막대 표시
+- **`RebalancingTable.tsx`** 신규: 현재비중·목표비중·액션(buy=녹색/sell=빨강/hold=회색)·주수 테이블
+- **`NewStockSuggestions.tsx`** 신규: 신규 추천 종목 목록 (최대 5종목, 섹터·이유 포함)
+- **`Portfolio.tsx`**: "AI 최적화 분석" 탭 추가 — 버튼 트리거 + 로딩 상태 + 3개 컴포넌트 통합
+- **`api/portfolio.ts`**: `OptimizeResult` 타입 + `apiOptimizePortfolio()` 함수 추가
+
+#### 단위 테스트 (`test_portfolio_optimize.py` 신규, 8개)
+- `test_optimize_score_range` — 점수 0-100 범위 검증
+- `test_optimize_target_weights_sum_100` — 목표비중 합계 100% 검증
+- `test_optimize_action_direction` — 2% 임계값 액션 방향 검증
+- `test_optimize_new_stocks_not_in_portfolio` — 보유 종목 미포함 검증
+- `test_optimize_redis_cache_hit` — 2차 호출 Redis 캐시 히트 검증
+- `test_optimize_async_client` — AsyncAnthropic 사용 검증
+- `test_analyze_portfolio_is_async` — analyze_portfolio async 전환 검증
+- `test_existing_ai_analysis_async` — 기존 AI 분석 async 호환성 검증
+- `test_ai_analysis.py` (기존 8개 테스트): async def + await 전환
+
+### Fixed
+- `analyze_portfolio()` 동기 Anthropic 클라이언트 이벤트 루프 블로킹 버그 수정
+
+---
+
 ## [0.25.0] - 2026-06-17
 
 ### Added (Phase 25: 알림 채널 설정 — SPEC-STOCK-025)

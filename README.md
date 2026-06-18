@@ -4,6 +4,13 @@
 
 ## 핵심 기능
 
+### Phase 27: 리스크 분석 및 상관관계 매트릭스 (v0.27.0)
+- **리스크 분석 엔드포인트**: `GET /portfolios/{id}/risk-analysis?period={30|60|90|180|252}&refresh={bool}` — 상관관계 매트릭스·종목별 연환산 변동성·포트폴리오 변동성·분산투자 효익 반환, Redis TTL=3600s 캐시
+- **numpy 전용 계산**: scipy 미추가, `np.corrcoef`(상관계수)·`np.cov`(공분산)·`np.std × √252 × 100`(연환산 변동성)·`sqrt(wᵀ·Σ·w) × √252`(포트폴리오 변동성) 사용
+- **분산투자 효익**: `max(0, (1 - port_vol / weighted_avg_vol) × 100)` — 포트폴리오가 개별 종목 평균 변동성 대비 얼마나 위험을 줄였는지 표시
+- **상관관계 히트맵 UI**: `RiskAnalysisPanel` — CSS 기반 blue(-1)→white(0)→red(+1) 히트맵 + 종목별 변동성 테이블 + 기간 선택기(30/60/90/180/252일)
+- **Redis 캐시**: 키=`portfolio_risk:{id}:{period}:{date}`, TTL=3600s, `?refresh=true` 강제 갱신
+
 ### Phase 26: 포트폴리오 AI 최적화 (v0.26.0)
 - **AI 최적화 엔드포인트**: `POST /portfolios/{id}/optimize?refresh={bool}` — 포트폴리오 종합 점수(0-100)·리밸런싱 액션·신규 추천 종목 반환, Redis TTL=3600s 캐시
 - **처방형 분석**: `OptimizeResult` — 종합 점수 + `ScoreBreakdown`(분산도·리스크균형·모멘텀 각 0-100) + 목표비중(`TargetWeightItem`) + 신규 추천(`NewStockItem` 최대 5종목)

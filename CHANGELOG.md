@@ -7,6 +7,58 @@
 
 ---
 
+## [0.27.0] - 2026-06-18
+
+### Added (Phase 27: 리스크 분석 및 상관관계 매트릭스 — SPEC-STOCK-027)
+
+#### 리스크 분석 엔드포인트 (`GET /portfolios/{id}/risk-analysis`)
+- **`HoldingVolatility` 스키마** (`schemas.py` 추가)
+  - `krx_code`, `name`, `annualized_volatility_pct`, `price_data_days`
+- **`RiskAnalysisResult` 응답 스키마** (`schemas.py` 추가)
+  - `correlation_matrix`: 종목 쌍별 피어슨 상관계수 딕셔너리 (대각 원소 = 1.0)
+  - `holdings_volatility`: 종목별 연환산 변동성 리스트
+  - `portfolio_volatility_pct`: 비중·공분산 반영 포트폴리오 연환산 변동성(%)
+  - `diversification_benefit_pct`: `max(0, (1 - port_vol / weighted_avg_vol) × 100)`
+  - `period_days`: 분석 기간 (30·60·90·180·252 중 택1, 기본 90)
+  - `calculated_at`: 계산 시각
+
+#### 리스크 분석 서비스 (`risk_analysis.py` 신규)
+- **numpy 전용 계산** (scipy 미추가, REQ-RISK-NFR-001 준수)
+  - `_daily_returns`: 시계열 가격 → 일간 수익률
+  - `_align_returns`: 날짜 기준 내부 조인(공통 거래일만 사용), NaN 방어
+  - `_correlation_matrix`: `np.corrcoef` 기반 상관계수 행렬
+  - `_annualized_volatility`: `np.std × √252 × 100` 연환산 변동성
+  - `_portfolio_volatility`: `sqrt(wᵀ · Σ · w) × √252 × 100` 포트폴리오 변동성
+  - `_diversification_benefit`: 분산투자 효익(%) 계산
+- **`calculate_risk_analysis(portfolio_id, user_id, db, redis, period=90, refresh=False)`** 오케스트레이션
+  - FinanceDataReader 이력 가격 조회(`run_in_executor`, 비차단)
+  - 종목별 try/except 독립 처리 (일부 실패 시 graceful degradation)
+  - Redis 캐시: 키=`portfolio_risk:{portfolio_id}:{period}:{date}`, TTL=3600s
+  - `?refresh=true` 강제 갱신 지원
+
+#### 리스크 분석 라우터 (`router.py`)
+- **`GET /portfolios/{portfolio_id}/risk-analysis?period={int}&refresh={bool}`** 신규
+  - `period` 허용값: {30, 60, 90, 180, 252}, 기본값 90, 이외 → HTTP 422
+  - `refresh` 기본값: `false`
+
+#### 프론트엔드 `RiskAnalysisPanel` (React)
+- **`RiskAnalysisPanel.tsx`** 신규: 상관관계 히트맵 + 변동성 테이블 + 포트폴리오 요약 + 기간 선택기
+  - CSS 기반 히트맵: blue(상관=-1) → white(0) → red(+1), 외부 차트 라이브러리 미사용
+  - 기간 선택기: 30/60/90/180/252일 버튼
+  - 종목별 연환산 변동성 테이블 + 포트폴리오 변동성·분산투자 효익 요약 카드
+- **`Portfolio.tsx`**: `<RiskAnalysisPanel portfolioId={portfolio.id} />` 통합
+- **`api/portfolio.ts`**: `HoldingVolatility`·`RiskAnalysisResult` 타입 + `apiGetRiskAnalysis()` 함수 추가
+
+#### 테스트
+- **단위 테스트** (`test_portfolio_risk.py` 신규, 14개)
+  - 순수 함수 8개: `_align_returns`(NaN 방어), `_correlation_matrix`, `_annualized_volatility`, `_portfolio_volatility`, `_diversification_benefit` 등
+  - 오케스트레이션 6개: Redis 캐시 히트/미스, `refresh=True`, scipy 미사용 검증
+- **통합 테스트** (`test_portfolio_router.py`, 3개 추가)
+  - `test_risk_analysis_success_200`, `test_risk_analysis_not_owner_403`, `test_risk_analysis_invalid_period_422`
+- **프론트엔드 컴포넌트 테스트** (`RiskAnalysisPanel.test.tsx` 신규, 5개)
+
+---
+
 ## [0.26.0] - 2026-06-17
 
 ### Added (Phase 26: 포트폴리오 AI 최적화 — SPEC-STOCK-026)

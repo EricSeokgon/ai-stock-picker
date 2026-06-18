@@ -16,6 +16,7 @@ import {
 import PortfolioScoreCard from '../components/PortfolioScoreCard';
 import RebalancingTable from '../components/RebalancingTable';
 import NewStockSuggestions from '../components/NewStockSuggestions';
+import RiskAnalysisPanel from '../components/RiskAnalysisPanel';
 import { getPortfolioDividends, type PortfolioDividends } from '../api/dividends';
 import { LivePriceBadge } from '../components/LivePriceBadge';
 import { PerformanceDonutChart } from '../components/PerformanceDonutChart';
@@ -809,6 +810,9 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
 
       {/* AI 최적화 분석 섹션 (SPEC-STOCK-026) */}
       <OptimizeSection portfolioId={portfolioId} token={token} />
+
+      {/* 포트폴리오 리스크 분석 (SPEC-STOCK-027) */}
+      <RiskAnalysisPanel portfolioId={portfolioId} />
 
       {/* AI 투자 조언 섹션 (SPEC-STOCK-014) */}
       <AdviceSection token={token} />

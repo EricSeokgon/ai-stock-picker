@@ -3,6 +3,8 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
+# SPEC-STOCK-027 — 리스크 분석 스키마는 파일 하단에 추가됨
+
 from pydantic import BaseModel, ConfigDict, field_validator
 
 
@@ -188,3 +190,27 @@ class OptimizeResult(BaseModel):
     target_weights: list[TargetWeightItem]  # 리밸런싱 목표 비중 목록
     new_stocks: list[NewStockItem]      # 추가 추천 종목 (최대 5개, 비보유)
     summary: str                        # 3-4 한국어 문장 + 면책 문구
+
+
+# ── SPEC-STOCK-027 포트폴리오 리스크 분석 스키마 ─────────────────────────────
+
+class HoldingVolatility(BaseModel):
+    """보유 종목별 변동성 데이터 (SPEC-STOCK-027 REQ-RISK-001)"""
+    krx_code: str
+    name: str
+    annualized_volatility_pct: float    # 연환산 변동성(%), std × √252 × 100
+    price_data_days: int                # 실제 사용된 거래일 수
+
+
+class RiskAnalysisResult(BaseModel):
+    """포트폴리오 리스크 분석 응답 (SPEC-STOCK-027)
+
+    # @MX:ANCHOR: [AUTO] 리스크 분석 API 응답 스키마
+    # @MX:REASON: router, risk_analysis service, 프론트 API 래퍼, 테스트에서 3곳 이상 참조
+    """
+    correlation_matrix: dict[str, dict[str, float]]  # Pearson 상관계수 행렬
+    holdings_volatility: list[HoldingVolatility]      # 종목별 연환산 변동성
+    portfolio_volatility_pct: float                   # 포트폴리오 전체 변동성(%)
+    diversification_benefit_pct: float                # 분산 효과(%), max(0, ...)
+    period_days: int                                  # 조회 기간(거래일)
+    calculated_at: datetime                           # 계산 시각

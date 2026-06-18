@@ -20,6 +20,7 @@ dependencies = [
     "bcrypt>=4.0",
     "python-telegram-bot>=21.0",
     "pydantic[email]>=2.13.4",
+    "numpy>=1.26",
 ]
 
 [project.optional-dependencies]

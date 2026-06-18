@@ -180,3 +180,41 @@ export async function apiOptimizePortfolio(
   }
   return res.json() as Promise<OptimizeResult>;
 }
+
+// ── SPEC-STOCK-027 포트폴리오 리스크 분석 타입 및 API ────────────────────────
+
+export interface HoldingVolatility {
+  krx_code: string;
+  name: string;
+  annualized_volatility_pct: number;
+  price_data_days: number;
+}
+
+export interface RiskAnalysisResult {
+  correlation_matrix: Record<string, Record<string, number>>;
+  holdings_volatility: HoldingVolatility[];
+  portfolio_volatility_pct: number;
+  diversification_benefit_pct: number;
+  period_days: number;
+  calculated_at: string;
+}
+
+// @MX:ANCHOR: [AUTO] 리스크 분석 API 공개 엔드포인트 — RiskAnalysisPanel에서 호출
+// @MX:REASON: 외부 시스템(백엔드 /portfolios/{id}/risk-analysis) 연동 지점으로 fan_in >= 3 예상
+export async function apiGetRiskAnalysis(
+  token: string,
+  portfolioId: number,
+  period: number = 90,
+  refresh: boolean = false,
+): Promise<RiskAnalysisResult> {
+  const params = new URLSearchParams({ period: String(period) });
+  if (refresh) params.set('refresh', 'true');
+  const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/risk-analysis?${params.toString()}`, {
+    headers: authHeaders(token),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { detail?: string };
+    throw new Error(err.detail ?? `리스크 분석 조회 실패: ${res.status}`);
+  }
+  return res.json() as Promise<RiskAnalysisResult>;
+}

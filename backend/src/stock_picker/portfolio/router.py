@@ -1,6 +1,6 @@
 # 포트폴리오 라우터 — CRUD + 성과 조회 + 배당 분석 엔드포인트
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from stock_picker.api.deps import get_redis_client
@@ -9,6 +9,7 @@ from stock_picker.db.models import Portfolio, PortfolioHolding, User
 from stock_picker.portfolio import service
 from stock_picker.portfolio.ai_analysis import analyze_portfolio
 from stock_picker.portfolio.dividends import calculate_portfolio_dividends
+from stock_picker.portfolio.risk_analysis import calculate_risk_analysis
 from stock_picker.portfolio.schemas import (
     HoldingCreate,
     HoldingResponse,
@@ -17,6 +18,7 @@ from stock_picker.portfolio.schemas import (
     PortfolioDividends,
     PortfolioPerformance,
     PortfolioResponse,
+    RiskAnalysisResult,
 )
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
@@ -137,6 +139,33 @@ async def optimize_portfolio(
             detail=result["message"],
         )
     return result
+
+
+# @MX:NOTE: [AUTO] SPEC-STOCK-027 — GET /portfolios/{id}/risk-analysis, Redis 캐시 TTL=3600s
+@router.get("/{portfolio_id}/risk-analysis", response_model=RiskAnalysisResult)
+async def get_risk_analysis(
+    portfolio_id: int,
+    period: int = Query(default=90, description="분석 기간(거래일). 허용값: 30, 60, 90, 180, 252"),
+    refresh: bool = Query(default=False, description="캐시 무시하고 재계산"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+    redis: aioredis.Redis = Depends(get_redis_client),
+) -> RiskAnalysisResult:
+    """포트폴리오 리스크 분석 — 상관관계·변동성·분산 효과 (SPEC-STOCK-027)"""
+    allowed_periods = {30, 60, 90, 180, 252}
+    if period not in allowed_periods:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"period는 {sorted(allowed_periods)} 중 하나여야 합니다",
+        )
+    return await calculate_risk_analysis(
+        portfolio_id=portfolio_id,
+        user_id=current_user.id,
+        db=db,
+        redis=redis,
+        period=period,
+        refresh=refresh,
+    )
 
 
 @router.get("/{portfolio_id}/performance", response_model=PortfolioPerformance)

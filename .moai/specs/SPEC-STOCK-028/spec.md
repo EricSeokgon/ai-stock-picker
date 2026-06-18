@@ -1,6 +1,6 @@
 ---
 id: SPEC-STOCK-028
-version: 0.3.0
+version: 0.4.0
 status: draft
 created_at: 2026-06-18
 updated_at: 2026-06-18
@@ -14,6 +14,7 @@ labels: [portfolio, overseas, forex]
 
 ## HISTORY
 
+- 2026-06-18 (v0.4.0): plan-auditor v3 지적 반영 — REQ-033 함수명 제거, REQ-051 np.corrcoef 제거, REQ-081 함수명 제거, AC-14(REQ-083 409 Conflict) 신규 추가, AC-15(REQ-084 race condition) 신규 추가.
 - 2026-06-18 (v0.3.0): plan-auditor v2 지적 반영 — REQ-031·032·050·080 HOW 제거, AC-6에 REQ-038 fallback 절 추가, AC-6b(REQ-016) 신규 추가, AC-11에 REQ-003 보존 절 추가, AC-13(REQ-065) 신규 추가, REQ-083·084(유니크 충돌·race condition) 추가, test_ai_analysis.py 추가.
 - 2026-06-18 (v0.2.0): plan-auditor 지적 반영 — frontmatter 필드명 수정(created_at/labels), REQ-020·021·022 HOW 제거, 섹터·배당 방어 REQ 추가, 인수 조건 전체 EARS 형식 전환, 테스트 목록 보완.
 - 2026-06-18 (v0.1.0): 최초 초안 작성. 해외 주식·ETF 포트폴리오 통합. SPEC-026·027이 명시적으로 본 SPEC으로 연기한 해외 자산 영역 구현.
@@ -80,7 +81,7 @@ FastAPI + PostgreSQL(asyncpg) + Redis + React + TypeScript + FinanceDataReader(F
 - **REQ-FOREX-030**: WHEN `calculate_performance()`가 `market='KRX'` 종목을 처리할 때 THE 시스템 SHALL 기존 KRX 현재가 조회 경로를 변경 없이 사용한다.
 - **REQ-FOREX-031**: WHEN `calculate_performance()`가 `market='NYSE'` 또는 `'NASDAQ'` 종목을 처리할 때 THE 시스템 SHALL 외부 데이터 공급자를 통해 해당 종목의 최신 USD 현재가를 조회한다.
 - **REQ-FOREX-032**: THE 시스템 SHALL 해외 종목 가격 조회 시 동기 I/O 작업을 이벤트 루프 블로킹 없이 비동기 컨텍스트에서 격리 실행한다(REQ-FOREX-022와 동일 원칙).
-- **REQ-FOREX-033**: WHEN 해외 종목의 USD 현재가를 산출한 후 THE 시스템 SHALL `get_usd_krw_rate`로 조회한 환율을 곱하여 KRW 환산 현재가를 계산한다.
+- **REQ-FOREX-033**: WHEN 해외 종목의 USD 현재가를 산출한 후 THE 시스템 SHALL 환율 서비스를 통해 조회한 환율을 곱하여 KRW 환산 현재가를 계산한다.
 - **REQ-FOREX-034**: WHERE 보유 종목의 `currency`가 `'USD'`인 경우 THE 시스템 SHALL `avg_buy_price`(매수 당시 USD 기준)도 현재 환율로 KRW 환산하여 수익률·평가손익을 계산한다.
 - **REQ-FOREX-035**: THE 시스템 SHALL 매수 단가(`avg_buy_price`)를 매수 당시 통화 그대로 DB에 저장하고, KRW 환산은 성과 계산 시점에만 수행한다(환율 변동 왜곡 방지).
 - **REQ-FOREX-036**: WHEN 포트폴리오 전체 평가금액·수익률을 집계할 때 THE 시스템 SHALL 모든 보유 종목을 KRW 단위로 통일하여 합산한다.
@@ -92,7 +93,7 @@ FastAPI + PostgreSQL(asyncpg) + Redis + React + TypeScript + FinanceDataReader(F
 ### 2.5 리스크 분석 해외 종목 지원 (REQ-FOREX-050 ~ 055)
 
 - **REQ-FOREX-050**: WHEN 리스크 분석의 상관관계·변동성 계산이 `market='NYSE'`/`'NASDAQ'` 종목을 포함할 때 THE 시스템 SHALL 외부 데이터 공급자를 통해 해외 종가 시계열을 조회한다.
-- **REQ-FOREX-051**: THE 시스템 SHALL 해외 종목 시계열에 대해 기존과 동일한 numpy 기반 계산(상관계수 `np.corrcoef`, 변동성 `std×√252`)을 적용한다(scipy 사용 금지, NFR-004 참조).
+- **REQ-FOREX-051**: THE 시스템 SHALL 해외 종목 시계열에 대해 기존과 동일한 numpy 기반 행렬 계산(상관계수·연간화 변동성 `std×√252`)을 적용한다(scipy 사용 금지, NFR-004 참조).
 - **REQ-FOREX-052**: THE 시스템 SHALL 상관관계 계산 시 해외 종목 USD 종가 시계열을 변환 없이 그대로 사용한다(상관계수는 통화에 불변이므로 KRW 환산 불필요).
 - **REQ-FOREX-053**: IF 해외 종목의 시계열 데이터가 부족하거나 조회 실패한 경우 THEN THE 시스템 SHALL 기존 KRX 종목과 동일하게 해당 종목을 계산에서 제외한다.
 - **REQ-FOREX-054**: WHERE 포트폴리오 변동성(`portfolio_volatility`)을 계산할 때 THE 시스템 SHALL 비중(weight) 산정을 KRW 환산 평가금액 기준으로 수행한다.
@@ -119,7 +120,7 @@ FastAPI + PostgreSQL(asyncpg) + Redis + React + TypeScript + FinanceDataReader(F
 ### 2.8 Alembic 마이그레이션 0019 (REQ-FOREX-080 ~ 082)
 
 - **REQ-FOREX-080**: THE 시스템 SHALL 마이그레이션 `0018` 이후에 적용될 신규 DB 마이그레이션을 제공하여 `portfolio_holdings` 테이블에 `market`·`currency` 컬럼을 추가한다.
-- **REQ-FOREX-081**: THE 마이그레이션 SHALL `portfolio_holdings` 테이블에 `market`·`currency` 컬럼을 추가하고(REQ-FOREX-001·002 사양), `downgrade()`에서 두 컬럼을 제거한다.
+- **REQ-FOREX-081**: THE 마이그레이션 SHALL `portfolio_holdings` 테이블에 `market`·`currency` 컬럼을 추가하고(REQ-FOREX-001·002 사양), 롤백 실행 시 두 컬럼을 제거한다.
 - **REQ-FOREX-082**: WHERE `portfolio_holdings`에 기존 고유 제약(unique constraint)이 ticker 단위로 존재하는 경우 THE 마이그레이션 SHALL 해당 제약을 `(portfolio_id, krx_code, market)` 조합 기준으로 변경하여 KRX `000020`과 동일 ticker의 해외 종목이 충돌하지 않도록 한다.
 - **REQ-FOREX-083**: IF `(portfolio_id, krx_code, market)` 고유 제약 위반 시 THEN THE 시스템 SHALL `409 Conflict`로 응답한다(기존 종목 중복 등록 방지).
 - **REQ-FOREX-084**: THE 시스템 SHALL 환율 캐시 저장 시 동시 요청에 의한 경쟁 쓰기(race condition)를 허용한다 — 마지막 쓰기가 우선되며 동일한 날짜 환율값이므로 일관성에 영향이 없다.
@@ -216,6 +217,14 @@ WHERE SPEC-028 구현이 완료된 경우 THE 백엔드 소스 SHALL `scipy`를 
 ### AC-13: Claude 호출 실패 시 graceful 처리 (REQ-FOREX-065)
 
 IF Claude API 호출이 실패한 경우 THEN THE 시스템 SHALL 예외를 전파하지 않고 오류 정보를 담은 딕셔너리를 반환한다.
+
+### AC-14: 중복 보유 종목 등록 거부 (REQ-FOREX-083)
+
+IF 이미 등록된 `(portfolio_id, krx_code, market)` 조합으로 보유 종목 추가가 요청된 경우 THEN THE 시스템 SHALL `409 Conflict`로 응답한다.
+
+### AC-15: 환율 캐시 race condition 허용 (REQ-FOREX-084)
+
+WHERE 환율 캐시 키에 대해 동시 쓰기가 발생한 경우 THE 시스템 SHALL 마지막 쓰기 값을 유지하고 예외를 발생시키지 않는다.
 
 ---
 

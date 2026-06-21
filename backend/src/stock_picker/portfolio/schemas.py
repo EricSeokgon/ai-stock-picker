@@ -1,11 +1,12 @@
-# 포트폴리오 관련 Pydantic v2 스키마 (SPEC-STOCK-017 확장)
+# 포트폴리오 관련 Pydantic v2 스키마 (SPEC-STOCK-017·028 확장)
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, Optional
 
 # SPEC-STOCK-027 — 리스크 분석 스키마는 파일 하단에 추가됨
+# SPEC-STOCK-028 — 해외 자산(NYSE/NASDAQ) 지원 필드 추가
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 
 class PortfolioCreate(BaseModel):
@@ -31,10 +32,13 @@ class PortfolioResponse(BaseModel):
 
 
 class HoldingCreate(BaseModel):
-    """보유 종목 추가 요청"""
+    """보유 종목 추가 요청 (SPEC-STOCK-028: 해외 자산 필드 추가)"""
     krx_code: str
     quantity: int
     avg_buy_price: Decimal
+    # SPEC-STOCK-028 — 거래소 및 통화 (기본값: KRX/KRW)
+    market: Literal["KRX", "NYSE", "NASDAQ"] = "KRX"
+    currency: Literal["KRW", "USD"] = "KRW"
 
     @field_validator("quantity")
     @classmethod
@@ -57,21 +61,33 @@ class HoldingCreate(BaseModel):
             raise ValueError("KRX 코드는 비어있을 수 없습니다")
         return v.strip()
 
+    @model_validator(mode="after")
+    def market_currency_consistent(self) -> "HoldingCreate":
+        """market-currency 정합성: KRX=KRW, NYSE/NASDAQ=USD."""
+        if self.market == "KRX" and self.currency != "KRW":
+            raise ValueError("KRX 종목은 KRW 통화만 지원합니다")
+        if self.market in ("NYSE", "NASDAQ") and self.currency != "USD":
+            raise ValueError("NYSE/NASDAQ 종목은 USD 통화만 지원합니다")
+        return self
+
 
 class HoldingResponse(BaseModel):
-    """보유 종목 응답"""
+    """보유 종목 응답 (SPEC-STOCK-028: market/currency 필드 추가)"""
     id: int
     portfolio_id: int
     krx_code: str
     quantity: int
     avg_buy_price: Decimal
     added_at: datetime
+    # SPEC-STOCK-028 — 거래소 및 통화 정보
+    market: str = "KRX"
+    currency: str = "KRW"
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class HoldingPerformance(BaseModel):
-    """보유 종목 성과 데이터 (SPEC-STOCK-017 확장: classification, sector, price_unavailable 추가)"""
+    """보유 종목 성과 데이터 (SPEC-STOCK-017·028 확장: market, currency, fx_rate_used 추가)"""
     krx_code: str
     quantity: int
     avg_buy_price: float
@@ -81,6 +97,10 @@ class HoldingPerformance(BaseModel):
     classification: Literal["high", "normal", "low"] = "normal"
     sector: str = "기타"
     price_unavailable: bool = False
+    # SPEC-STOCK-028 신규 필드
+    market: str = "KRX"
+    currency: str = "KRW"
+    fx_rate_used: Optional[float] = None  # USD/KRW 환율 (KRX 종목은 None)
 
 
 class ClassificationGroup(BaseModel):

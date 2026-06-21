@@ -1,5 +1,6 @@
 # 포트폴리오 라우터 — CRUD + 성과 조회 + 배당 분석 엔드포인트
 import redis.asyncio as aioredis
+import sqlalchemy.exc
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -67,13 +68,21 @@ def add_holding(
             detail="포트폴리오를 찾을 수 없습니다",
         )
 
-    return service.add_holding(
-        db,
-        portfolio_id=portfolio_id,
-        krx_code=body.krx_code,
-        quantity=body.quantity,
-        avg_buy_price=body.avg_buy_price,
-    )
+    try:
+        return service.add_holding(
+            db,
+            portfolio_id=portfolio_id,
+            krx_code=body.krx_code,
+            quantity=body.quantity,
+            avg_buy_price=body.avg_buy_price,
+            market=body.market,
+            currency=body.currency,
+        )
+    except sqlalchemy.exc.IntegrityError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 동일 시장에 동일 종목이 존재합니다",
+        )
 
 
 @router.delete(
@@ -169,12 +178,13 @@ async def get_risk_analysis(
 
 
 @router.get("/{portfolio_id}/performance", response_model=PortfolioPerformance)
-def get_performance(
+async def get_performance(
     portfolio_id: int,
     db: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
+    redis: aioredis.Redis = Depends(get_redis_client),
 ) -> PortfolioPerformance:
-    """포트폴리오 성과 계산 — 현재가 기반"""
+    """포트폴리오 성과 계산 — KRX + 해외 자산 현재가 기반 (SPEC-STOCK-028)"""
     # 소유권 확인
     portfolio = (
         db.query(Portfolio)
@@ -187,7 +197,9 @@ def get_performance(
             detail="포트폴리오를 찾을 수 없습니다",
         )
 
-    result = service.calculate_performance(db, portfolio_id=portfolio_id, user_id=current_user.id)
+    result = await service.calculate_performance(
+        db, portfolio_id=portfolio_id, user_id=current_user.id, redis=redis
+    )
     return PortfolioPerformance(**result)
 
 

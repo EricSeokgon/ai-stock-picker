@@ -1,7 +1,7 @@
 # SPEC-STOCK-017 성과 분류·섹터 집계 단위 테스트
-# TDD RED phase — 아직 구현 없음, 실패 예상
+# SPEC-STOCK-028 T-006: calculate_performance async 전환 반영
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -25,6 +25,8 @@ def _make_holding(
     krx_code: str = "005930",
     quantity: int = 10,
     avg_buy_price: Decimal = Decimal("70000.00"),
+    market: str = "KRX",
+    currency: str = "KRW",
 ) -> PortfolioHolding:
     h = PortfolioHolding()
     h.id = id
@@ -32,6 +34,8 @@ def _make_holding(
     h.krx_code = krx_code
     h.quantity = quantity
     h.avg_buy_price = avg_buy_price
+    h.market = market
+    h.currency = currency
     return h
 
 
@@ -41,7 +45,8 @@ def _make_holding(
 class TestReturnPctCalculation:
     """수익률 계산 공식 검증"""
 
-    def test_positive_return_is_correct(self):
+    @pytest.mark.asyncio
+    async def test_positive_return_is_correct(self):
         """매입가 70000 → 현재가 75000: 수익률 ≈ +7.14%"""
         db = MagicMock()
         portfolio = _make_portfolio()
@@ -50,16 +55,18 @@ class TestReturnPctCalculation:
 
         db.query.return_value.filter.return_value.first.return_value = portfolio
         db.query.return_value.filter.return_value.all.return_value = [holding]
+        redis = AsyncMock()
 
         with patch(
             "stock_picker.portfolio.service.get_current_price",
             return_value={"price": 75000.0},
         ):
-            result = service.calculate_performance(db, portfolio_id=1, user_id=1)
+            result = await service.calculate_performance(db, portfolio_id=1, user_id=1, redis=redis)
 
         assert result["holdings"][0]["return_pct"] == pytest.approx(7.14, abs=0.01)
 
-    def test_negative_return_is_correct(self):
+    @pytest.mark.asyncio
+    async def test_negative_return_is_correct(self):
         """매입가 70000 → 현재가 63000: 수익률 = -10.00%"""
         db = MagicMock()
         portfolio = _make_portfolio()
@@ -68,12 +75,13 @@ class TestReturnPctCalculation:
 
         db.query.return_value.filter.return_value.first.return_value = portfolio
         db.query.return_value.filter.return_value.all.return_value = [holding]
+        redis = AsyncMock()
 
         with patch(
             "stock_picker.portfolio.service.get_current_price",
             return_value={"price": 63000.0},
         ):
-            result = service.calculate_performance(db, portfolio_id=1, user_id=1)
+            result = await service.calculate_performance(db, portfolio_id=1, user_id=1, redis=redis)
 
         assert result["holdings"][0]["return_pct"] == pytest.approx(-10.0, abs=0.01)
 
@@ -84,7 +92,7 @@ class TestReturnPctCalculation:
 class TestHoldingClassification:
     """보유 종목 성과 분류 검증"""
 
-    def _run(self, buy_price: float, current_price: float, quantity: int = 10) -> dict:
+    async def _run(self, buy_price: float, current_price: float, quantity: int = 10) -> dict:
         """공통 setup — 단일 holding 성과 계산"""
         db = MagicMock()
         portfolio = _make_portfolio()
@@ -95,44 +103,51 @@ class TestHoldingClassification:
 
         db.query.return_value.filter.return_value.first.return_value = portfolio
         db.query.return_value.filter.return_value.all.return_value = [holding]
+        redis = AsyncMock()
 
         with patch(
             "stock_picker.portfolio.service.get_current_price",
             return_value={"price": current_price},
         ):
-            result = service.calculate_performance(db, portfolio_id=1, user_id=1)
+            result = await service.calculate_performance(db, portfolio_id=1, user_id=1, redis=redis)
 
         return result["holdings"][0]
 
-    def test_high_when_return_above_5_pct(self):
+    @pytest.mark.asyncio
+    async def test_high_when_return_above_5_pct(self):
         """수익률 >= +5.0% → classification = 'high'"""
-        holding = self._run(70000, 75000)
+        holding = await self._run(70000, 75000)
         assert holding["classification"] == "high"
 
-    def test_high_boundary_exactly_5_pct(self):
+    @pytest.mark.asyncio
+    async def test_high_boundary_exactly_5_pct(self):
         """수익률 = +5.0% → classification = 'high'"""
-        holding = self._run(100000, 105000)
+        holding = await self._run(100000, 105000)
         assert holding["classification"] == "high"
 
-    def test_normal_when_return_between_minus5_and_plus5(self):
+    @pytest.mark.asyncio
+    async def test_normal_when_return_between_minus5_and_plus5(self):
         """수익률 0% → classification = 'normal'"""
-        holding = self._run(70000, 70000)
+        holding = await self._run(70000, 70000)
         assert holding["classification"] == "normal"
 
-    def test_normal_just_below_high(self):
+    @pytest.mark.asyncio
+    async def test_normal_just_below_high(self):
         """수익률 +4.99% → classification = 'normal'"""
         # 100000 → 104990 = +4.99%
-        holding = self._run(100000, 104990)
+        holding = await self._run(100000, 104990)
         assert holding["classification"] == "normal"
 
-    def test_low_when_return_below_minus5_pct(self):
+    @pytest.mark.asyncio
+    async def test_low_when_return_below_minus5_pct(self):
         """수익률 <= -5.0% → classification = 'low'"""
-        holding = self._run(70000, 63000)
+        holding = await self._run(70000, 63000)
         assert holding["classification"] == "low"
 
-    def test_low_boundary_exactly_minus5_pct(self):
+    @pytest.mark.asyncio
+    async def test_low_boundary_exactly_minus5_pct(self):
         """수익률 = -5.0% → classification = 'low'"""
-        holding = self._run(100000, 95000)
+        holding = await self._run(100000, 95000)
         assert holding["classification"] == "low"
 
 
@@ -142,7 +157,8 @@ class TestHoldingClassification:
 class TestPriceUnavailable:
     """현재가 조회 실패 처리"""
 
-    def test_price_unavailable_flag_set_when_get_current_price_returns_none(self):
+    @pytest.mark.asyncio
+    async def test_price_unavailable_flag_set_when_get_current_price_returns_none(self):
         """get_current_price → None 시 price_unavailable=True, return_pct=0"""
         db = MagicMock()
         portfolio = _make_portfolio()
@@ -151,18 +167,20 @@ class TestPriceUnavailable:
 
         db.query.return_value.filter.return_value.first.return_value = portfolio
         db.query.return_value.filter.return_value.all.return_value = [holding]
+        redis = AsyncMock()
 
         with patch(
             "stock_picker.portfolio.service.get_current_price",
             return_value=None,
         ):
-            result = service.calculate_performance(db, portfolio_id=1, user_id=1)
+            result = await service.calculate_performance(db, portfolio_id=1, user_id=1, redis=redis)
 
         h = result["holdings"][0]
         assert h["price_unavailable"] is True
         assert h["return_pct"] == 0.0
 
-    def test_zero_buy_price_yields_return_pct_zero(self):
+    @pytest.mark.asyncio
+    async def test_zero_buy_price_yields_return_pct_zero(self):
         """매입가 0 → 0 나눗셈 방지 → return_pct=0.0"""
         db = MagicMock()
         portfolio = _make_portfolio()
@@ -171,12 +189,13 @@ class TestPriceUnavailable:
 
         db.query.return_value.filter.return_value.first.return_value = portfolio
         db.query.return_value.filter.return_value.all.return_value = [holding]
+        redis = AsyncMock()
 
         with patch(
             "stock_picker.portfolio.service.get_current_price",
             return_value={"price": 50000.0},
         ):
-            result = service.calculate_performance(db, portfolio_id=1, user_id=1)
+            result = await service.calculate_performance(db, portfolio_id=1, user_id=1, redis=redis)
 
         assert result["holdings"][0]["return_pct"] == 0.0
 
@@ -187,7 +206,8 @@ class TestPriceUnavailable:
 class TestEmptyPortfolio:
     """빈 포트폴리오 응답 검증"""
 
-    def test_empty_holdings_returns_zero_summary(self):
+    @pytest.mark.asyncio
+    async def test_empty_holdings_returns_zero_summary(self):
         """보유 종목 없을 때 빈 holdings + 0 값"""
         db = MagicMock()
         portfolio = _make_portfolio()
@@ -195,8 +215,9 @@ class TestEmptyPortfolio:
 
         db.query.return_value.filter.return_value.first.return_value = portfolio
         db.query.return_value.filter.return_value.all.return_value = []
+        redis = AsyncMock()
 
-        result = service.calculate_performance(db, portfolio_id=1, user_id=1)
+        result = await service.calculate_performance(db, portfolio_id=1, user_id=1, redis=redis)
 
         assert result["holdings"] == []
         assert result["total_invested"] == 0.0
@@ -214,7 +235,8 @@ class TestEmptyPortfolio:
 class TestSectorPerformance:
     """섹터별 수익률 집계 검증"""
 
-    def test_sector_performance_groups_same_sector(self):
+    @pytest.mark.asyncio
+    async def test_sector_performance_groups_same_sector(self):
         """동일 섹터 종목들이 하나의 섹터 항목으로 집계됨"""
         db = MagicMock()
         portfolio = _make_portfolio()
@@ -225,6 +247,7 @@ class TestSectorPerformance:
 
         db.query.return_value.filter.return_value.first.return_value = portfolio
         db.query.return_value.filter.return_value.all.return_value = [h1, h2]
+        redis = AsyncMock()
 
         def mock_price(krx_code: str):
             prices = {"005930": 75000.0, "005380": 200000.0}
@@ -232,7 +255,7 @@ class TestSectorPerformance:
             return {"price": p} if p > 0 else None
 
         with patch("stock_picker.portfolio.service.get_current_price", side_effect=mock_price):
-            result = service.calculate_performance(db, portfolio_id=1, user_id=1)
+            result = await service.calculate_performance(db, portfolio_id=1, user_id=1, redis=redis)
 
         sectors = {s["sector"]: s for s in result["sector_performance"]}
         assert "전자/반도체" in sectors
@@ -240,7 +263,8 @@ class TestSectorPerformance:
         elec_sector = sectors["전자/반도체"]
         assert elec_sector["holding_count"] == 2
 
-    def test_sector_performance_sorted_by_invested_desc(self):
+    @pytest.mark.asyncio
+    async def test_sector_performance_sorted_by_invested_desc(self):
         """sector_performance는 투자금 내림차순 정렬"""
         db = MagicMock()
         portfolio = _make_portfolio()
@@ -252,12 +276,13 @@ class TestSectorPerformance:
 
         db.query.return_value.filter.return_value.first.return_value = portfolio
         db.query.return_value.filter.return_value.all.return_value = [h_auto, h_elec]
+        redis = AsyncMock()
 
         def mock_price(krx_code: str):
             return {"price": float({"012330": 100000, "005930": 70000}[krx_code])}
 
         with patch("stock_picker.portfolio.service.get_current_price", side_effect=mock_price):
-            result = service.calculate_performance(db, portfolio_id=1, user_id=1)
+            result = await service.calculate_performance(db, portfolio_id=1, user_id=1, redis=redis)
 
         invested_values = [s["invested"] for s in result["sector_performance"]]
         assert invested_values == sorted(invested_values, reverse=True)
@@ -269,7 +294,8 @@ class TestSectorPerformance:
 class TestClassificationSummary:
     """classification_summary 필드 검증"""
 
-    def test_classification_summary_counts_are_correct(self):
+    @pytest.mark.asyncio
+    async def test_classification_summary_counts_are_correct(self):
         """고/일반/저수익 종목 수 집계"""
         db = MagicMock()
         portfolio = _make_portfolio()
@@ -283,20 +309,22 @@ class TestClassificationSummary:
 
         db.query.return_value.filter.return_value.first.return_value = portfolio
         db.query.return_value.filter.return_value.all.return_value = [h1, h2, h3]
+        redis = AsyncMock()
 
         def mock_price(krx_code: str):
             prices = {"005930": 75000.0, "000660": 100000.0, "012330": 45000.0}
             return {"price": prices[krx_code]}
 
         with patch("stock_picker.portfolio.service.get_current_price", side_effect=mock_price):
-            result = service.calculate_performance(db, portfolio_id=1, user_id=1)
+            result = await service.calculate_performance(db, portfolio_id=1, user_id=1, redis=redis)
 
         summary = result["classification_summary"]
         assert summary["high"]["count"] == 1
         assert summary["normal"]["count"] == 1
         assert summary["low"]["count"] == 1
 
-    def test_classification_summary_invested_pct_sums_to_100(self):
+    @pytest.mark.asyncio
+    async def test_classification_summary_invested_pct_sums_to_100(self):
         """invested_pct 합계는 100.0"""
         db = MagicMock()
         portfolio = _make_portfolio()
@@ -306,13 +334,14 @@ class TestClassificationSummary:
 
         db.query.return_value.filter.return_value.first.return_value = portfolio
         db.query.return_value.filter.return_value.all.return_value = [h1, h2]
+        redis = AsyncMock()
 
         def mock_price(krx_code: str):
             prices = {"005930": 75000.0, "000660": 100000.0}
             return {"price": prices[krx_code]}
 
         with patch("stock_picker.portfolio.service.get_current_price", side_effect=mock_price):
-            result = service.calculate_performance(db, portfolio_id=1, user_id=1)
+            result = await service.calculate_performance(db, portfolio_id=1, user_id=1, redis=redis)
 
         summary = result["classification_summary"]
         total_pct = (

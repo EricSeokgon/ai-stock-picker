@@ -1,6 +1,6 @@
 # 포트폴리오 서비스 유닛 테스트 — mock DB + 성과 계산 검증
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -24,6 +24,8 @@ def _make_holding(
     krx_code: str = "005930",
     quantity: int = 10,
     avg_buy_price: Decimal = Decimal("70000.00"),
+    market: str = "KRX",
+    currency: str = "KRW",
 ) -> PortfolioHolding:
     """테스트용 PortfolioHolding 인스턴스 생성"""
     h = PortfolioHolding()
@@ -32,6 +34,8 @@ def _make_holding(
     h.krx_code = krx_code
     h.quantity = quantity
     h.avg_buy_price = avg_buy_price
+    h.market = market
+    h.currency = currency
     return h
 
 
@@ -174,21 +178,24 @@ class TestRemoveHolding:
 
 
 class TestCalculatePerformance:
-    """calculate_performance 테스트"""
+    """calculate_performance 테스트 (async — SPEC-STOCK-028 T-006 이후 async 전환)"""
 
-    def test_returns_empty_when_portfolio_not_found(self):
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_portfolio_not_found(self):
         """포트폴리오 미발견 시 빈 성과 반환"""
         db = MagicMock()
         db.query.return_value.filter.return_value.first.return_value = None
+        redis = AsyncMock()
 
-        result = service.calculate_performance(db, portfolio_id=999, user_id=1)
+        result = await service.calculate_performance(db, portfolio_id=999, user_id=1, redis=redis)
 
         assert result["holdings"] == []
         assert result["total_invested"] == 0.0
         assert result["total_current"] == 0.0
         assert result["total_return_pct"] == 0.0
 
-    def test_calculates_positive_return(self):
+    @pytest.mark.asyncio
+    async def test_calculates_positive_return(self):
         """수익 발생 시 양수 수익률 계산"""
         db = MagicMock()
         portfolio = _make_portfolio()
@@ -198,19 +205,21 @@ class TestCalculatePerformance:
         # get_portfolio_with_holdings가 portfolio 반환하도록 설정
         db.query.return_value.filter.return_value.first.return_value = portfolio
         db.query.return_value.filter.return_value.all.return_value = [holding]
+        redis = AsyncMock()
 
         # 현재가를 75000으로 mocking (SPEC-STOCK-017: get_current_price → dict 반환)
         with patch(
             "stock_picker.portfolio.service.get_current_price",
             return_value={"price": 75000.0},
         ):
-            result = service.calculate_performance(db, portfolio_id=1, user_id=1)
+            result = await service.calculate_performance(db, portfolio_id=1, user_id=1, redis=redis)
 
         assert result["total_invested"] == 700000.0
         assert result["total_current"] == 750000.0
         assert result["total_return_pct"] == pytest.approx(7.14, abs=0.01)
 
-    def test_calculates_negative_return(self):
+    @pytest.mark.asyncio
+    async def test_calculates_negative_return(self):
         """손실 발생 시 음수 수익률 계산"""
         db = MagicMock()
         portfolio = _make_portfolio()
@@ -219,16 +228,18 @@ class TestCalculatePerformance:
 
         db.query.return_value.filter.return_value.first.return_value = portfolio
         db.query.return_value.filter.return_value.all.return_value = [holding]
+        redis = AsyncMock()
 
         with patch(
             "stock_picker.portfolio.service.get_current_price",
             return_value={"price": 63000.0},
         ):
-            result = service.calculate_performance(db, portfolio_id=1, user_id=1)
+            result = await service.calculate_performance(db, portfolio_id=1, user_id=1, redis=redis)
 
         assert result["total_return_pct"] == pytest.approx(-10.0, abs=0.01)
 
-    def test_uses_buy_price_when_current_price_unavailable(self):
+    @pytest.mark.asyncio
+    async def test_uses_buy_price_when_current_price_unavailable(self):
         """현재가 조회 실패 시 매수가로 대체 (수익률 0%)"""
         db = MagicMock()
         portfolio = _make_portfolio()
@@ -237,11 +248,12 @@ class TestCalculatePerformance:
 
         db.query.return_value.filter.return_value.first.return_value = portfolio
         db.query.return_value.filter.return_value.all.return_value = [holding]
+        redis = AsyncMock()
 
         with patch(
             "stock_picker.portfolio.service.get_current_price",
             return_value=None,
         ):
-            result = service.calculate_performance(db, portfolio_id=1, user_id=1)
+            result = await service.calculate_performance(db, portfolio_id=1, user_id=1, redis=redis)
 
         assert result["total_return_pct"] == 0.0

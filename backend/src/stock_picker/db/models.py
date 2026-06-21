@@ -244,7 +244,12 @@ class Portfolio(Base):
 
 
 class PortfolioHolding(Base):
-    """포트폴리오 보유 종목 테이블"""
+    """포트폴리오 보유 종목 테이블 (SPEC-STOCK-028: 해외 자산 지원)
+
+    # @MX:ANCHOR: [AUTO] 보유 종목 핵심 엔티티 — 해외 자산(NYSE/NASDAQ) 포함
+    # @MX:REASON: service.py, router.py, dividends.py, risk_analysis.py 등 4개 이상 모듈에서 참조
+    # @MX:SPEC: SPEC-STOCK-028 REQ-FA-001
+    """
 
     __tablename__ = "portfolio_holdings"
 
@@ -252,9 +257,14 @@ class PortfolioHolding(Base):
     portfolio_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
     )
+    # krx_code: KRX 종목코드 또는 해외 티커 식별자 (컬럼명 유지 — 하위 호환)
     krx_code: Mapped[str] = mapped_column(String(10), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     avg_buy_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    # market: 상장 거래소 — KRX(기본), NYSE, NASDAQ
+    market: Mapped[str] = mapped_column(String(10), nullable=False, server_default="KRX")
+    # currency: 결제 통화 — KRW(기본), USD
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="KRW")
     added_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -263,6 +273,14 @@ class PortfolioHolding(Base):
 
     # 연관 관계
     portfolio: Mapped["Portfolio"] = relationship("Portfolio", back_populates="holdings")
+
+    __table_args__ = (
+        # (portfolio_id, krx_code, market) 복합 UNIQUE — 동일 시장 내 종목 중복 방지
+        UniqueConstraint(
+            "portfolio_id", "krx_code", "market",
+            name="uq_holding_portfolio_ticker_market",
+        ),
+    )
 
 
 # ── Phase E: 관심종목 위시리스트 ───────────────────────────────────────────────

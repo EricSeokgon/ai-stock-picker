@@ -369,3 +369,105 @@ class TestExistingAiAnalysisAsync:
 
         assert "disclaimer" in result
         assert result["disclaimer"] == "본 분석은 투자 권유가 아닌 정보 제공 목적입니다."
+
+
+# ──────────────────────────────────────────────────────────────
+# T-008: optimize_portfolio 해외 자산 지원 (SPEC-STOCK-028)
+# ──────────────────────────────────────────────────────────────
+
+def _make_holding_foreign(
+    krx_code: str = "AAPL",
+    quantity: int = 5,
+    avg_buy_price: Decimal = Decimal("150.00"),
+    market: str = "NASDAQ",
+    currency: str = "USD",
+) -> PortfolioHolding:
+    h = PortfolioHolding()
+    h.id = 2
+    h.portfolio_id = 1
+    h.krx_code = krx_code
+    h.quantity = quantity
+    h.avg_buy_price = avg_buy_price
+    h.market = market
+    h.currency = currency
+    return h
+
+
+class TestOptimizePortfolioForeignAsset:
+    """T-008: optimize_portfolio 해외 자산 지원 테스트"""
+
+    async def test_holdings_data_includes_market_and_currency(self):
+        """optimize_portfolio가 Claude에 넘기는 holdings_data에 market/currency 포함"""
+        from unittest.mock import AsyncMock, MagicMock, patch
+        from stock_picker.portfolio.service import optimize_portfolio
+
+        db = MagicMock()
+        redis = AsyncMock()
+        portfolio = _make_portfolio()
+        h_krx = _make_holding("005930", 10, Decimal("70000.00"))
+        h_nasdaq = _make_holding_foreign("AAPL", 5, Decimal("150.00"), "NASDAQ", "USD")
+
+        db.query.return_value.filter.return_value.first.return_value = portfolio
+        db.query.return_value.filter.return_value.all.return_value = [h_krx, h_nasdaq]
+
+        redis.get = AsyncMock(return_value=None)
+        redis.setex = AsyncMock()
+
+        captured_holdings_data = []
+
+        async def mock_optimize(holdings_data, portfolio_codes, db_session):
+            captured_holdings_data.extend(holdings_data)
+            return _mock_optimize_response()
+
+        with patch(
+            "stock_picker.portfolio.ai_analysis.optimize_portfolio_with_claude",
+            side_effect=mock_optimize,
+        ):
+            await optimize_portfolio(portfolio_id=1, user_id=1, db=db, redis=redis)
+
+        krx_item = next((d for d in captured_holdings_data if d["krx_code"] == "005930"), None)
+        nasdaq_item = next((d for d in captured_holdings_data if d["krx_code"] == "AAPL"), None)
+
+        assert krx_item is not None
+        assert "market" in krx_item
+        assert "currency" in krx_item
+
+        assert nasdaq_item is not None
+        assert "market" in nasdaq_item
+        assert nasdaq_item["market"] == "NASDAQ"
+        assert nasdaq_item["currency"] == "USD"
+
+    async def test_new_stocks_limited_to_krx(self):
+        """new_stocks 추천은 현재 포트폴리오 미보유 종목만 포함 (기존 필터 보존)"""
+        from unittest.mock import AsyncMock, MagicMock, patch
+        from stock_picker.portfolio.service import optimize_portfolio
+
+        db = MagicMock()
+        redis = AsyncMock()
+        portfolio = _make_portfolio()
+        h = _make_holding("005930", 10, Decimal("70000.00"))
+        h2 = _make_holding("000660", 5, Decimal("100000.00"))
+
+        db.query.return_value.filter.return_value.first.return_value = portfolio
+        db.query.return_value.filter.return_value.all.return_value = [h, h2]
+
+        redis.get = AsyncMock(return_value=None)
+        redis.setex = AsyncMock()
+
+        # new_stocks에 이미 보유 중인 종목 포함 → 제외되어야 함
+        response = _mock_optimize_response(
+            new_stocks=[
+                {"krx_code": "005930", "name": "삼성전자", "sector": "IT", "reason": "이미 보유"},
+                {"krx_code": "035420", "name": "NAVER", "sector": "IT", "reason": "추가 검토"},
+            ]
+        )
+
+        with patch(
+            "stock_picker.portfolio.ai_analysis.optimize_portfolio_with_claude",
+            new=AsyncMock(return_value=response),
+        ):
+            result = await optimize_portfolio(portfolio_id=1, user_id=1, db=db, redis=redis)
+
+        new_codes = [ns.krx_code for ns in result.new_stocks]
+        assert "005930" not in new_codes
+        assert "035420" in new_codes

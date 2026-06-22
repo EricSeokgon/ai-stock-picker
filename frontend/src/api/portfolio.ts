@@ -10,7 +10,10 @@ export interface Portfolio {
   created_at: string;
 }
 
-// 보유 종목 타입
+// 보유 종목 타입 (SPEC-STOCK-028: market/currency 필드 추가)
+export type Market = 'KRX' | 'NYSE' | 'NASDAQ';
+export type Currency = 'KRW' | 'USD';
+
 export interface Holding {
   id: number;
   portfolio_id: number;
@@ -18,6 +21,17 @@ export interface Holding {
   quantity: number;
   avg_buy_price: number;
   created_at: string;
+  market?: Market;
+  currency?: Currency;
+}
+
+// 보유 종목 추가 요청 타입
+export interface HoldingCreate {
+  krx_code: string;
+  quantity: number;
+  avg_buy_price: number;
+  market?: Market;
+  currency?: Currency;
 }
 
 // 성과 데이터 타입 (SPEC-STOCK-017: 백엔드 응답과 정합화 + 신규 필드 추가)
@@ -31,6 +45,11 @@ export interface HoldingPerformance {
   classification: 'high' | 'normal' | 'low';
   sector: string;
   price_unavailable: boolean;
+  // SPEC-STOCK-028: 해외 자산 필드
+  market?: Market;
+  currency?: Currency;
+  fx_rate_used?: number | null;
+  current_value_krw?: number | null;
 }
 
 export interface ClassificationGroup {
@@ -103,18 +122,20 @@ export async function apiListHoldings(token: string, portfolioId: number): Promi
   return res.json() as Promise<Holding[]>;
 }
 
-// 보유 종목 추가
+// 보유 종목 추가 (SPEC-STOCK-028: market/currency 파라미터 추가, 기본값으로 역방향 호환)
 export async function apiAddHolding(
   token: string,
   portfolioId: number,
   krx_code: string,
   quantity: number,
   avg_buy_price: number,
+  market: Market = 'KRX',
+  currency: Currency = 'KRW',
 ): Promise<Holding> {
   const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/holdings`, {
     method: 'POST',
     headers: authHeaders(token),
-    body: JSON.stringify({ krx_code, quantity, avg_buy_price }),
+    body: JSON.stringify({ krx_code, quantity, avg_buy_price, market, currency }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as { detail?: string };

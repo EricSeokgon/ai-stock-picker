@@ -10,6 +10,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from stock_picker.db.models import Portfolio, PortfolioHolding
+from stock_picker.portfolio import fx_rate as fx_rate_module
 from stock_picker.portfolio.utils import get_sector as _get_sector  # SPEC-STOCK-017: 공유 utils로 통합
 
 logger = logging.getLogger(__name__)
@@ -72,24 +73,38 @@ async def analyze_portfolio(portfolio_id: int, user_id: int, db: Session) -> dic
     return analysis
 
 
-def _build_portfolio_data(holdings: list[PortfolioHolding]) -> list[dict[str, Any]]:
+def _build_portfolio_data(
+    holdings: list[PortfolioHolding],
+    fx_rate: float = 1.0,
+) -> list[dict[str, Any]]:
     """보유 종목 목록을 분석용 데이터 구조로 변환.
 
+    # @MX:NOTE: [AUTO] USD 종목은 fx_rate로 KRW 환산하여 total_value 및 weight_pct 계산
     사용자 식별 정보(user_id, portfolio_id)는 포함하지 않음.
+    fx_rate: USD→KRW 환율 (기본 1.0 = KRX 전용 환경)
     """
-    total_value = sum(float(h.avg_buy_price) * h.quantity for h in holdings)
+    def _krw_value(h: PortfolioHolding) -> float:
+        currency = getattr(h, "currency", "KRW") or "KRW"
+        rate = fx_rate if currency == "USD" else 1.0
+        return float(h.avg_buy_price) * h.quantity * rate
+
+    total_value = sum(_krw_value(h) for h in holdings)
 
     result = []
     for h in holdings:
-        invested = float(h.avg_buy_price) * h.quantity
-        weight_pct = round((invested / total_value * 100), 2) if total_value > 0 else 0.0
+        invested_krw = _krw_value(h)
+        weight_pct = round((invested_krw / total_value * 100), 2) if total_value > 0 else 0.0
+        market = getattr(h, "market", "KRX") or "KRX"
+        currency = getattr(h, "currency", "KRW") or "KRW"
         result.append({
             "krx_code": h.krx_code,
             "sector": _get_sector(h.krx_code),
             "quantity": h.quantity,
             "avg_buy_price": float(h.avg_buy_price),
-            "invested_amount": round(invested, 2),
+            "invested_amount": round(invested_krw, 2),
             "weight_pct": weight_pct,
+            "market": market,
+            "currency": currency,
         })
     return result
 

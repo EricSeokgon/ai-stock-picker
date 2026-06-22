@@ -2,7 +2,11 @@ import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-run
 // 포트폴리오 관리 페이지
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { apiListPortfolios, apiCreatePortfolio, apiListHoldings, apiAddHolding, apiGetPerformance, } from '../api/portfolio';
+import { apiListPortfolios, apiCreatePortfolio, apiListHoldings, apiAddHolding, apiGetPerformance, apiOptimizePortfolio, } from '../api/portfolio';
+import PortfolioScoreCard from '../components/PortfolioScoreCard';
+import RebalancingTable from '../components/RebalancingTable';
+import NewStockSuggestions from '../components/NewStockSuggestions';
+import RiskAnalysisPanel from '../components/RiskAnalysisPanel';
 import { getPortfolioDividends } from '../api/dividends';
 import { LivePriceBadge } from '../components/LivePriceBadge';
 import { PerformanceDonutChart } from '../components/PerformanceDonutChart';
@@ -135,6 +139,42 @@ function AiAnalysisSection({ portfolioId, token }) {
                             fontSize: '0.8rem', opacity: loading ? 0.7 : 1,
                         }, children: loading ? '분석 중...' : 'AI 분석 실행' }), result && (_jsx("button", { onClick: () => setExpanded((v) => !v), style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8rem', color: '#666' }, children: expanded ? '▲ 접기' : '▼ 펼치기' }))] }), error && (_jsx("p", { style: { color: '#c62828', fontSize: '0.8rem', margin: '0.25rem 0' }, children: error })), result && expanded && (_jsxs("div", { style: { fontSize: '0.875rem' }, children: [_jsxs("div", { style: { marginBottom: '0.5rem' }, children: [_jsx("strong", { children: "\uBD84\uC0B0\uB3C4:" }), " ", _jsx("span", { children: result.diversification })] }), _jsxs("div", { style: { marginBottom: '0.5rem' }, children: [_jsx("strong", { children: "\uB9AC\uC2A4\uD06C:" }), " ", _jsx("span", { children: result.risk })] }), result.suggestions && result.suggestions.length > 0 && (_jsxs("div", { style: { marginBottom: '0.5rem' }, children: [_jsx("strong", { children: "\uAC1C\uC120 \uC81C\uC548:" }), _jsx("ul", { style: { margin: '0.25rem 0 0 1rem', padding: 0 }, children: result.suggestions.map((s, i) => (_jsx("li", { children: s }, i))) })] })), _jsx("p", { style: { fontSize: '0.75rem', color: '#888', marginTop: '0.5rem', marginBottom: 0 }, children: "\uBCF8 \uBD84\uC11D\uC740 AI\uAC00 \uC0DD\uC131\uD55C \uCC38\uACE0 \uC815\uBCF4\uC785\uB2C8\uB2E4. \uC2E4\uC81C \uD22C\uC790 \uACB0\uC815\uC740 \uBCF8\uC778 \uCC45\uC784\uD558\uC5D0 \uC774\uB8E8\uC5B4\uC838\uC57C \uD569\uB2C8\uB2E4." })] }))] }));
 }
+// AI 최적화 분석 섹션 (SPEC-STOCK-026)
+function OptimizeSection({ portfolioId, token }) {
+    const [loading, setLoading] = useState(false);
+    const [result, setResult] = useState(null);
+    const [error, setError] = useState(null);
+    async function handleOptimize(refresh = false) {
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await apiOptimizePortfolio(token, portfolioId, refresh);
+            setResult(data);
+        }
+        catch (e) {
+            setError(e instanceof Error ? e.message : 'AI 최적화 분석 실패');
+        }
+        finally {
+            setLoading(false);
+        }
+    }
+    const sectionStyle = {
+        marginTop: '1rem',
+        padding: '0.75rem',
+        border: '1px solid #ede9fe',
+        borderRadius: '4px',
+        background: '#faf5ff',
+    };
+    return (_jsxs("div", { style: sectionStyle, children: [_jsxs("div", { style: { display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }, children: [_jsx("strong", { style: { fontSize: '0.875rem' }, children: "AI \uCD5C\uC801\uD654 \uBD84\uC11D" }), _jsx("button", { onClick: () => void handleOptimize(false), disabled: loading, style: {
+                            padding: '0.3rem 0.7rem', background: '#7c3aed', color: '#fff',
+                            border: 'none', borderRadius: '4px', cursor: loading ? 'default' : 'pointer',
+                            fontSize: '0.8rem', opacity: loading ? 0.7 : 1,
+                        }, children: loading ? '분석 중...' : '최적화 분석 실행' }), result && (_jsx("button", { onClick: () => void handleOptimize(true), disabled: loading, style: {
+                            padding: '0.3rem 0.7rem', background: 'none', border: '1px solid #7c3aed',
+                            color: '#7c3aed', borderRadius: '4px', cursor: loading ? 'default' : 'pointer',
+                            fontSize: '0.8rem', opacity: loading ? 0.7 : 1,
+                        }, children: "\uC0C8\uB85C \uBD84\uC11D" }))] }), error && (_jsx("p", { style: { color: '#c62828', fontSize: '0.8rem', margin: '0.25rem 0' }, children: error })), result && (_jsxs("div", { style: { display: 'flex', flexDirection: 'column', gap: '1rem' }, children: [_jsx(PortfolioScoreCard, { score: result.score, breakdown: result.score_breakdown }), _jsxs("div", { children: [_jsx("p", { style: { margin: '0 0 8px', fontWeight: 600, fontSize: '13px', color: '#374151' }, children: "\uB9AC\uBC38\uB7F0\uC2F1 \uC81C\uC548" }), _jsx(RebalancingTable, { items: result.target_weights })] }), result.new_stocks.length > 0 && (_jsxs("div", { children: [_jsx("p", { style: { margin: '0 0 8px', fontWeight: 600, fontSize: '13px', color: '#374151' }, children: "\uC2E0\uADDC \uC885\uBAA9 \uCD94\uCC9C" }), _jsx(NewStockSuggestions, { stocks: result.new_stocks })] })), result.summary && (_jsx("p", { style: { fontSize: '0.8rem', color: '#4b5563', lineHeight: 1.6, margin: 0 }, children: result.summary }))] }))] }));
+}
 // AI 투자 조언 섹션 — 리밸런싱·리스크·브리핑 (SPEC-STOCK-014)
 // @MX:NOTE: [AUTO] 3종 조언을 탭으로 전환하는 단일 섹션 컴포넌트
 function AdviceSection({ token }) {
@@ -206,12 +246,15 @@ function PortfolioDetail({ portfolioId, token }) {
     const [holdings, setHoldings] = useState([]);
     const [performance, setPerformance] = useState(null);
     const [loadErr, setLoadErr] = useState(null);
-    // 종목 추가 폼 상태
+    // 종목 추가 폼 상태 (SPEC-STOCK-028: market/currency 추가)
     const [krxCode, setKrxCode] = useState('');
     const [quantity, setQuantity] = useState('');
     const [avgBuyPrice, setAvgBuyPrice] = useState('');
+    const [market, setMarket] = useState('KRX');
     const [addErr, setAddErr] = useState(null);
     const [addLoading, setAddLoading] = useState(false);
+    // market 변경 시 currency 자동 설정
+    const currency = market === 'KRX' ? 'KRW' : 'USD';
     async function load() {
         try {
             const [h, p] = await Promise.all([
@@ -231,10 +274,11 @@ function PortfolioDetail({ portfolioId, token }) {
         setAddErr(null);
         setAddLoading(true);
         try {
-            await apiAddHolding(token, portfolioId, krxCode, Number(quantity), Number(avgBuyPrice));
+            await apiAddHolding(token, portfolioId, krxCode, Number(quantity), Number(avgBuyPrice), market, currency);
             setKrxCode('');
             setQuantity('');
             setAvgBuyPrice('');
+            setMarket('KRX');
             await load();
         }
         catch (err) {
@@ -256,7 +300,15 @@ function PortfolioDetail({ portfolioId, token }) {
                                     const clsColors = { high: '#2e7d32', normal: '#1565c0', low: '#c62828' };
                                     const group = performance.classification_summary[cls];
                                     return (_jsxs("div", { style: { display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }, children: [_jsx("span", { style: { width: '10px', height: '10px', borderRadius: '50%', background: clsColors[cls], flexShrink: 0 } }), _jsx("span", { style: { color: '#555' }, children: clsLabels[cls] }), _jsxs("span", { style: { marginLeft: 'auto', fontWeight: 600 }, children: [group.count, "\uC885\uBAA9"] }), _jsxs("span", { style: { color: '#888' }, children: ["(", group.invested_pct.toFixed(1), "%)"] })] }, cls));
-                                }) })] }), _jsxs("div", { style: { flex: '1', minWidth: '200px' }, children: [_jsx("h5", { style: { margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#555' }, children: "\uC139\uD130\uBCC4 \uC131\uACFC" }), _jsx("div", { style: { display: 'flex', flexDirection: 'column', gap: '0.25rem' }, children: performance.sector_performance.map((sp) => (_jsxs("div", { style: { display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', borderBottom: '1px solid #eee', paddingBottom: '0.15rem' }, children: [_jsx("span", { style: { color: '#555' }, children: sp.sector }), _jsxs("span", { children: [_jsxs("span", { style: { color: '#888', marginRight: '0.5rem' }, children: [sp.holding_count, "\uC885\uBAA9"] }), _jsxs("span", { style: { fontWeight: 600, color: sp.return_pct >= 0 ? '#2e7d32' : '#c62828' }, children: [sp.return_pct >= 0 ? '+' : '', sp.return_pct.toFixed(2), "%"] })] })] }, sp.sector))) })] })] })), holdings.length > 0 ? (_jsx("div", { style: { overflowX: 'auto', marginBottom: '1rem', WebkitOverflowScrolling: 'touch' }, children: _jsxs("table", { style: { width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', minWidth: '360px' }, children: [_jsx("thead", { children: _jsxs("tr", { style: { background: '#e3f2fd' }, children: [_jsx("th", { style: cellStyle, children: "\uC885\uBAA9\uCF54\uB4DC" }), _jsx("th", { style: cellStyle, children: "\uC218\uB7C9" }), _jsx("th", { style: cellStyle, children: "\uD3C9\uADE0\uB2E8\uAC00" }), _jsx("th", { style: cellStyle, children: "\uD604\uC7AC \uC2DC\uC138" })] }) }), _jsx("tbody", { children: holdings.map((h) => (_jsxs("tr", { style: { borderBottom: '1px solid #eee' }, children: [_jsx("td", { style: cellStyle, children: h.krx_code }), _jsx("td", { style: cellStyle, children: h.quantity.toLocaleString() }), _jsxs("td", { style: cellStyle, children: ["\u20A9", h.avg_buy_price.toLocaleString()] }), _jsx("td", { style: cellStyle, children: _jsx(LivePriceBadge, { krxCode: h.krx_code }) })] }, h.id))) })] }) })) : (_jsx("p", { style: { fontSize: '0.875rem', color: '#666', marginBottom: '1rem' }, children: "\uBCF4\uC720 \uC885\uBAA9\uC774 \uC5C6\uC2B5\uB2C8\uB2E4." })), _jsxs("div", { children: [_jsx("h4", { style: { margin: '0 0 0.5rem', fontSize: '0.875rem' }, children: "\uC885\uBAA9 \uCD94\uAC00" }), addErr && _jsx("p", { style: { color: '#c62828', fontSize: '0.8rem', margin: '0 0 0.5rem' }, children: addErr }), _jsxs("form", { onSubmit: (e) => void handleAddHolding(e), style: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }, children: [_jsx("input", { placeholder: "KRX \uCF54\uB4DC (\uC608: 005930)", value: krxCode, onChange: (e) => setKrxCode(e.target.value), required: true, style: { flex: '1 1 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' } }), _jsx("input", { placeholder: "\uC218\uB7C9", type: "number", min: "1", value: quantity, onChange: (e) => setQuantity(e.target.value), required: true, style: { flex: '1 1 80px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' } }), _jsx("input", { placeholder: "\uD3C9\uADE0\uB2E8\uAC00 (\uC6D0)", type: "number", min: "1", value: avgBuyPrice, onChange: (e) => setAvgBuyPrice(e.target.value), required: true, style: { flex: '1 1 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' } }), _jsx("button", { type: "submit", disabled: addLoading, style: { padding: '0.35rem 0.75rem', background: '#388e3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.875rem' }, children: addLoading ? '추가 중...' : '추가' })] })] }), _jsx(DividendsSection, { portfolioId: portfolioId, token: token }), _jsx(AiAnalysisSection, { portfolioId: portfolioId, token: token }), _jsx(AdviceSection, { token: token })] }));
+                                }) })] }), _jsxs("div", { style: { flex: '1', minWidth: '200px' }, children: [_jsx("h5", { style: { margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#555' }, children: "\uC139\uD130\uBCC4 \uC131\uACFC" }), _jsx("div", { style: { display: 'flex', flexDirection: 'column', gap: '0.25rem' }, children: performance.sector_performance.map((sp) => (_jsxs("div", { style: { display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', borderBottom: '1px solid #eee', paddingBottom: '0.15rem' }, children: [_jsx("span", { style: { color: '#555' }, children: sp.sector }), _jsxs("span", { children: [_jsxs("span", { style: { color: '#888', marginRight: '0.5rem' }, children: [sp.holding_count, "\uC885\uBAA9"] }), _jsxs("span", { style: { fontWeight: 600, color: sp.return_pct >= 0 ? '#2e7d32' : '#c62828' }, children: [sp.return_pct >= 0 ? '+' : '', sp.return_pct.toFixed(2), "%"] })] })] }, sp.sector))) })] })] })), holdings.length > 0 ? (_jsx("div", { style: { overflowX: 'auto', marginBottom: '1rem', WebkitOverflowScrolling: 'touch' }, children: _jsxs("table", { style: { width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', minWidth: '360px' }, children: [_jsx("thead", { children: _jsxs("tr", { style: { background: '#e3f2fd' }, children: [_jsx("th", { style: cellStyle, children: "\uC885\uBAA9\uCF54\uB4DC" }), _jsx("th", { style: cellStyle, children: "\uC218\uB7C9" }), _jsx("th", { style: cellStyle, children: "\uD3C9\uADE0\uB2E8\uAC00" }), _jsx("th", { style: cellStyle, children: "\uD604\uC7AC \uC2DC\uC138" })] }) }), _jsx("tbody", { children: holdings.map((h) => (_jsxs("tr", { style: { borderBottom: '1px solid #eee' }, children: [_jsxs("td", { style: cellStyle, children: [h.krx_code, h.market && h.market !== 'KRX' && (_jsx("span", { style: {
+                                                    marginLeft: '0.3rem',
+                                                    padding: '0.1rem 0.3rem',
+                                                    background: '#e3f2fd',
+                                                    borderRadius: '3px',
+                                                    fontSize: '0.7rem',
+                                                    color: '#1565c0',
+                                                    fontWeight: 600,
+                                                }, children: h.market }))] }), _jsx("td", { style: cellStyle, children: h.quantity.toLocaleString() }), _jsxs("td", { style: cellStyle, children: [h.currency === 'USD' ? '$' : '₩', h.avg_buy_price.toLocaleString()] }), _jsx("td", { style: cellStyle, children: _jsx(LivePriceBadge, { krxCode: h.krx_code }) })] }, h.id))) })] }) })) : (_jsx("p", { style: { fontSize: '0.875rem', color: '#666', marginBottom: '1rem' }, children: "\uBCF4\uC720 \uC885\uBAA9\uC774 \uC5C6\uC2B5\uB2C8\uB2E4." })), _jsxs("div", { children: [_jsx("h4", { style: { margin: '0 0 0.5rem', fontSize: '0.875rem' }, children: "\uC885\uBAA9 \uCD94\uAC00" }), addErr && _jsx("p", { style: { color: '#c62828', fontSize: '0.8rem', margin: '0 0 0.5rem' }, children: addErr }), _jsxs("form", { onSubmit: (e) => void handleAddHolding(e), style: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }, children: [_jsxs("select", { value: market, onChange: (e) => setMarket(e.target.value), style: { flex: '0 0 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' }, children: [_jsx("option", { value: "KRX", children: "KRX (\uAD6D\uB0B4)" }), _jsx("option", { value: "NYSE", children: "NYSE (\uBBF8\uAD6D)" }), _jsx("option", { value: "NASDAQ", children: "NASDAQ (\uBBF8\uAD6D)" })] }), _jsx("input", { placeholder: market === 'KRX' ? '종목코드 (예: 005930)' : '티커 (예: AAPL)', value: krxCode, onChange: (e) => setKrxCode(e.target.value), required: true, style: { flex: '1 1 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' } }), _jsx("input", { placeholder: "\uC218\uB7C9", type: "number", min: "1", value: quantity, onChange: (e) => setQuantity(e.target.value), required: true, style: { flex: '1 1 80px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' } }), _jsx("input", { placeholder: currency === 'USD' ? '평균단가 (USD)' : '평균단가 (원)', type: "number", min: "1", value: avgBuyPrice, onChange: (e) => setAvgBuyPrice(e.target.value), required: true, style: { flex: '1 1 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' } }), _jsx("button", { type: "submit", disabled: addLoading, style: { padding: '0.35rem 0.75rem', background: '#388e3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.875rem' }, children: addLoading ? '추가 중...' : '추가' })] })] }), _jsx(DividendsSection, { portfolioId: portfolioId, token: token }), _jsx(AiAnalysisSection, { portfolioId: portfolioId, token: token }), _jsx(OptimizeSection, { portfolioId: portfolioId, token: token }), _jsx(RiskAnalysisPanel, { portfolioId: portfolioId }), _jsx(AdviceSection, { token: token })] }));
 }
 export default function Portfolio() {
     const { token } = useAuth();

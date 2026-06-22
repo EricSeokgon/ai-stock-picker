@@ -12,6 +12,8 @@ import {
   type Holding,
   type PortfolioPerformance,
   type OptimizeResult,
+  type Market,
+  type Currency,
 } from '../api/portfolio';
 import PortfolioScoreCard from '../components/PortfolioScoreCard';
 import RebalancingTable from '../components/RebalancingTable';
@@ -631,12 +633,16 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
   const [performance, setPerformance] = useState<PortfolioPerformance | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
-  // 종목 추가 폼 상태
+  // 종목 추가 폼 상태 (SPEC-STOCK-028: market/currency 추가)
   const [krxCode, setKrxCode] = useState('');
   const [quantity, setQuantity] = useState('');
   const [avgBuyPrice, setAvgBuyPrice] = useState('');
+  const [market, setMarket] = useState<Market>('KRX');
   const [addErr, setAddErr] = useState<string | null>(null);
   const [addLoading, setAddLoading] = useState(false);
+
+  // market 변경 시 currency 자동 설정
+  const currency: Currency = market === 'KRX' ? 'KRW' : 'USD';
 
   async function load() {
     try {
@@ -658,10 +664,11 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
     setAddErr(null);
     setAddLoading(true);
     try {
-      await apiAddHolding(token, portfolioId, krxCode, Number(quantity), Number(avgBuyPrice));
+      await apiAddHolding(token, portfolioId, krxCode, Number(quantity), Number(avgBuyPrice), market, currency);
       setKrxCode('');
       setQuantity('');
       setAvgBuyPrice('');
+      setMarket('KRX');
       await load();
     } catch (err) {
       setAddErr(err instanceof Error ? err.message : '추가 실패');
@@ -769,14 +776,47 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
               </tr>
             </thead>
             <tbody>
-              {holdings.map((h) => (
-                <tr key={h.id} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={cellStyle}>{h.krx_code}</td>
-                  <td style={cellStyle}>{h.quantity.toLocaleString()}</td>
-                  <td style={cellStyle}>₩{h.avg_buy_price.toLocaleString()}</td>
-                  <td style={cellStyle}><LivePriceBadge krxCode={h.krx_code} /></td>
-                </tr>
-              ))}
+              {holdings.map((h) => {
+                // SPEC-STOCK-028: USD 종목의 성과 데이터 매칭 (환율 환산값 표시용)
+                const perf = performance?.holdings.find((p) => p.krx_code === h.krx_code);
+                const isUsd = h.currency === 'USD';
+                return (
+                  <tr key={h.id} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={cellStyle}>
+                      {h.krx_code}
+                      {h.market && h.market !== 'KRX' ? (
+                        <span style={{
+                          marginLeft: '0.3rem',
+                          padding: '0.1rem 0.3rem',
+                          background: '#fff3e0',
+                          borderRadius: '3px',
+                          fontSize: '0.7rem',
+                          color: '#e65100',
+                          fontWeight: 600,
+                        }}>
+                          {h.market}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td style={cellStyle}>{h.quantity.toLocaleString()}</td>
+                    <td style={cellStyle}>
+                      {isUsd ? '$' : '₩'}{h.avg_buy_price.toLocaleString()}
+                    </td>
+                    <td style={cellStyle}>
+                      <LivePriceBadge krxCode={h.krx_code} />
+                      {/* SPEC-STOCK-028: USD 종목 KRW 환산값 표시 */}
+                      {isUsd && perf?.current_value_krw != null && (
+                        <span style={{ display: 'block', fontSize: '0.7rem', color: '#888', marginTop: '0.1rem' }}>
+                          ≈₩{Math.round(perf.current_value_krw).toLocaleString()}
+                          {perf.fx_rate_used != null && (
+                            <span style={{ marginLeft: '0.25rem' }}>(@{perf.fx_rate_used.toFixed(0)})</span>
+                          )}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -789,12 +829,34 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
         <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.875rem' }}>종목 추가</h4>
         {addErr && <p style={{ color: '#c62828', fontSize: '0.8rem', margin: '0 0 0.5rem' }}>{addErr}</p>}
         <form onSubmit={(e) => void handleAddHolding(e)} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <input placeholder="KRX 코드 (예: 005930)" value={krxCode} onChange={(e) => setKrxCode(e.target.value)} required
-            style={{ flex: '1 1 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' }} />
+          {/* SPEC-STOCK-028: 시장 선택 드롭다운 */}
+          <select
+            value={market}
+            onChange={(e) => setMarket(e.target.value as Market)}
+            style={{ flex: '0 0 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' }}
+          >
+            <option value="KRX">KRX (국내)</option>
+            <option value="NYSE">NYSE (미국)</option>
+            <option value="NASDAQ">NASDAQ (미국)</option>
+          </select>
+          <input
+            placeholder={market === 'KRX' ? '종목코드 (예: 005930)' : '티커 (예: AAPL)'}
+            value={krxCode}
+            onChange={(e) => setKrxCode(e.target.value)}
+            required
+            style={{ flex: '1 1 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' }}
+          />
           <input placeholder="수량" type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} required
             style={{ flex: '1 1 80px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' }} />
-          <input placeholder="평균단가 (원)" type="number" min="1" value={avgBuyPrice} onChange={(e) => setAvgBuyPrice(e.target.value)} required
-            style={{ flex: '1 1 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' }} />
+          <input
+            placeholder={currency === 'USD' ? '평균단가 (USD)' : '평균단가 (원)'}
+            type="number"
+            min="1"
+            value={avgBuyPrice}
+            onChange={(e) => setAvgBuyPrice(e.target.value)}
+            required
+            style={{ flex: '1 1 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' }}
+          />
           <button type="submit" disabled={addLoading}
             style={{ padding: '0.35rem 0.75rem', background: '#388e3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.875rem' }}>
             {addLoading ? '추가 중...' : '추가'}

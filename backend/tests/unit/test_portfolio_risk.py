@@ -385,3 +385,227 @@ class TestRiskAnalysisOrchestration:
                 )
 
         assert exc_info.value.status_code == 400
+
+
+# ──────────────────────────────────────────────────────────────
+# T-007: 해외 자산 리스크 분석 지원 (SPEC-STOCK-028)
+# ──────────────────────────────────────────────────────────────
+
+def _make_holding_with_market(
+    krx_code: str = "005930",
+    quantity: int = 10,
+    avg_buy_price: float = 70000.0,
+    market: str = "KRX",
+    currency: str = "KRW",
+):
+    """market/currency 속성을 가진 테스트용 보유 종목 Mock 생성"""
+    holding = MagicMock()
+    holding.krx_code = krx_code
+    holding.quantity = quantity
+    holding.avg_buy_price = avg_buy_price
+    holding.market = market
+    holding.currency = currency
+    return holding
+
+
+class TestRiskAnalysisForeignAssetSupport:
+    """T-007: 혼합 KRX+NASDAQ 포트폴리오 리스크 분석 테스트"""
+
+    async def test_mixed_krx_nasdaq_portfolio_uses_fdr_for_foreign(self):
+        """혼합 KRX+NASDAQ 포트폴리오에서 외국 종목 가격도 FDR로 조회하여 계산에 포함된다"""
+        from stock_picker.portfolio.risk_analysis import calculate_risk_analysis
+
+        db = MagicMock()
+        redis = AsyncMock()
+
+        portfolio = _make_portfolio()
+        h_krx = _make_holding_with_market("005930", 10, 70000.0, "KRX", "KRW")
+        h_nasdaq = _make_holding_with_market("AAPL", 5, 150.0, "NASDAQ", "USD")
+
+        db.query.return_value.filter.return_value.first.return_value = portfolio
+        db.query.return_value.filter.return_value.all.return_value = [h_krx, h_nasdaq]
+
+        redis.get = AsyncMock(return_value=None)
+        redis.setex = AsyncMock()
+
+        krx_prices = _make_price_history("005930", n=20)
+        nasdaq_prices = _make_price_history("AAPL", n=20)
+
+        def side_effect(code, period):
+            if code == "005930":
+                return krx_prices
+            if code == "AAPL":
+                return nasdaq_prices
+            return []
+
+        with patch(
+            "stock_picker.portfolio.risk_analysis._fetch_stock_prices",
+            side_effect=side_effect,
+        ):
+            with patch(
+                "stock_picker.portfolio.risk_analysis.fx_rate_module.get_usd_krw_rate",
+                new=AsyncMock(return_value=1350.0),
+            ):
+                result = await calculate_risk_analysis(
+                    portfolio_id=1, user_id=1, db=db, redis=redis, period=90
+                )
+
+        # 두 종목 모두 변동성 결과에 포함되어야 한다
+        codes = [hv.krx_code for hv in result.holdings_volatility]
+        assert "005930" in codes
+        assert "AAPL" in codes
+
+    async def test_weights_use_krw_converted_value_for_usd_holdings(self):
+        """USD 보유 종목 가중치 계산 시 KRW 환산 금액(USD price × fx_rate)을 사용한다"""
+        from stock_picker.portfolio.risk_analysis import calculate_risk_analysis
+
+        db = MagicMock()
+        redis = AsyncMock()
+
+        portfolio = _make_portfolio()
+        # KRX: 10주 × 100,000원 = 1,000,000원
+        h_krx = _make_holding_with_market("005930", 10, 100000.0, "KRX", "KRW")
+        # NASDAQ: 5주 × 200 USD × 1000 fx_rate = 1,000,000원 → 동일 비중
+        h_nasdaq = _make_holding_with_market("AAPL", 5, 200.0, "NASDAQ", "USD")
+
+        db.query.return_value.filter.return_value.first.return_value = portfolio
+        db.query.return_value.filter.return_value.all.return_value = [h_krx, h_nasdaq]
+
+        redis.get = AsyncMock(return_value=None)
+        redis.setex = AsyncMock()
+
+        krx_prices = _make_price_history("005930", n=20)
+        nasdaq_prices = _make_price_history("AAPL", n=20)
+
+        def side_effect(code, period):
+            return krx_prices if code == "005930" else nasdaq_prices
+
+        with patch(
+            "stock_picker.portfolio.risk_analysis._fetch_stock_prices",
+            side_effect=side_effect,
+        ):
+            with patch(
+                "stock_picker.portfolio.risk_analysis.fx_rate_module.get_usd_krw_rate",
+                new=AsyncMock(return_value=1000.0),
+            ):
+                result = await calculate_risk_analysis(
+                    portfolio_id=1, user_id=1, db=db, redis=redis, period=90
+                )
+
+        # 결과 스키마 구조가 변경되지 않아야 한다
+        assert hasattr(result, "correlation_matrix")
+        assert hasattr(result, "holdings_volatility")
+        assert hasattr(result, "portfolio_volatility_pct")
+        assert hasattr(result, "diversification_benefit_pct")
+        # 두 종목 모두 포함되어야 한다
+        assert len(result.holdings_volatility) == 2
+
+    async def test_insufficient_foreign_data_excluded_gracefully(self):
+        """데이터 부족한 외국 종목은 gracefully 제외된다 (KRX 동일 동작)"""
+        from stock_picker.portfolio.risk_analysis import calculate_risk_analysis
+
+        db = MagicMock()
+        redis = AsyncMock()
+
+        portfolio = _make_portfolio()
+        h1 = _make_holding_with_market("005930", 10, 70000.0, "KRX", "KRW")
+        h2 = _make_holding_with_market("000660", 5, 100000.0, "KRX", "KRW")
+        h3 = _make_holding_with_market("AAPL", 3, 150.0, "NASDAQ", "USD")  # 데이터 없음
+
+        db.query.return_value.filter.return_value.first.return_value = portfolio
+        db.query.return_value.filter.return_value.all.return_value = [h1, h2, h3]
+
+        redis.get = AsyncMock(return_value=None)
+        redis.setex = AsyncMock()
+
+        krx_prices_1 = _make_price_history("005930", n=20)
+        krx_prices_2 = _make_price_history("000660", n=20)
+
+        def side_effect(code, period):
+            if code == "005930":
+                return krx_prices_1
+            if code == "000660":
+                return krx_prices_2
+            return []  # AAPL 데이터 없음
+
+        with patch(
+            "stock_picker.portfolio.risk_analysis._fetch_stock_prices",
+            side_effect=side_effect,
+        ):
+            with patch(
+                "stock_picker.portfolio.risk_analysis.fx_rate_module.get_usd_krw_rate",
+                new=AsyncMock(return_value=1350.0),
+            ):
+                result = await calculate_risk_analysis(
+                    portfolio_id=1, user_id=1, db=db, redis=redis, period=90
+                )
+
+        codes = [hv.krx_code for hv in result.holdings_volatility]
+        assert "AAPL" not in codes
+        assert "005930" in codes
+        assert "000660" in codes
+
+    async def test_response_schema_unchanged_for_foreign_portfolio(self):
+        """해외 자산 포함 포트폴리오도 응답 스키마 구조가 동일하다"""
+        from stock_picker.portfolio.risk_analysis import calculate_risk_analysis
+        from stock_picker.portfolio.schemas import RiskAnalysisResult
+
+        db = MagicMock()
+        redis = AsyncMock()
+
+        portfolio = _make_portfolio()
+        h_krx = _make_holding_with_market("005930", 10, 70000.0, "KRX", "KRW")
+        h_nasdaq = _make_holding_with_market("TSLA", 2, 200.0, "NASDAQ", "USD")
+
+        db.query.return_value.filter.return_value.first.return_value = portfolio
+        db.query.return_value.filter.return_value.all.return_value = [h_krx, h_nasdaq]
+
+        redis.get = AsyncMock(return_value=None)
+        redis.setex = AsyncMock()
+
+        prices = _make_price_history("any", n=20)
+
+        with patch(
+            "stock_picker.portfolio.risk_analysis._fetch_stock_prices",
+            return_value=prices,
+        ):
+            with patch(
+                "stock_picker.portfolio.risk_analysis.fx_rate_module.get_usd_krw_rate",
+                new=AsyncMock(return_value=1350.0),
+            ):
+                result = await calculate_risk_analysis(
+                    portfolio_id=1, user_id=1, db=db, redis=redis, period=90
+                )
+
+        assert isinstance(result, RiskAnalysisResult)
+
+    async def test_krx_only_portfolio_backward_compatible(self):
+        """KRX 전용 포트폴리오는 기존과 동일하게 동작한다 (역방향 호환성)"""
+        from stock_picker.portfolio.risk_analysis import calculate_risk_analysis
+
+        db = MagicMock()
+        redis = AsyncMock()
+
+        portfolio = _make_portfolio()
+        h1 = _make_holding_with_market("005930", 10, 70000.0, "KRX", "KRW")
+        h2 = _make_holding_with_market("000660", 5, 100000.0, "KRX", "KRW")
+
+        db.query.return_value.filter.return_value.first.return_value = portfolio
+        db.query.return_value.filter.return_value.all.return_value = [h1, h2]
+
+        redis.get = AsyncMock(return_value=None)
+        redis.setex = AsyncMock()
+
+        prices = _make_price_history("any", n=20)
+
+        with patch(
+            "stock_picker.portfolio.risk_analysis._fetch_stock_prices",
+            return_value=prices,
+        ):
+            result = await calculate_risk_analysis(
+                portfolio_id=1, user_id=1, db=db, redis=redis, period=90
+            )
+
+        codes = [hv.krx_code for hv in result.holdings_volatility]
+        assert "005930" in codes
+        assert "000660" in codes

@@ -407,6 +407,8 @@ async def optimize_portfolio(
     for h in holdings:
         invested = float(h.avg_buy_price) * h.quantity
         weight_pct = round((invested / total_value * 100), 2) if total_value > 0 else 0.0
+        market = getattr(h, "market", "KRX") or "KRX"
+        currency = getattr(h, "currency", "KRW") or "KRW"
         holdings_data.append({
             "krx_code": h.krx_code,
             "quantity": h.quantity,
@@ -414,6 +416,8 @@ async def optimize_portfolio(
             "invested_amount": round(invested, 2),
             "weight_pct": weight_pct,
             "sector": get_sector(h.krx_code),
+            "market": market,
+            "currency": currency,
         })
 
     # Claude AI 최적화 분석 호출

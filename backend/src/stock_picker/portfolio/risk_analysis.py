@@ -11,6 +11,7 @@ from typing import Any
 
 import numpy as np
 
+from stock_picker.portfolio import fx_rate as fx_rate_module
 from stock_picker.portfolio import service as portfolio_service
 from stock_picker.portfolio.schemas import HoldingVolatility, RiskAnalysisResult
 
@@ -292,11 +293,25 @@ async def calculate_risk_analysis(
     # 5. 수익률 정렬 및 순수 함수 계산
     aligned = _align_returns(valid_price_data)
 
-    # 가중치 계산 (quantity × current_price, 없으면 균등 배분)
+    # # @MX:NOTE: [AUTO] KRW 환산 가중치 — USD 종목은 fx_rate를 곱해 KRW 기준으로 통일
+    # USD 보유 종목 여부 확인 후 필요 시 환율 1회 조회
+    has_usd = any(getattr(h, "currency", "KRW") == "USD" for h in valid_holdings)
+    if has_usd:
+        try:
+            fx_rate = await fx_rate_module.get_usd_krw_rate(redis)
+        except Exception as e:
+            logger.warning("환율 조회 실패 — 폴백 환율 사용: %s", e)
+            fx_rate = fx_rate_module._FALLBACK_RATE
+    else:
+        fx_rate = 1.0
+
+    # 가중치 계산 (quantity × avg_buy_price × fx_rate_if_usd, 없으면 균등 배분)
     weights_raw = []
     for h in valid_holdings:
         if h.krx_code in aligned and len(aligned[h.krx_code]) > 0:
-            weights_raw.append(float(h.avg_buy_price) * float(h.quantity))
+            currency = getattr(h, "currency", "KRW") or "KRW"
+            rate = fx_rate if currency == "USD" else 1.0
+            weights_raw.append(float(h.avg_buy_price) * float(h.quantity) * rate)
         else:
             weights_raw.append(0.0)
 
@@ -315,7 +330,9 @@ async def calculate_risk_analysis(
     for h, w in zip(valid_holdings, weights):
         if h.krx_code in aligned and len(aligned[h.krx_code]) >= 2:
             filtered_holdings.append(h)
-            filtered_weights_raw.append(float(h.avg_buy_price) * float(h.quantity))
+            currency = getattr(h, "currency", "KRW") or "KRW"
+            rate = fx_rate if currency == "USD" else 1.0
+            filtered_weights_raw.append(float(h.avg_buy_price) * float(h.quantity) * rate)
             filtered_aligned[h.krx_code] = aligned[h.krx_code]
 
     if len(filtered_holdings) < 2:

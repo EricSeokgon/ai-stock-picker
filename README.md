@@ -4,6 +4,15 @@
 
 ## 핵심 기능
 
+### Phase 28: 해외 자산(NYSE/NASDAQ) 지원 (v0.28.0)
+- **해외 자산 DB 확장**: `portfolio_holdings` 테이블에 `market` (KRX/NYSE/NASDAQ) · `currency` (KRW/USD) 컬럼 추가 — Alembic 마이그레이션 0019, 기존 KRX 데이터 하위호환 보존
+- **USD/KRW 환율 서비스** (`fx_rate.py` 신규): FinanceDataReader 기반 실시간 환율 조회, Redis TTL=3600s 캐시, 취득 실패 시 fallback 1350.0
+- **KRW 통합 계산**: 모든 포트폴리오 계산(성과·리스크·AI 최적화)에서 USD 포지션을 `avg_buy_price × quantity × fx_rate`로 원화 환산 후 통합 처리
+- **스키마 확장**: `HoldingCreate`·`HoldingResponse`에 `market`·`currency` 필드 추가. `HoldingPerformance.current_value_krw` — USD 포지션의 원화 환산 현재가
+- **마켓 검증**: KRX→KRW, NYSE/NASDAQ→USD 조합만 허용. 불일치 시 400 거부
+- **프론트엔드 UI**: 종목 추가 시 마켓 선택(KRX/NYSE/NASDAQ) + 통화 자동 설정, NYSE·NASDAQ 포지션에 주황색 배지 표시, `≈₩XXX,XXX (@환율)` 원화 환산 현재가 표시
+- **유니크 제약**: `(portfolio_id, krx_code, market)` 복합 유니크 — 동일 티커를 마켓별로 구분 보유 가능
+
 ### Phase 27: 리스크 분석 및 상관관계 매트릭스 (v0.27.0)
 - **리스크 분석 엔드포인트**: `GET /portfolios/{id}/risk-analysis?period={30|60|90|180|252}&refresh={bool}` — 상관관계 매트릭스·종목별 연환산 변동성·포트폴리오 변동성·분산투자 효익 반환, Redis TTL=3600s 캐시
 - **numpy 전용 계산**: scipy 미추가, `np.corrcoef`(상관계수)·`np.cov`(공분산)·`np.std × √252 × 100`(연환산 변동성)·`sqrt(wᵀ·Σ·w) × √252`(포트폴리오 변동성) 사용

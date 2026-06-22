@@ -7,6 +7,38 @@
 
 ---
 
+## [0.28.0] - 2026-06-22
+
+### Added (Phase 28: 해외 자산(NYSE/NASDAQ) 지원 — SPEC-STOCK-028)
+
+#### DB 확장 (`portfolio_holdings` 테이블)
+- **`market` 컬럼** (`VARCHAR(10)`, `NOT NULL`, `DEFAULT 'KRX'`): 허용 값 `KRX`·`NYSE`·`NASDAQ`
+- **`currency` 컬럼** (`VARCHAR(3)`, `NOT NULL`, `DEFAULT 'KRW'`): 허용 값 `KRW`·`USD`
+- **유니크 제약 `uq_holding_portfolio_ticker_market`**: `(portfolio_id, krx_code, market)` — 동일 티커를 마켓별로 구분 보유
+- **Alembic 마이그레이션 0019**: 기존 KRX 행에 `market='KRX'`·`currency='KRW'` 기본값 자동 적용, 하위호환 보존
+
+#### USD/KRW 환율 서비스 (`fx_rate.py` 신규)
+- **`get_usd_krw_rate(redis)`**: FinanceDataReader `USD/KRW` 종목 기반 실시간 환율 조회
+- **Redis 캐시**: 키=`fx:usd_krw:{date}`, TTL=3600s
+- **Fallback**: FDR 취득 실패·Redis 오류 시 1350.0 반환 (서비스 가용성 보장)
+
+#### 성과 계산 (`service.py`)
+- **KRW 통합 성과**: USD 포지션 현재가 → `current_value_krw = current_price × quantity × fx_rate` 원화 환산
+- **마켓 검증**: `add_holding()` — KRX+KRW 또는 NYSE/NASDAQ+USD 조합만 허용, 불일치 시 400
+- **`HoldingPerformance.current_value_krw`**: USD 포지션의 원화 환산 현재가 응답 포함
+
+#### 리스크 분석·AI 최적화 확장
+- **`risk_analysis.py`**: 포지션 비중을 `avg_buy_price × quantity × fx_rate` KRW 기준으로 산출. FDR은 해외 티커 직접 지원
+- **`ai_analysis.py`**: `_build_portfolio_data(holdings, fx_rate=1.0)` — `market`·`currency` 필드 포함, 비중은 KRW 환산값 기준
+
+#### 프론트엔드 UI (`Portfolio.tsx`)
+- **마켓 선택 드롭다운**: 종목 추가 시 KRX·NYSE·NASDAQ 선택 → 통화 자동 설정
+- **마켓 배지**: NYSE·NASDAQ 포지션에 주황색 배지, KRX에 파란색 배지
+- **원화 환산 현재가**: USD 포지션에 `≈₩XXX,XXX (@환율)` 형식 표시
+- **TypeScript 타입**: `Market`, `Currency` 타입 + `HoldingPerformance.current_value_krw` 필드 추가
+
+---
+
 ## [0.27.0] - 2026-06-18
 
 ### Added (Phase 27: 리스크 분석 및 상관관계 매트릭스 — SPEC-STOCK-027)

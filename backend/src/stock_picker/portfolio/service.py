@@ -84,9 +84,7 @@ def list_portfolios(db: Session, user_id: int) -> list[Portfolio]:
     return db.query(Portfolio).filter(Portfolio.user_id == user_id).all()
 
 
-def get_portfolio_with_holdings(
-    db: Session, portfolio_id: int, user_id: int
-) -> Portfolio | None:
+def get_portfolio_with_holdings(db: Session, portfolio_id: int, user_id: int) -> Portfolio | None:
     """포트폴리오와 보유 종목 함께 조회 (소유권 확인 포함)"""
     portfolio = (
         db.query(Portfolio)
@@ -97,9 +95,7 @@ def get_portfolio_with_holdings(
         return None
     # holdings 명시적 로드 (lazy="noload"이므로 직접 쿼리)
     portfolio.holdings = (
-        db.query(PortfolioHolding)
-        .filter(PortfolioHolding.portfolio_id == portfolio_id)
-        .all()
+        db.query(PortfolioHolding).filter(PortfolioHolding.portfolio_id == portfolio_id).all()
     )
     return portfolio
 
@@ -264,19 +260,21 @@ async def calculate_performance(
 
         classification = _classify(return_pct)
 
-        holdings_perf.append({
-            "krx_code": h.krx_code,
-            "quantity": h.quantity,
-            "avg_buy_price": buy_price_orig,
-            "current_price": current_price,
-            "return_pct": round(return_pct, 2),
-            "classification": classification,
-            "sector": sector,
-            "price_unavailable": price_unavailable,
-            "market": market,
-            "currency": currency,
-            "fx_rate_used": fx_rate_used,
-        })
+        holdings_perf.append(
+            {
+                "krx_code": h.krx_code,
+                "quantity": h.quantity,
+                "avg_buy_price": buy_price_orig,
+                "current_price": current_price,
+                "return_pct": round(return_pct, 2),
+                "classification": classification,
+                "sector": sector,
+                "price_unavailable": price_unavailable,
+                "market": market,
+                "currency": currency,
+                "fx_rate_used": fx_rate_used,
+            }
+        )
 
         total_invested += invested
         total_current += current_val
@@ -288,9 +286,7 @@ async def calculate_performance(
         sector_map[sector_key]["count"] += 1
 
     total_return_pct = (
-        ((total_current - total_invested) / total_invested * 100)
-        if total_invested > 0
-        else 0.0
+        ((total_current - total_invested) / total_invested * 100) if total_invested > 0 else 0.0
     )
 
     # classification_summary 계산
@@ -308,24 +304,22 @@ async def calculate_performance(
 
     if total_invested > 0:
         for cls in summary:
-            summary[cls]["invested_pct"] = round(
-                summary[cls]["invested"] / total_invested * 100, 2
-            )
+            summary[cls]["invested_pct"] = round(summary[cls]["invested"] / total_invested * 100, 2)
 
     # sector_performance 계산 (투자금 내림차순 정렬)
     sector_perf = []
     for sector_name, data in sector_map.items():
         s_invested = data["invested"]
         s_current = data["current"]
-        s_return_pct = (
-            ((s_current - s_invested) / s_invested * 100) if s_invested > 0 else 0.0
+        s_return_pct = ((s_current - s_invested) / s_invested * 100) if s_invested > 0 else 0.0
+        sector_perf.append(
+            {
+                "sector": sector_name,
+                "holding_count": data["count"],
+                "invested": round(s_invested, 2),
+                "return_pct": round(s_return_pct, 2),
+            }
         )
-        sector_perf.append({
-            "sector": sector_name,
-            "holding_count": data["count"],
-            "invested": round(s_invested, 2),
-            "return_pct": round(s_return_pct, 2),
-        })
     sector_perf.sort(key=lambda x: x["invested"], reverse=True)
 
     return {
@@ -375,6 +369,7 @@ async def optimize_portfolio(
     )
     if portfolio is None:
         from fastapi import HTTPException, status
+
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="포트폴리오에 접근할 수 없습니다",
@@ -391,9 +386,7 @@ async def optimize_portfolio(
 
     # 보유 종목 조회
     holdings = (
-        db.query(PortfolioHolding)
-        .filter(PortfolioHolding.portfolio_id == portfolio_id)
-        .all()
+        db.query(PortfolioHolding).filter(PortfolioHolding.portfolio_id == portfolio_id).all()
     )
 
     if not holdings:
@@ -409,16 +402,18 @@ async def optimize_portfolio(
         weight_pct = round((invested / total_value * 100), 2) if total_value > 0 else 0.0
         market = getattr(h, "market", "KRX") or "KRX"
         currency = getattr(h, "currency", "KRW") or "KRW"
-        holdings_data.append({
-            "krx_code": h.krx_code,
-            "quantity": h.quantity,
-            "avg_buy_price": float(h.avg_buy_price),
-            "invested_amount": round(invested, 2),
-            "weight_pct": weight_pct,
-            "sector": get_sector(h.krx_code),
-            "market": market,
-            "currency": currency,
-        })
+        holdings_data.append(
+            {
+                "krx_code": h.krx_code,
+                "quantity": h.quantity,
+                "avg_buy_price": float(h.avg_buy_price),
+                "invested_amount": round(invested, 2),
+                "weight_pct": weight_pct,
+                "sector": get_sector(h.krx_code),
+                "market": market,
+                "currency": currency,
+            }
+        )
 
     # Claude AI 최적화 분석 호출
     raw = await optimize_portfolio_with_claude(holdings_data, portfolio_codes, db)
@@ -459,24 +454,28 @@ async def optimize_portfolio(
         else:
             delta_shares = 0
 
-        target_weight_items.append(TargetWeightItem(
-            krx_code=krx_code,
-            current_pct=current_pct,
-            target_pct=target_pct,
-            action=action,
-            delta_shares=delta_shares,
-        ))
+        target_weight_items.append(
+            TargetWeightItem(
+                krx_code=krx_code,
+                current_pct=current_pct,
+                target_pct=target_pct,
+                action=action,
+                delta_shares=delta_shares,
+            )
+        )
 
     # new_stocks — 포트폴리오 보유 종목 제외, 최대 5개
     new_stock_items = []
     for ns in raw.get("new_stocks", [])[:5]:
         if ns["krx_code"] not in portfolio_codes:
-            new_stock_items.append(NewStockItem(
-                krx_code=ns["krx_code"],
-                name=ns.get("name", ""),
-                sector=ns.get("sector", "기타"),
-                reason=ns.get("reason", ""),
-            ))
+            new_stock_items.append(
+                NewStockItem(
+                    krx_code=ns["krx_code"],
+                    name=ns.get("name", ""),
+                    sector=ns.get("sector", "기타"),
+                    reason=ns.get("reason", ""),
+                )
+            )
 
     result = OptimizeResult(
         score=score,

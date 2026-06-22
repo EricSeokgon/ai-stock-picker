@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session
 
 from stock_picker.db.models import Portfolio, PortfolioHolding
 from stock_picker.portfolio import fx_rate as fx_rate_module
-from stock_picker.portfolio.utils import get_sector as _get_sector  # SPEC-STOCK-017: 공유 utils로 통합
+from stock_picker.portfolio.utils import (
+    get_sector as _get_sector,
+)  # SPEC-STOCK-017: 공유 utils로 통합
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +52,7 @@ async def analyze_portfolio(portfolio_id: int, user_id: int, db: Session) -> dic
 
     # holdings 조회
     holdings = (
-        db.query(PortfolioHolding)
-        .filter(PortfolioHolding.portfolio_id == portfolio_id)
-        .all()
+        db.query(PortfolioHolding).filter(PortfolioHolding.portfolio_id == portfolio_id).all()
     )
 
     # 보유 종목 없으면 Claude 미호출
@@ -83,6 +83,7 @@ def _build_portfolio_data(
     사용자 식별 정보(user_id, portfolio_id)는 포함하지 않음.
     fx_rate: USD→KRW 환율 (기본 1.0 = KRX 전용 환경)
     """
+
     def _krw_value(h: PortfolioHolding) -> float:
         currency = getattr(h, "currency", "KRW") or "KRW"
         rate = fx_rate if currency == "USD" else 1.0
@@ -96,16 +97,18 @@ def _build_portfolio_data(
         weight_pct = round((invested_krw / total_value * 100), 2) if total_value > 0 else 0.0
         market = getattr(h, "market", "KRX") or "KRX"
         currency = getattr(h, "currency", "KRW") or "KRW"
-        result.append({
-            "krx_code": h.krx_code,
-            "sector": _get_sector(h.krx_code),
-            "quantity": h.quantity,
-            "avg_buy_price": float(h.avg_buy_price),
-            "invested_amount": round(invested_krw, 2),
-            "weight_pct": weight_pct,
-            "market": market,
-            "currency": currency,
-        })
+        result.append(
+            {
+                "krx_code": h.krx_code,
+                "sector": _get_sector(h.krx_code),
+                "quantity": h.quantity,
+                "avg_buy_price": float(h.avg_buy_price),
+                "invested_amount": round(invested_krw, 2),
+                "weight_pct": weight_pct,
+                "market": market,
+                "currency": currency,
+            }
+        )
     return result
 
 
@@ -118,6 +121,7 @@ async def _call_claude_async(portfolio_data: list[dict[str, Any]]) -> dict[str, 
         {"diversification": str, "risk": str, "suggestions": str}
     """
     import os
+
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
         raise RuntimeError("ANTHROPIC_API_KEY가 설정되지 않았습니다")

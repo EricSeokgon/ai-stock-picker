@@ -24,6 +24,7 @@ _RISK_TTL = 3600  # 1시간
 # 순수 함수 레이어
 # ──────────────────────────────────────────────────────────────
 
+
 def _daily_returns(closes: list[float]) -> np.ndarray:
     """종가 리스트에서 일별 수익률 계산.
 
@@ -177,6 +178,7 @@ def _diversification_benefit(
 # FDR 조회 헬퍼 (동기, 스레드 풀에서 실행)
 # ──────────────────────────────────────────────────────────────
 
+
 def _fetch_stock_prices(krx_code: str, period: int) -> list[dict]:
     """동기 FDR 주가 이력 조회 (스레드 풀에서 실행).
 
@@ -210,7 +212,9 @@ def _fetch_stock_prices(krx_code: str, period: int) -> list[dict]:
         rows = []
         for idx, row in df.iterrows():
             close_val = row[close_col]
-            if close_val is None or (hasattr(close_val, "__float__") and math.isnan(float(close_val))):
+            if close_val is None or (
+                hasattr(close_val, "__float__") and math.isnan(float(close_val))
+            ):
                 continue
             rows.append({"date": str(idx)[:10], "close": float(close_val)})
         return rows
@@ -222,6 +226,7 @@ def _fetch_stock_prices(krx_code: str, period: int) -> list[dict]:
 # ──────────────────────────────────────────────────────────────
 # 오케스트레이션 함수
 # ──────────────────────────────────────────────────────────────
+
 
 async def calculate_risk_analysis(
     portfolio_id: int,
@@ -270,8 +275,7 @@ async def calculate_risk_analysis(
     # 3. FDR 주가 데이터 수집 (run_in_executor)
     loop = asyncio.get_event_loop()
     price_tasks = [
-        loop.run_in_executor(None, _fetch_stock_prices, h.krx_code, period)
-        for h in holdings
+        loop.run_in_executor(None, _fetch_stock_prices, h.krx_code, period) for h in holdings
     ]
     price_results = await asyncio.gather(*price_tasks)
 
@@ -363,12 +367,14 @@ async def calculate_risk_analysis(
         raw_name = getattr(h, "name", None)
         name = raw_name if isinstance(raw_name, str) and raw_name else h.krx_code
 
-        holdings_volatility.append(HoldingVolatility(
-            krx_code=h.krx_code,
-            name=name,
-            annualized_volatility_pct=round(vol, 4),
-            price_data_days=len(valid_price_data.get(h.krx_code, [])),
-        ))
+        holdings_volatility.append(
+            HoldingVolatility(
+                krx_code=h.krx_code,
+                name=name,
+                annualized_volatility_pct=round(vol, 4),
+                price_data_days=len(valid_price_data.get(h.krx_code, [])),
+            )
+        )
 
     # 포트폴리오 변동성
     port_vol = _portfolio_volatility(final_weights, filtered_aligned)

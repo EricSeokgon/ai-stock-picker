@@ -11,7 +11,10 @@ from stock_picker.portfolio import service
 from stock_picker.portfolio.ai_analysis import analyze_portfolio
 from stock_picker.portfolio.dividends import calculate_portfolio_dividends
 from stock_picker.portfolio.risk_analysis import calculate_risk_analysis
+from stock_picker.portfolio.backtest import run_portfolio_backtest
 from stock_picker.portfolio.schemas import (
+    BacktestRequest,
+    BacktestResult,
     HoldingCreate,
     HoldingResponse,
     OptimizeResult,
@@ -201,6 +204,25 @@ async def get_performance(
         db, portfolio_id=portfolio_id, user_id=current_user.id, redis=redis
     )
     return PortfolioPerformance(**result)
+
+
+@router.post("/{portfolio_id}/backtest", response_model=BacktestResult)
+async def backtest_portfolio(
+    portfolio_id: int,
+    body: BacktestRequest,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    redis: aioredis.Redis = Depends(get_redis_client),
+) -> BacktestResult:
+    """포트폴리오 buy-and-hold 백테스팅 — FDR 가격 시계열 기반 수익률 시뮬레이션 (SPEC-STOCK-029)"""
+    return await run_portfolio_backtest(
+        portfolio_id=portfolio_id,
+        user_id=current_user.id,
+        db=db,
+        redis=redis,
+        start_date=body.start_date,
+        end_date=body.end_date,
+    )
 
 
 @router.get("/{portfolio_id}/dividends", response_model=PortfolioDividends)

@@ -6,6 +6,8 @@ from typing import Literal, Optional
 # SPEC-STOCK-027 — 리스크 분석 스키마는 파일 하단에 추가됨
 # SPEC-STOCK-028 — 해외 자산(NYSE/NASDAQ) 지원 필드 추가
 
+from datetime import date
+
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 
@@ -255,3 +257,49 @@ class RiskAnalysisResult(BaseModel):
     diversification_benefit_pct: float  # 분산 효과(%), max(0, ...)
     period_days: int  # 조회 기간(거래일)
     calculated_at: datetime  # 계산 시각
+
+
+# ── SPEC-STOCK-029 포트폴리오 백테스팅 스키마 ─────────────────────────────────
+
+
+class BacktestRequest(BaseModel):
+    """백테스트 요청 스키마 (SPEC-STOCK-029 REQ-PBT-020)
+
+    # @MX:NOTE: [AUTO] disclaimer 필드는 '투자 권유가 아니며 정보 제공 목적' 문구 포함 필수 (REQ-PBT-NFR-003)
+    """
+
+    start_date: date
+    end_date: date
+
+    @model_validator(mode="after")
+    def validate_dates(self) -> "BacktestRequest":
+        """시작일 >= 종료일이면 ValueError 발생 (REQ-PBT-020)"""
+        if self.start_date >= self.end_date:
+            raise ValueError("end_date는 start_date보다 이후여야 합니다")
+        return self
+
+
+class DailyReturn(BaseModel):
+    """일별 백테스트 결과 항목 (SPEC-STOCK-029 REQ-PBT-040)"""
+
+    date: str  # "YYYY-MM-DD"
+    portfolio_value: float  # 1.0 기준 정규화 포트폴리오 가치
+    daily_return: float  # 일별 수익률
+    cumulative_return: float  # 누적 수익률 (첫날=0)
+
+
+class BacktestResult(BaseModel):
+    """포트폴리오 백테스팅 응답 (SPEC-STOCK-029)
+
+    # @MX:ANCHOR: [AUTO] 백테스팅 API 응답 스키마
+    # @MX:REASON: router, backtest service, 프론트 API 래퍼, 테스트에서 3곳 이상 참조
+    """
+
+    daily: list[DailyReturn]  # 일별 결과
+    mdd: float  # 최대 낙폭 (≤0)
+    sharpe_ratio: float  # 연환산 샤프 비율 (무위험수익률 0.035)
+    total_return: float  # 총 수익률
+    period_days: int  # 거래일 수
+    excluded_tickers: list[str]  # FDR 조회 실패로 제외된 종목
+    used_tickers: list[str]  # 실제 계산에 사용된 종목
+    disclaimer: str  # 면책 문구 (REQ-PBT-NFR-003)

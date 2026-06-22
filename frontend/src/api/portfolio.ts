@@ -239,3 +239,45 @@ export async function apiGetRiskAnalysis(
   }
   return res.json() as Promise<RiskAnalysisResult>;
 }
+
+// ── SPEC-STOCK-029 포트폴리오 백테스팅 타입 및 API ───────────────────────────
+
+// 일별 백테스트 결과
+export interface DailyReturn {
+  date: string;              // "YYYY-MM-DD"
+  portfolio_value: number;   // 1.0 기준 정규화 포트폴리오 가치
+  daily_return: number;      // 일별 수익률
+  cumulative_return: number; // 누적 수익률 (첫날=0)
+}
+
+// 백테스팅 결과
+export interface BacktestResult {
+  daily: DailyReturn[];
+  mdd: number;              // 최대 낙폭 (≤0)
+  sharpe_ratio: number;     // 연환산 샤프 비율 (무위험수익률 0.035)
+  total_return: number;     // 총 수익률
+  period_days: number;      // 거래일 수
+  excluded_tickers: string[]; // FDR 조회 실패로 제외된 종목
+  used_tickers: string[];   // 실제 계산에 사용된 종목
+  disclaimer: string;       // 면책 문구 (REQ-PBT-NFR-003)
+}
+
+// @MX:ANCHOR: [AUTO] 백테스팅 API 공개 엔드포인트 — BacktestPanel에서 호출
+// @MX:REASON: 외부 시스템(백엔드 /portfolios/{id}/backtest) 연동 지점으로 fan_in >= 3 예상
+export async function runPortfolioBacktest(
+  token: string,
+  portfolioId: number,
+  startDate: string,
+  endDate: string,
+): Promise<BacktestResult> {
+  const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/backtest`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ start_date: startDate, end_date: endDate }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { detail?: string };
+    throw new Error(err.detail ?? `백테스팅 실패: ${res.status}`);
+  }
+  return res.json() as Promise<BacktestResult>;
+}

@@ -89,3 +89,17 @@ export async function apiGetRiskAnalysis(token, portfolioId, period = 90, refres
     }
     return res.json();
 }
+// @MX:ANCHOR: [AUTO] 백테스팅 API 공개 엔드포인트 — BacktestPanel에서 호출
+// @MX:REASON: 외부 시스템(백엔드 /portfolios/{id}/backtest) 연동 지점으로 fan_in >= 3 예상
+export async function runPortfolioBacktest(token, portfolioId, startDate, endDate) {
+    const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/backtest`, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ start_date: startDate, end_date: endDate }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail ?? `백테스팅 실패: ${res.status}`);
+    }
+    return res.json();
+}

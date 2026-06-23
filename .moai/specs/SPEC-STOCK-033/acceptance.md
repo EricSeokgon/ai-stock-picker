@@ -8,31 +8,31 @@
 
 ### AC-DVY-001 — 종목별 연 배당 추정
 
-- THE 시스템 SHALL 보유 종목별로 가용 배당 이력에서 주당 연 배당금(`annual_dps`)을 추정한다.
-- THE 시스템 SHALL 배당 데이터가 없는 종목의 `annual_dps`를 0으로 설정한다.
-- THE 시스템 SHALL 종목별 `estimated_annual_dividend`를 `shares × annual_dps`로 산출한다.
-- THE 시스템 SHALL 종목별 `dividend_yield_pct`를 `annual_dps / current_price × 100`으로 산출하되, 현재가가 0 또는 미확보면 0.0으로 설정한다.
+- THE 시스템 SHALL 보유 종목별로 가용 배당 이력에서 주당 연 배당금을 추정한다.
+- THE 시스템 SHALL 배당 데이터가 없는 종목의 주당 연 배당금을 0으로 설정한다.
+- THE 시스템 SHALL 종목별 추정 연 배당액을 주당 연 배당금과 보유 수량의 곱으로 산출한다.
+- THE 시스템 SHALL 종목별 배당수익률을 주당 연 배당금을 현재가로 나눈 백분율로 산출하되, 현재가가 0 또는 미확보면 0.0으로 설정한다.
 
 ### AC-DVY-002 — 포트폴리오 가중 평균 배당수익률
 
-- THE 시스템 SHALL `portfolio_dividend_yield_pct`를 각 종목 평가액과 배당수익률의 곱의 합을 총 평가액으로 나눈 값으로 산출한다.
-- THE 시스템 SHALL 총 평가액이 0이면 `portfolio_dividend_yield_pct`를 0.0으로 설정한다.
-- THE 시스템 SHALL `total_annual_dividend`를 모든 종목 `estimated_annual_dividend`의 합으로 산출한다.
+- THE 시스템 SHALL 포트폴리오 가중 평균 배당 수익률을 각 종목 평가액과 배당수익률의 곱의 합을 총 평가액으로 나눈 값으로 산출한다.
+- THE 시스템 SHALL 총 평가액이 0이면 포트폴리오 가중 평균 배당 수익률을 0.0으로 설정한다.
+- THE 시스템 SHALL 포트폴리오 총 추정 연 배당액을 모든 종목의 추정 연 배당액의 합으로 산출한다.
 
 ### AC-DVY-003 — 날짜 정밀 배당 캘린더
 
-- THE 시스템 SHALL 요청 연도(`year`)의 예상 배당 이벤트를 월별로 그룹화하여 `months: {month: [events]}` 형태로 반환한다.
-- THE 시스템 SHALL 각 이벤트에 `ex_dividend_date`, `dps`, `shares`, `estimated_total`(= shares × dps)을 포함한다.
-- THE 시스템 SHALL `payment_date`가 확인되지 않으면 None으로 설정하고 추측하지 않는다.
+- THE 시스템 SHALL 요청 연도의 예상 배당 이벤트를 월별로 그룹화된 배당 일정 목록으로 반환한다.
+- THE 시스템 SHALL 각 이벤트에 배당기준일, 주당 배당금, 보유 수량, 추정 총 배당액(보유 수량과 주당 배당금의 곱)을 포함한다.
+- THE 시스템 SHALL 지급일이 확인되지 않으면 값을 비워 두고 추측하지 않는다.
 - THE 시스템 SHALL 배당기준일이 확인되지 않는 종목을 캘린더에서 제외한다.
 
 ### AC-DVY-004 — DRIP 재투자 시뮬레이션
 
-- THE 시스템 SHALL `years` 길이의 연도별 투영(`DRIPYearData` 목록)을 반환한다.
-- THE 시스템 SHALL 각 연도 `portfolio_value`를 직전 연도 가치에 재투자 배당(`직전가치 × yield/100 × reinvest_rate`)을 더한 값으로 산출한다.
-- THE 시스템 SHALL `cumulative_return_pct`를 `(portfolio_value / initial_value - 1) × 100`으로 산출한다.
-- WHEN `reinvest_rate=0.0`이면 THE 시스템 SHALL 모든 연도 `portfolio_value`를 `initial_value`와 동일하게, 누적 수익률을 0으로 유지한다.
-- THE 시스템 SHALL 응답에 면책 문구(`disclaimer`)를 포함한다.
+- THE 시스템 SHALL 요청 연수만큼의 연도별 가치 투영 목록을 반환한다.
+- THE 시스템 SHALL 각 연도 포트폴리오 가치를 직전 연도 가치에 재투자 배당(직전 연도 가치에 배당수익률과 재투자 비율을 곱한 값)을 더한 값으로 산출한다.
+- THE 시스템 SHALL 누적 수익률을 현재 포트폴리오 가치를 초기 가치로 나눈 비율에서 1을 뺀 백분율로 산출한다.
+- WHEN 재투자 비율이 0이면 THE 시스템 SHALL 모든 연도 포트폴리오 가치를 초기 가치와 동일하게, 누적 수익률을 0으로 유지한다.
+- THE 시스템 SHALL 응답에 면책 문구를 포함한다.
 
 ### AC-DVY-005 — 소유권 확인
 
@@ -41,10 +41,10 @@
 
 ### AC-DVY-NFR — 비기능
 
-- THE `dividend_yield.py` 순수 함수 SHALL DB·Redis·외부 API 호출 없이 입력값만으로 결정적 결과를 반환한다.
+- THE 배당 수익률 분석 모듈의 순수 함수 SHALL DB·Redis·외부 API 호출 없이 입력값만으로 결정적 결과를 반환한다.
 - THE DRIP 계산 SHALL 단일 단순 복리 공식만 사용하고 확률 시뮬레이션을 사용하지 않는다.
-- THE 신규 코드 SHALL `scipy`를 import하지 않는다.
-- THE `dividend_yield.py` SHALL 단위 테스트 커버리지 85% 이상을 충족한다.
+- THE 신규 수치 계산 코드 SHALL 본 프로젝트에서 기존에 승인된 라이브러리만을 사용하고 신규 외부 수치 최적화 라이브러리를 추가하지 않는다.
+- THE 배당 수익률 분석 모듈 SHALL 단위 테스트 커버리지 85% 이상을 충족한다.
 
 ---
 

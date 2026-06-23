@@ -1,6 +1,6 @@
 ---
 id: "SPEC-STOCK-033"
-version: "0.1.0"
+version: "0.2.0"
 status: "draft"
 created_at: "2026-06-24"
 updated_at: "2026-06-24"
@@ -19,10 +19,11 @@ labels: ["portfolio", "dividend", "drip", "backend", "frontend"]
 | 버전 | 날짜 | 변경 내용 |
 |------|------|-----------|
 | 0.1.0 | 2026-06-24 | 최초 작성. SPEC-019 중복 평가 반영 — 033을 강화 레이어로 정의. 신규 핵심: DRIP 재투자 시뮬레이션. 신규 보조: 날짜 정밀 배당 캘린더. 신규 엔드포인트 3종(`/dividend/summary`·`/dividend/calendar`·`/dividend/drip`). DB 테이블·마이그레이션 미도입(019 데이터 레이어 재사용). |
+| 0.2.0 | 2026-06-24 | plan-auditor v1 지적사항 반영(9건). NFR 번호 범위 정정(001~004→001~005). REQ-DVY-NFR-002 비격식 어미 제거. REQ-DVY-NFR-005·acceptance.md SHALL 진술에서 파일 경로·변수명·라이브러리명·자료구조 리터럴을 행동 서술(자연어)로 치환. |
 
 > **REQ 접두사 설계 원칙**: 본 SPEC은 `REQ-DVY-*`(DiVidend Yield) 접두사를 사용한다. SPEC-019가 `REQ-DIV-*`를 점유하므로 충돌을 회피한다.
 
-> **번호 체계**: REQ-DVY-001~005 연속 번호. NFR은 REQ-DVY-NFR-001~004.
+> **번호 체계**: REQ-DVY-001~005 연속 번호. NFR은 REQ-DVY-NFR-001~005.
 
 ---
 
@@ -125,10 +126,10 @@ IF 요청 사용자가 소유하지 않은 포트폴리오에 대해 배당 분�
 ## 4. 비기능 요구사항 (NFR)
 
 - **REQ-DVY-NFR-001 (외부 최적화 라이브러리 비도입)**: THE 시스템 SHALL 본 SPEC 신규 수치 계산 코드를 표준 수학 연산 및 프로젝트 승인 라이브러리만으로 구현하며, 새로운 외부 수치 라이브러리를 도입하지 않는다.
-- **REQ-DVY-NFR-002 (순수 함수 테스트성)**: THE 시스템의 핵심 배당 집계·DRIP 계산 컴포넌트 SHALL DB·외부 캐시·외부 API에 대한 의존 없이 입력값만으로 결정적 결과를 반환하여 단위 테스트가 가능해야 한다.
+- **REQ-DVY-NFR-002 (순수 함수 테스트성)**: THE 시스템의 핵심 배당 집계·DRIP 계산 컴포넌트 SHALL DB·외부 캐시·외부 API에 대한 의존 없이 입력값만으로 결정적 결과를 반환한다.
 - **REQ-DVY-NFR-003 (배당 데이터 미확보 graceful degradation)**: IF 종목의 배당 데이터를 확보할 수 없으면 THEN THE 시스템 SHALL 해당 종목의 배당을 0으로 처리하고 오류를 발생시키지 않으며, 미확보 날짜는 단언하지 않고 비워 둔다.
 - **REQ-DVY-NFR-004 (단순 복리 모델)**: THE DRIP 시뮬레이션 SHALL 단일 단순 복리 공식을 사용하며 확률 시뮬레이션을 사용하지 않는다.
-- **REQ-DVY-NFR-005 (테스트 커버리지)**: THE `portfolio/dividend_yield.py` SHALL 단위 테스트 커버리지 85% 이상을 충족한다.
+- **REQ-DVY-NFR-005 (테스트 커버리지)**: THE 시스템의 배당 수익률 계산 컴포넌트 SHALL 단위 테스트 커버리지 85% 이상을 충족한다.
 
 ---
 

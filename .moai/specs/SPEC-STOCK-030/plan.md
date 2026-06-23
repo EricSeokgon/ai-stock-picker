@@ -73,7 +73,7 @@ research.md에서 식별한 재사용 패턴(파일·라인).
 
 - `get_portfolio_with_holdings()` — `service.py:87-100`.
 - 라우터 패턴: `router.py:157-180`(risk-analysis GET 엔드포인트, query param + DI).
-- 소유권 미스 시 404, 타사용자 시 403(코드베이스 관례 확인).
+- 소유권 불일치(타사용자 포함) 시 404(코드베이스 관례: get_portfolio_with_holdings user_id 필터).
 
 ### 3.5 스키마 (T-001, REQ-PS-003)
 
@@ -124,7 +124,7 @@ research.md에서 식별한 재사용 패턴(파일·라인).
 - 캐시 히트(refresh=false) → FDR 미호출.
 - 캐시 갱신(refresh=true) → 재계산.
 - 빈 포트폴리오 → 200 + 빈 데이터.
-- 타사용자 포트폴리오 → 403.
+- 타사용자 포트폴리오(소유권 불일치) → 404.
 - 미인증 → 401.
 - 존재하지 않는 포트폴리오 → 404.
 

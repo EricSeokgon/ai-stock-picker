@@ -7,6 +7,21 @@
 
 ---
 
+## [0.32.0] - 2026-06-23
+
+### Added (SPEC-STOCK-032: 포트폴리오 리밸런싱 자동화)
+- 포트폴리오 리밸런싱 주문 계획서 자동 산출 (SPEC-028 AI 제안 → 실행 가능한 주수·금액)
+- `rebalancing_plans` 테이블 신규 생성 (Alembic 마이그레이션 0021)
+- 리밸런싱 계산 REST API (`POST /portfolios/{id}/rebalance/calculate`, `GET /portfolios/{id}/rebalance/orders`)
+- 순수 함수 `calculate_rebalancing_orders()` — DB 없이 단위 테스트 가능
+- 1주 단위 정수 수량, 예산 제약, 국내(0.015%)·해외(0.25%) 수수료 추정
+- 매수 우선 정렬(언더웨이트 매수 → 오버웨이트 매도 → 홀드)
+- dry-run/저장 모드: 미리보기 후 계획서 DB 저장 가능
+- 프론트엔드 리밸런싱 주문 패널(`RebalancingOrderPanel`)
+- 단위 테스트 27종 (91% 커버리지, scipy 금지 NFR 포함)
+
+---
+
 ## [0.31.0] - 2026-06-23
 
 ### Added (SPEC-STOCK-031: 포트폴리오 알림 강화)

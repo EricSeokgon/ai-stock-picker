@@ -4,6 +4,17 @@
 
 ## 핵심 기능
 
+### Phase 30: 포트폴리오 기간별 성과 요약 (v0.30.0)
+- **성과 요약 엔드포인트**: `GET /portfolios/{id}/performance-summary?refresh={bool}` — YTD·1M·3M·6M·1Y 5개 표준 기간의 총수익률·연환산수익률·MDD를 한 번의 요청으로 일괄 반환
+- **연환산수익률**: `((종료가치/시작가치)^(252/거래일수) - 1) × 100` — 252 거래일 기준 연환산, 기간 길이에 무관하게 비교 가능한 수익률
+- **최대낙폭(MDD)**: `min((가치[t] - 이전최고가치) / 이전최고가치) × 100` — `calculate_max_drawdown` 재사용(backtest/metrics.py)
+- **KRX + 해외 자산**: NYSE/NASDAQ 종목은 USD 종가를 `get_usd_krw_rate(redis)`로 원화 환산 후 통합 계산, 환율 조회 실패 시 1350.0 fallback
+- **부분 결과 허용**: 유효 거래일 2일 미만 기간은 `has_data=false`로 표시, 전체 에러 없이 나머지 기간 정상 반환
+- **Redis 캐시**: 키=`portfolio_perf_summary:{id}:{YYYY-MM-DD}`, TTL=3600s, `?refresh=true` 강제 갱신
+- **numpy 전용 계산**: scipy 미추가(NFR-001), SPEC-027·028·029 패턴과 일관성 유지
+- **53개 단위 테스트**: 커버리지 91.62%(목표 85% 초과) — 기간 산출·수익률 계산·캐시 경로·소유권·부분 결과 전체 검증
+- **프론트엔드**: `PerformanceSummaryPanel` — 5개 기간 카드 그리드, 양수 녹색·음수 적색, `has_data=false` 시 "데이터 없음" 표시
+
 ### Phase 29: 포트폴리오 백테스팅 (v0.29.0)
 - **백테스팅 엔드포인트**: `POST /portfolios/{id}/backtest` — 보유 포트폴리오를 지정 기간 그대로 보유했다고 가정한 buy-and-hold 수익률 시뮬레이션, FDR 실제 시세 기반
 - **일별·누적 수익률**: 기간 내 매 거래일의 포트폴리오 가치 변화를 일별 수익률(`daily_return_pct`)·누적 수익률(`cumulative_return_pct`)로 산출

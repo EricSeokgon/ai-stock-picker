@@ -1,7 +1,7 @@
 ---
 id: "SPEC-STOCK-030"
 version: "0.3.0"
-status: "draft"
+status: "completed"
 created_at: "2026-06-23"
 updated_at: "2026-06-23"
 author: "ircp"
@@ -270,3 +270,21 @@ YTD: date(today.year, 1, 1)        # 당해 1월 1일
   - 미구현 순수 함수·오케스트레이션에 테스트 작성 전 임시 마커. GREEN 단계에서 제거.
 
 태그 설명은 한국어로 작성하고, 에이전트 생성 태그는 `[AUTO]` 접두사를 포함한다.
+
+---
+
+## Implementation Notes (sync: 2026-06-23)
+
+### 실제 구현 요약
+
+- **구현 방식**: Strategy A — `portfolio/performance_summary.py` 독립 모듈 (backtest.py 비공개 함수 import 없음)
+- **테스트**: 53개 단위 테스트, 커버리지 91.62% (목표 85% 초과)
+- **NFR-001 준수**: scipy 미사용 확인 (numpy + math 표준 라이브러리만)
+- **HTTP 상태 코드**: 소유권 불일치 → 404 (코드베이스 관례 준수)
+- **Redis 캐시**: `portfolio_perf_summary:{id}:{YYYY-MM-DD}` TTL=3600s
+
+### 계획 대비 실제 변경사항
+
+- 계획된 모든 파일이 구현됨 (범위 확장 없음)
+- plan.md의 D-008 이슈: private 함수 재사용 대신 Strategy A(독립 구현) 선택
+- SPEC 요건 REQ-PS-001~010 전체 충족

@@ -7,6 +7,39 @@
 
 ---
 
+## [0.30.0] - 2026-06-23
+
+### Added (Phase 30: 포트폴리오 기간별 성과 요약 — SPEC-STOCK-030)
+
+#### 성과 요약 서비스 (`portfolio/performance_summary.py` 신규)
+- **`get_performance_summary(portfolio_id, user_id, db, redis, refresh)`**: YTD·1M·3M·6M·1Y 5개 표준 기간 성과 일괄 산출 메인 진입점 (`@MX:ANCHOR`, fan_in >= 3)
+- **기간별 지표 산출**: `total_return_pct`(총수익률)·`annualized_return_pct`(연환산수익률, 252 거래일 기준)·`mdd_pct`(최대낙폭)
+- **numpy + math 전용**: scipy 미사용(NFR-001 준수), SPEC-027·028·029와 일관된 통계 계산 방식
+- **Redis 캐시**: 키=`portfolio_perf_summary:{portfolio_id}:{YYYY-MM-DD}`, TTL=3600s, `?refresh=true` 강제 갱신
+- **KRX + 해외 혼합 지원**: NYSE/NASDAQ USD 종가 × `get_usd_krw_rate(redis)` KRW 환산, 실패 시 fallback 1350.0
+- **소유권 검증**: 포트폴리오 없거나 타 사용자 소유 → HTTP 404 (코드베이스 관례 준수)
+- **부분 결과**: 유효 거래일 2일 미만 또는 데이터 없는 기간 → `has_data=false` 표시(전체 에러 없음)
+
+#### 스키마 (`portfolio/schemas.py`)
+- **`PeriodPerformance`**: `period`(ytd/1m/3m/6m/1y)·`start_date`·`end_date`·`trading_days`·`has_data`·`total_return_pct`·`annualized_return_pct`·`mdd_pct`
+- **`PerformanceSummaryResponse`**: `portfolio_id`·`periods`(list, 5개)·`calculated_at`(ISO-8601 UTC)·`disclaimer`
+
+#### 엔드포인트 (`portfolio/router.py`)
+- **`GET /portfolios/{portfolio_id}/performance-summary?refresh={bool}`**: 인증 필요(`Depends(get_current_user)`), 소유권 검증, PerformanceSummaryResponse 응답
+  - HTTP 404: 포트폴리오 없거나 타 사용자 소유
+  - HTTP 200 + 빈 데이터: 보유 종목 없거나 전 종목 시세 부족 시(에러 없음)
+
+#### 테스트
+- **단위 테스트** (`tests/unit/test_portfolio_performance_summary.py`): 53개 테스트, 커버리지 91.62% (목표 85% 초과)
+  - 기간 시작일 산출, 수익률·연환산·MDD 계산, Redis 캐시 히트/미스, 소유권 검증, 부분 결과(has_data=false), KRW 환산 경로 전체
+
+#### 프론트엔드
+- **`PerformanceSummaryPanel.js`** (신규): 5개 기간(YTD/1M/3M/6M/1Y) 카드 그리드, 양수 녹색·음수 적색, `has_data=false` 시 "데이터 없음" 표시
+- **`api/portfolio.js` / `portfolio.ts`** (수정): `apiGetPerformanceSummary(portfolioId, refresh)` 추가
+- **`pages/Portfolio.tsx`** (수정): `PerformanceSummaryPanel` 컴포넌트 통합
+
+---
+
 ## [0.29.0] - 2026-06-23
 
 ### Added (Phase 29: 포트폴리오 백테스팅 — SPEC-STOCK-029)

@@ -1,6 +1,6 @@
 ---
 id: "SPEC-STOCK-032"
-version: "0.1.0"
+version: "0.2.0"
 status: "draft"
 created_at: "2026-06-23"
 updated_at: "2026-06-23"
@@ -19,10 +19,11 @@ labels: ["portfolio", "rebalancing", "orders", "backend", "frontend"]
 | 버전 | 날짜 | 변경 내용 |
 |------|------|-----------|
 | 0.1.0 | 2026-06-23 | 최초 작성 |
+| 0.2.0 | 2026-06-23 | plan-auditor v1 지적사항 반영 — NFR-001/002/003/005 정규문에서 구현 세부(라이브러리명·함수명·HTTP 코드) 제거하고 행위 의도로 재작성, REQ-RBA-001/004 EARS Event-driven 준수(THEN 제거), REQ-RBA-005 → 005a/005b 분리, 구현 세부는 5장 설계 결정 노트로 이동 |
 
 > **REQ 접두사 설계 원칙**: 본 SPEC은 `REQ-RBA-*`(ReBalancing Automation) 접두사를 사용한다. SPEC-026(AI 최적화)이 `REQ-OPT-*`를 점유하므로 충돌을 회피한다.
 
-> **번호 체계**: REQ-RBA-001~006 연속 번호를 사용한다.
+> **번호 체계**: REQ-RBA-001~006 연속 번호를 사용한다. Dry-Run/저장 동작은 단일 EARS 트리거-응답 원칙에 따라 REQ-RBA-005a(미리보기)·005b(저장)로 분리한다.
 
 ---
 
@@ -59,7 +60,7 @@ SPEC-026 `RebalancingTable` UI는 "현재 50% → 목표 45%, 매도"처럼 비�
 
 ### 1.4 기술 스택 (확정·재사용)
 
-FastAPI + PostgreSQL(asyncpg) + SQLAlchemy + Alembic + Redis + React + JavaScript/TypeScript. 신규 라이브러리는 도입하지 않는다. 수치 계산은 `numpy` + `math`만 사용한다(NFR-001, scipy 금지). 가격 조회는 기존 `get_current_price`(KRX)·`_fetch_foreign_price`(해외)·`fx_rate`를 재사용한다.
+FastAPI + PostgreSQL(asyncpg) + SQLAlchemy + Alembic + Redis + React + JavaScript/TypeScript. 신규 라이브러리는 도입하지 않는다(NFR-001). 수치 계산은 `numpy` + `math`만 사용한다(5.1 설계 결정 노트, scipy 미사용). 가격 조회는 기존 `get_current_price`(KRX)·`_fetch_foreign_price`(해외)·`fx_rate`를 재사용한다.
 
 ---
 
@@ -97,7 +98,7 @@ FastAPI + PostgreSQL(asyncpg) + SQLAlchemy + Alembic + Redis + React + JavaScrip
 
 ### REQ-RBA-001 (Event-driven) — 리밸런싱 주문 계산
 
-WHEN 사용자가 포트폴리오에 대해 리밸런싱 주문 계산을 요청하면 THEN THE 시스템 SHALL 현재 비중을 목표 비중으로 이동시키는 매수/매도 수량을 **1주 단위 정수**로 계산하되, 주어진 예산 한도 내에서 산출한다.
+WHEN 사용자가 포트폴리오에 대해 리밸런싱 주문 계산을 요청하면 THE 시스템 SHALL 현재 비중을 목표 비중으로 이동시키는 매수/매도 수량을 **1주 단위 정수**로 계산하되, 주어진 예산 한도 내에서 산출한다.
 
 ### REQ-RBA-002 (State-driven) — 예산 제약
 
@@ -109,11 +110,15 @@ THE 시스템 SHALL 각 매수/매도 주문에 대해 추정 수수료를 산�
 
 ### REQ-RBA-004 (Event-driven) — 우선순위 정렬
 
-WHEN 복수 종목이 리밸런싱 대상이면 THEN THE 시스템 SHALL 언더웨이트(매수) 종목을 오버웨이트(매도) 종목보다 우선하여 예산을 배분하고, 출력 주문 목록을 buy → sell → hold 순으로 정렬한다(세금 고려: 매도 차익 실현 최소화).
+WHEN 복수 종목이 리밸런싱 대상이면 THE 시스템 SHALL 언더웨이트(매수) 종목을 오버웨이트(매도) 종목보다 우선하여 예산을 배분하고, 출력 주문 목록을 buy → sell → hold 순으로 정렬한다(세금 고려: 매도 차익 실현 최소화).
 
-### REQ-RBA-005 (Event-driven) — Dry-Run vs 저장
+### REQ-RBA-005a (Event-driven) — Dry-Run 미리보기
 
-WHEN 사용자가 `dry_run=true`(기본)로 주문을 미리보기하면 THEN THE 시스템 SHALL DB에 기록하지 않고 계획서를 반환한다. IF 사용자가 `dry_run=false`로 확정하면 THEN THE 시스템 SHALL 주문 계획서를 `rebalancing_plans` 테이블에 저장하고 저장된 계획서를 반환한다.
+WHEN 사용자가 `dry_run=true`(기본)로 주문을 미리보기 요청하면 THE 시스템 SHALL 영속 저장소에 기록하지 않고 계획서를 반환한다.
+
+### REQ-RBA-005b (Event-driven) — 계획서 저장
+
+WHEN 사용자가 `dry_run=false`로 주문 계획을 확정하면 THE 시스템 SHALL 주문 계획서를 영속 저장소에 저장하고 저장된 계획서를 반환한다.
 
 ### REQ-RBA-006 (Ubiquitous) — 주문 요약
 
@@ -123,11 +128,11 @@ THE 시스템 SHALL 각 주문에 대해 다음을 반환한다 — `krx_code`, 
 
 ## 4. 비기능 요구사항 (NFR)
 
-- **NFR-001 (scipy 금지)**: THE 시스템 SHALL 본 SPEC 신규 코드에서 `scipy`를 import하지 않는다. 수치 계산은 `numpy` + `math`만 사용한다(`risk_analysis.py` 패턴 일관성).
-- **NFR-002 (순수 함수 테스트성)**: THE `calculate_rebalancing_orders` 순수 함수 SHALL DB·Redis·외부 API 의존 없이 입력(holdings + 가격 + 목표 비중 + 예산 + 수수료율)만으로 결정적 결과를 산출하여 단위 테스트가 가능해야 한다.
-- **NFR-003 (국내/해외 수수료 구분)**: THE 시스템 SHALL `PortfolioHolding.market`(KRX|NYSE|NASDAQ)을 기준으로 국내/해외 수수료율을 자동 구분 적용한다(SPEC-028 시장 판별 재사용).
+- **NFR-001 (외부 최적화 라이브러리 비도입)**: THE 시스템 SHALL 본 SPEC 신규 수치 계산 코드를 표준 수학 연산 및 프로젝트 승인 라이브러리만으로 구현하며, 새로운 외부 최적화 라이브러리를 도입하지 않는다.
+- **NFR-002 (순수 함수 테스트성)**: THE 시스템의 핵심 리밸런싱 계산 컴포넌트 SHALL DB·외부 캐시·외부 API에 대한 의존 없이, 입력값(보유 현황·가격·목표 비중·예산·수수료율)만으로 결정적 결과를 반환하여 단위 테스트가 가능해야 한다.
+- **NFR-003 (국내/해외 수수료 구분)**: THE 시스템 SHALL 종목의 거래 시장(국내/해외)을 기준으로 국내/해외 수수료율을 자동 구분 적용한다.
 - **NFR-004 (graceful degradation)**: IF 특정 종목의 현재가 조회가 실패하면 THEN THE 시스템 SHALL 해당 종목을 `action="hold"`, `quantity=0`으로 처리하고 사유를 표기하여, 다른 종목의 주문 계산을 차단하지 않는다.
-- **NFR-005 (소유권 일관성)**: THE 시스템 SHALL 포트폴리오 소유권 확인에 `get_portfolio_with_holdings()`(소유권 불일치 시 None)를 사용하고, 소유권 위반 시 `404 Not Found`로 응답한다(코드베이스 관례, 403 아님).
+- **NFR-005 (소유권 일관성)**: THE 시스템 SHALL 요청 사용자가 해당 포트폴리오의 소유자가 아닌 경우, 포트폴리오가 존재하지 않는 경우와 동일한 오류 응답을 반환하여 소유권 정보를 노출하지 않는다.
 - **NFR-006 (테스트 커버리지)**: THE `portfolio/rebalancing.py` SHALL 단위 테스트 커버리지 85% 이상을 충족한다.
 
 ---
@@ -162,6 +167,10 @@ def calculate_rebalancing_orders(
 
 순수 함수는 DB·가격 조회를 하지 않는다. 가격·KRW 환산은 호출자(서비스)가 주입한다(NFR-002).
 
+> **설계 결정 노트(라이브러리)**: NFR-001 구현 시 수치 계산은 `numpy` + `math`만 사용하고 `scipy`는 import하지 않는다(`risk_analysis.py` 패턴 일관성). 이는 WHAT(외부 최적화 라이브러리 비도입)을 만족하는 HOW 선택이다.
+> **설계 결정 노트(테스트성)**: NFR-002의 핵심 계산 컴포넌트는 순수 함수 `calculate_rebalancing_orders`로 구현한다.
+> **설계 결정 노트(시장 판별)**: NFR-003의 국내/해외 구분은 `PortfolioHolding.market`(KRX|NYSE|NASDAQ)을 기준으로 하며 SPEC-028 시장 판별 로직을 재사용한다.
+
 ### 5.2 서비스 오케스트레이션
 
 ```
@@ -182,6 +191,8 @@ calculate_rebalancing_plan(portfolio_id, user_id, db, redis, budget?, commission
 ```
 
 예외 처리: 종목별 가격 조회 try-except, 실패 종목 hold 처리(NFR-004).
+
+> **설계 결정 노트(소유권 응답)**: NFR-005 구현 시 소유권 확인은 `get_portfolio_with_holdings()`(소유권 불일치 시 None)를 사용하고, 소유권 위반은 `404 Not Found`로 응답한다(코드베이스 관례, 403 아님 — 소유권 정보 비노출).
 
 ### 5.3 `rebalancing_plans` 테이블 스키마
 

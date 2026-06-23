@@ -8,42 +8,43 @@
 
 ### AC-RBA-001 (REQ-RBA-001 주문 계산)
 
-- WHEN `calculate_rebalancing_orders`가 holdings·target_weights·budget을 받으면 THEN 각 종목의 `quantity`는 **정수**(1주 단위)여야 한다.
-- WHEN 종목 조정 금액을 현재가로 나눈 값이 소수면 THEN 매수는 내림(floor), 매도는 보유 수량 한도 내 내림으로 산출되어야 한다.
+- WHEN 리밸런싱 주문 계산 요청이 완료되면 THE 시스템 SHALL 각 종목의 주문 수량을 1주 단위 정수로 반환한다.
+- WHEN 매수 조정 금액을 현재가로 나눈 값이 소수이면 THE 시스템 SHALL 매수 수량을 내림(floor) 처리하여 정수로 반환하고, 매도 수량은 보유 수량 한도 내에서 내림 처리하여 반환한다.
 
 ### AC-RBA-002 (REQ-RBA-002 예산 제약)
 
-- WHILE 매수 주문을 산출하는 동안 THEN 모든 `buy` 주문의 `estimated_amount` 합계(`total_buy_amount`)는 `budget`을 초과하지 않아야 한다.
-- WHEN `budget`이 None으로 서비스에 전달되면 THEN 현재 포트폴리오 총 평가액(KRW)이 기본 예산으로 사용되어야 한다.
+- WHILE 매수 주문을 산출하는 동안 THE 시스템 SHALL 모든 매수 주문 금액 합계가 지정된 예산을 초과하지 않도록 보장한다.
+- WHEN 예산이 지정되지 않은 채로 계산이 요청되면 THE 시스템 SHALL 현재 포트폴리오 총 평가액(KRW)을 기본 예산으로 사용한다.
 
 ### AC-RBA-003 (REQ-RBA-003 수수료)
 
-- THE 각 주문의 `estimated_commission`은 `estimated_amount × rate`와 같아야 한다.
-- WHEN 종목 `market`이 KRX면 THEN 기본 국내 수수료율 0.00015가, NYSE/NASDAQ면 0.0025가 적용되어야 한다.
-- THE `action="hold"` 주문의 `estimated_commission`은 0이어야 한다.
+- THE 시스템 SHALL 각 주문의 추정 수수료를 주문 금액과 수수료율의 곱으로 산출한다.
+- WHEN 종목의 거래 시장이 국내(KRX)이면 THE 시스템 SHALL 기본 국내 수수료율 0.00015를 적용하고, 해외(NYSE/NASDAQ)이면 0.0025를 적용한다.
+- THE 시스템 SHALL `action="hold"` 주문의 추정 수수료를 0으로 산출한다.
 
 ### AC-RBA-004 (REQ-RBA-004 우선순위)
 
-- WHEN buy·sell 주문이 모두 존재하면 THEN 출력 목록은 buy → sell → hold 순으로 정렬되어야 한다.
-- WHEN 예산이 모든 매수를 충족하기에 부족하면 THEN 조정 금액(delta_value)이 큰 언더웨이트 종목부터 예산이 배분되어야 한다.
+- WHEN buy·sell 주문이 모두 존재하면 THE 시스템 SHALL 출력 목록을 buy → sell → hold 순으로 정렬하여 반환한다.
+- WHEN 예산이 모든 매수를 충족하기에 부족하면 THE 시스템 SHALL 비중 조정 필요량이 큰 언더웨이트 종목부터 우선하여 예산을 배분한다.
 
-### AC-RBA-005 (REQ-RBA-005 dry-run vs 저장)
+### AC-RBA-005 (REQ-RBA-005a/005b dry-run vs 저장)
 
-- WHEN `dry_run=true`(기본)로 calculate를 호출하면 THEN `rebalancing_plans` 테이블에 행이 추가되지 않아야 한다.
-- WHEN `dry_run=false`로 호출하면 THEN `rebalancing_plans`에 1행이 저장되고, 저장된 계획서가 반환되어야 한다.
+- WHEN 사용자가 `dry_run=true`(기본)로 계산을 요청하면 THE 시스템 SHALL 영속 저장소에 주문 계획을 기록하지 않고 계획서를 반환한다.
+- WHEN 사용자가 `dry_run=false`로 계산을 요청하면 THE 시스템 SHALL 주문 계획서를 영속 저장소에 1건 저장하고 저장된 계획서를 반환한다.
 
 ### AC-RBA-006 (REQ-RBA-006 주문 요약)
 
-- THE 각 `RebalancingOrder`는 krx_code·stock_name·action·quantity·estimated_price·estimated_amount·estimated_commission·current_weight·target_weight·expected_weight_after 필드를 모두 포함해야 한다.
-- THE `RebalancingOrderPlan`은 portfolio_id·budget·total_buy_amount·total_sell_amount·total_commission·orders·created_at을 포함해야 한다.
+- THE 시스템 SHALL 각 주문에 대해 krx_code·stock_name·action·quantity·estimated_price·estimated_amount·estimated_commission·current_weight·target_weight·expected_weight_after 필드를 모두 반환한다.
+- THE 시스템 SHALL 계획서 수준에서 portfolio_id·budget·total_buy_amount·total_sell_amount·total_commission·orders·created_at을 반환한다.
 
 ### AC-NFR (비기능)
 
-- AC-NFR-001: `portfolio/rebalancing.py`는 `scipy`를 import하지 않는다(`grep -r "import scipy"` 결과 없음).
-- AC-NFR-002: `calculate_rebalancing_orders`는 DB·Redis 픽스처 없이 호출 가능하며 결정적 결과를 반환한다.
-- AC-NFR-004: 한 종목의 현재가가 None이어도 나머지 종목 주문이 정상 산출되고, 해당 종목은 `action="hold"`로 표기된다.
-- AC-NFR-005: 타 사용자의 포트폴리오로 calculate를 호출하면 `404`가 반환된다.
-- AC-NFR-006: `test_rebalancing.py` 커버리지 ≥ 85%.
+- AC-NFR-001: THE 시스템 SHALL 리밸런싱 계산 모듈 내에서 프로젝트 승인 외 외부 최적화 라이브러리를 사용하지 않는다.
+- AC-NFR-002: THE 시스템의 핵심 리밸런싱 계산 컴포넌트 SHALL DB·외부 캐시 픽스처 없이 호출 가능하며 결정적 결과를 반환한다.
+- AC-NFR-003: WHEN 종목의 거래 시장이 국내(KRX)이면 THE 시스템 SHALL 국내 수수료율을 적용하고, 해외(NYSE/NASDAQ)이면 THE 시스템 SHALL 해외 수수료율을 적용한다.
+- AC-NFR-004: WHEN 한 종목의 현재가 조회가 실패하면 THE 시스템 SHALL 해당 종목을 `action="hold"`로 표기하고 나머지 종목 주문을 정상 산출한다.
+- AC-NFR-005: WHEN 요청 사용자가 소유하지 않은 포트폴리오로 계산을 요청하면 THE 시스템 SHALL 포트폴리오가 존재하지 않는 경우와 동일한 오류 응답을 반환한다.
+- AC-NFR-006: THE 시스템 SHALL 리밸런싱 계산 모듈에 대해 단위 테스트 커버리지 85% 이상을 충족한다.
 
 ---
 

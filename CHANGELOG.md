@@ -7,6 +7,21 @@
 
 ---
 
+## [0.31.0] - 2026-06-23
+
+### Added (SPEC-STOCK-031: 포트폴리오 알림 강화)
+- 포트폴리오 단위 알림 2종 추가: 목표 수익률 도달(`portfolio_target_return`) · MDD 임계값 초과(`portfolio_mdd_breach`)
+- `portfolio_alerts` 테이블 신규 생성 (Alembic 마이그레이션 0020)
+- 포트폴리오 알림 CRUD REST API (`POST/GET/PUT/DELETE /portfolios/{id}/alerts`)
+- 기존 10분 주기 알림 스케줄러에 포트폴리오 알림 점검 통합
+- 인박스·이메일·텔레그램 발송 파이프라인 재사용 (신규 채널 없음)
+- YTD 성과 기반 알림 조건 평가 (SPEC-030 `calculate_performance_summary` 재사용)
+- 알림 멱등성: `PORT_{portfolio_id}` krx_code + notifications UNIQUE 제약
+- 프론트엔드 포트폴리오 알림 설정 패널 (`PortfolioAlertPanel`)
+- 단위 테스트 24종 (scipy 금지 NFR 검증 포함)
+
+---
+
 ## [0.30.0] - 2026-06-23
 
 ### Added (Phase 30: 포트폴리오 기간별 성과 요약 — SPEC-STOCK-030)

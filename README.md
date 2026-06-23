@@ -4,6 +4,18 @@
 
 ## 핵심 기능
 
+### Phase 29: 포트폴리오 백테스팅 (v0.29.0)
+- **백테스팅 엔드포인트**: `POST /portfolios/{id}/backtest` — 보유 포트폴리오를 지정 기간 그대로 보유했다고 가정한 buy-and-hold 수익률 시뮬레이션, FDR 실제 시세 기반
+- **일별·누적 수익률**: 기간 내 매 거래일의 포트폴리오 가치 변화를 일별 수익률(`daily_return_pct`)·누적 수익률(`cumulative_return_pct`)로 산출
+- **주요 지표**: MDD(최대 낙폭, `calculate_max_drawdown` 재사용)·샤프 비율(무위험수익률 3.5%, `calculate_sharpe_ratio` 재사용)·총 수익률(`calculate_total_return` 재사용)
+- **KRX + 해외 자산**: NYSE/NASDAQ 종목은 USD 종가를 `get_usd_krw_rate(redis)`로 원화 환산 후 통합 계산, 환율 조회 실패 시 1350.0 fallback
+- **거래일 내부 조인**: `_align_close_series()` — KRX·NYSE/NASDAQ 거래일 불일치를 공통 거래일 교집합으로 정규화
+- **부분 결과 허용**: FDR 조회 실패 종목은 `excluded_tickers`로 분리, 유효 종목만으로 시뮬레이션 계속 진행 (전 종목 실패 시만 422)
+- **비차단 FDR 조회**: `asyncio.gather` + `run_in_executor` 병렬 패치, 이벤트 루프 블로킹 없음
+- **투자 고지 면책 조항**: 모든 응답에 `disclaimer` 필드 포함 — '투자 권유가 아니며 정보 제공 목적' 문구 법적 요건 준수
+- **numpy 전용 계산**: scipy 미추가, 기존 `backtest/metrics.py` 순수 함수 재사용 (`portfolio/backtest.py` 독립 모듈)
+- **프론트엔드**: `BacktestPanel`(기간 입력·요약 카드) + `BacktestChart`(Recharts 일별/누적 수익률 라인 차트) 신규 컴포넌트
+
 ### Phase 28: 해외 자산(NYSE/NASDAQ) 지원 (v0.28.0)
 - **해외 자산 DB 확장**: `portfolio_holdings` 테이블에 `market` (KRX/NYSE/NASDAQ) · `currency` (KRW/USD) 컬럼 추가 — Alembic 마이그레이션 0019, 기존 KRX 데이터 하위호환 보존
 - **USD/KRW 환율 서비스** (`fx_rate.py` 신규): FinanceDataReader 기반 실시간 환율 조회, Redis TTL=3600s 캐시, 취득 실패 시 fallback 1350.0

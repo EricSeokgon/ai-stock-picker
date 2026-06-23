@@ -7,6 +7,48 @@
 
 ---
 
+## [0.29.0] - 2026-06-23
+
+### Added (Phase 29: 포트폴리오 백테스팅 — SPEC-STOCK-029)
+
+#### 백테스팅 서비스 (`portfolio/backtest.py` 신규)
+- **`run_portfolio_backtest(portfolio_id, user_id, db, redis, start_date, end_date)`**: buy-and-hold 포트폴리오 시뮬레이션 메인 진입점 (`@MX:ANCHOR`, fan_in >= 3)
+- **`_align_close_series(price_data)`**: KRX·NYSE/NASDAQ 거래일 불일치를 공통 거래일 교집합(inner join)으로 정규화
+- **`_normalize_weights(weights)`**: 보유 비중 합계 1.0 정규화 (소수점 오차 방지)
+- **`_daily_portfolio_values(aligned_closes, weights, tickers)`**: 가중 합산 포트폴리오 가치 시계열 산출
+- **`_compute_returns(values)`**: 일별 수익률 + 누적 수익률 페어 산출
+- **`_fetch_price_series_sync(ticker, start_date, end_date)`**: FDR 동기 호출 래퍼 (`@MX:WARN`, run_in_executor 전용)
+- **지표 재사용**: `calculate_max_drawdown` · `calculate_sharpe_ratio(risk_free_rate=0.035)` · `calculate_total_return` — `backtest/metrics.py` import 재사용, numpy 전용 (scipy 미사용)
+- **부분 결과**: FDR 실패 종목 → `excluded_tickers` 분리, 유효 종목만 계속 계산 (전 종목 실패 시 HTTP 422)
+- **KRW 통합**: USD 종목 종가 × `get_usd_krw_rate(redis)`, 실패 시 fallback 1350.0
+- **DISCLAIMER 상수**: '투자 권유가 아니며 정보 제공 목적' 문구 — 모든 BacktestResult 응답에 포함
+- **비차단 FDR**: `asyncio.gather` + `loop.run_in_executor` 병렬 시세 조회
+
+#### 스키마 (`portfolio/schemas.py`)
+- **`BacktestRequest`**: `portfolio_id`·`start_date`·`end_date` + `model_validator(mode="after")` — end > start 강제 검증
+- **`DailyReturn`**: `date`·`daily_return_pct`·`cumulative_return_pct`
+- **`BacktestResult`**: `portfolio_id`·`start_date`·`end_date`·`total_return_pct`·`mdd_pct`·`sharpe_ratio`·`daily_returns` (list)·`valid_tickers`·`excluded_tickers`·`disclaimer`
+
+#### 엔드포인트 (`portfolio/router.py`)
+- **`POST /portfolios/{portfolio_id}/backtest`**: 인증 필요(`Depends(get_current_user)`), 소유권 검증, BacktestRequest 바디, BacktestResult 응답
+  - HTTP 404: 포트폴리오 없거나 타 사용자 소유
+  - HTTP 400: 보유 종목 없음 또는 종료일 ≤ 시작일
+  - HTTP 422: 전 종목 FDR 조회 실패
+
+#### 테스트
+- **단위 테스트** (`tests/unit/test_portfolio_backtest.py`): 32개 테스트, 커버리지 90% (목표 75%)
+  - 스키마 검증(날짜 순서 오류), 가중치 정규화, 종가 정렬, 포트폴리오 가치 계산, 수익률 산출, FDR 조회, 오케스트레이션(성공·에러 케이스 전체)
+- **통합 테스트** (`tests/integration/test_portfolio_backtest_router.py`): 11개 테스트
+  - 200 OK(성공 응답), 400(날짜 검증), 404(잘못된 소유자), 422(전 종목 실패), disclaimer 포함 검증
+
+#### 프론트엔드
+- **`BacktestPanel.js`** (신규): 시작일/종료일 입력, 백테스트 실행 버튼, MDD·샤프비율·총수익률 요약 카드, 오류 메시지 표시
+- **`BacktestChart.js`** (신규): Recharts `LineChart` — 일별 수익률·누적 수익률 이중 라인 차트
+- **`api/portfolio.js` / `portfolio.ts`** (수정): `runPortfolioBacktest(token, portfolioId, {startDate, endDate})` 추가 (`@MX:ANCHOR`)
+- **`pages/Portfolio.js` / `Portfolio.tsx`** (수정): `BacktestPanel` 컴포넌트 통합
+
+---
+
 ## [0.28.0] - 2026-06-22
 
 ### Added (Phase 28: 해외 자산(NYSE/NASDAQ) 지원 — SPEC-STOCK-028)

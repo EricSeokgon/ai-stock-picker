@@ -1,7 +1,7 @@
 ---
 id: "SPEC-STOCK-029"
 version: "0.2.0"
-status: "draft"
+status: "implemented"
 created_at: "2026-06-22"
 updated: "2026-06-23"
 author: "ircp"
@@ -17,6 +17,7 @@ issue_number: 0
 - 2026-06-22 (v0.1.0): 최초 초안 작성. 사용자 보유 포트폴리오(종목+비중)를 특정 기간 보유했다면의 수익률을 실제 FDR 시세로 시뮬레이션. MDD·샤프 비율·일별/누적 수익률 산출. KRX + NYSE/NASDAQ 지원(SPEC-028 exchange 필드 활용). **기존 `backtest/` 패키지(전략 백테스트, SPEC-012)와 별개의 portfolio 도메인 기능**임을 명시.
 - 2026-06-23 (v0.2.0): plan-auditor v1 지적사항 반영 — 프론트매터 수정, AC EARS 형식 재작성, REQ-024 통합, 알고리즘 출력 필드명 통일.
 - 2026-06-23 (v0.2.0): REQ-PBT-024 삭제: REQ-PBT-022로 통합 (v0.2.0).
+- 2026-06-23 (v0.2.0): Run Phase 완료 — T-001~T-008 구현, 32 단위 테스트 + 11 통합 테스트 PASS, 커버리지 90%. SPEC 상태 draft → implemented.
 
 > **REQ 접두사 설계 원칙**: 본 SPEC은 `REQ-PBT-*`(Portfolio BackTest) 접두사를 사용한다. 기존 SPEC-STOCK-012(전략 백테스트)가 `REQ-BT-*`를 점유하므로 충돌을 회피한다.
 

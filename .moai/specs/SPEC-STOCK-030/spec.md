@@ -1,6 +1,6 @@
 ---
 id: "SPEC-STOCK-030"
-version: "0.2.0"
+version: "0.3.0"
 status: "draft"
 created_at: "2026-06-23"
 updated_at: "2026-06-23"
@@ -20,6 +20,7 @@ labels: ["portfolio", "performance", "backend", "frontend"]
 |------|------|-----------|
 | 0.1.0 | 2026-06-23 | 최초 작성 |
 | 0.2.0 | 2026-06-23 | plan-auditor v1 지적사항 반영: frontmatter 수정(created_at·labels), REQ-PS-003 HOW 제거, REQ-PS-004 구현 세부사항 이동, REQ-PS-010 NFR-001 통합, Delta Marker 명확화, 프라이빗 함수 공유 계획 추가 |
+| 0.3.0 | 2026-06-23 | plan-auditor v2 지적사항 반영: §5.3 소유권 불일치 HTTP 상태 코드를 403→404로 수정(코드베이스 관례 일관성) |
 
 > **REQ 접두사 설계 원칙**: 본 SPEC은 `REQ-PS-*`(Performance Summary) 접두사를 사용한다. SPEC-029(포트폴리오 백테스트)가 `REQ-PBT-*`를, SPEC-027(리스크 분석)이 `REQ-RISK-*`를 점유하므로 충돌을 회피한다.
 
@@ -183,7 +184,7 @@ YTD: date(today.year, 1, 1)        # 당해 1월 1일
 
 `risk_analysis.py`·`backtest.py` 패턴을 모방한다.
 
-1. 소유권 확인(`get_portfolio_with_holdings`) → 없으면 404 / 타사용자면 403.
+1. 소유권 확인(`get_portfolio_with_holdings`) → 포트폴리오 없거나 소유권 불일치 시 404(코드베이스 관례).
 2. Redis 캐시 조회(키 `portfolio_perf_summary:{portfolio_id}:{today_kst}`, `refresh=False` 시).
 3. 보유 종목 0개 → 빈 성과 응답(REQ-PS-005).
 4. 해외 종목 존재 시 환율 조회(`get_usd_krw_rate`, 실패 시 fallback).

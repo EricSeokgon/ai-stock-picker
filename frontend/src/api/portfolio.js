@@ -151,6 +151,36 @@ export async function apiDeletePortfolioAlert(token, portfolioId, alertId) {
     }
 }
 
+// @MX:NOTE: [AUTO] 리밸런싱 계획 계산 (SPEC-STOCK-032 RBA-001~005)
+export async function apiCalculateRebalancing(token, portfolioId, options = {}) {
+    const body = {
+        dry_run: options.dryRun ?? true,
+        budget: options.budget ?? null,
+        commission_rate_domestic: options.commissionRateDomestic ?? 0.00015,
+        commission_rate_foreign: options.commissionRateForeign ?? 0.0025,
+    };
+    const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/rebalance/calculate`, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail ?? `리밸런싱 계산 실패: ${res.status}`);
+    }
+    return res.json();
+}
+// @MX:NOTE: [AUTO] 저장된 리밸런싱 계획 목록 조회 (SPEC-STOCK-032 RBA-005)
+export async function apiListRebalancingOrders(token, portfolioId, limit = 5) {
+    const res = await fetch(
+        `${API_BASE}/portfolios/${portfolioId}/rebalance/orders?limit=${limit}`,
+        { headers: authHeaders(token) },
+    );
+    if (!res.ok)
+        throw new Error(`리밸런싱 내역 조회 실패: ${res.status}`);
+    return res.json();
+}
+
 // @MX:ANCHOR: [AUTO] 백테스팅 API 공개 엔드포인트 — BacktestPanel에서 호출
 // @MX:REASON: 외부 시스템(백엔드 /portfolios/{id}/backtest) 연동 지점으로 fan_in >= 3 예상
 export async function runPortfolioBacktest(token, portfolioId, startDate, endDate) {

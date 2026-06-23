@@ -371,3 +371,47 @@ class PortfolioAlertResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ─────────────────────────────────────────────────────────────
+# SPEC-STOCK-032: 포트폴리오 리밸런싱 자동화 스키마
+# ─────────────────────────────────────────────────────────────
+
+
+class RebalancingOrder(BaseModel):
+    """단일 종목 리밸런싱 주문 (RBA-006)."""
+
+    krx_code: str
+    stock_name: str
+    action: Literal["buy", "sell", "hold"]
+    quantity: int
+    estimated_price: float
+    estimated_amount: float
+    estimated_commission: float
+    current_weight: float
+    target_weight: float
+    expected_weight_after: float
+
+
+class RebalancingOrderPlan(BaseModel):
+    """리밸런싱 계획서 — 주문 목록 및 요약 (RBA-006)."""
+
+    portfolio_id: int
+    budget: float
+    total_buy_amount: float
+    total_sell_amount: float
+    total_commission: float
+    orders: list[RebalancingOrder]
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RebalancingCalculateRequest(BaseModel):
+    """리밸런싱 계산 요청 (RBA-002, RBA-005)."""
+
+    # None이면 포트폴리오 총 평가액을 예산으로 사용
+    budget: Optional[float] = None
+    commission_rate_domestic: float = 0.00015   # KRX 국내 수수료 0.015%
+    commission_rate_foreign: float = 0.0025     # NYSE/NASDAQ 해외 수수료 0.25%
+    dry_run: bool = True                         # True: 계획만 반환, False: DB 저장

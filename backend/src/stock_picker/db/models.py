@@ -736,3 +736,38 @@ class NotificationPreference(Base):
     )
 
     user: Mapped["User"] = relationship("User", lazy="noload")
+
+
+# ── Phase L: 리밸런싱 계획 저장 (SPEC-STOCK-032) ─────────────────────────────
+
+
+class RebalancingPlan(Base):
+    """포트폴리오 리밸런싱 계획서 저장 테이블 (SPEC-STOCK-032 RBA-005).
+
+    dry_run=False 요청 시 생성된 주문 계획을 영구 보관한다.
+    orders_json: RebalancingOrder 리스트를 JSON 직렬화한 Text (SQLite 호환)
+    """
+
+    __tablename__ = "rebalancing_plans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    portfolio_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    budget: Mapped[float] = mapped_column(Float, nullable=False)
+    total_buy_amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    total_sell_amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    total_commission: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    # RebalancingOrder 목록 JSON 직렬화 (SQLite JSONB 미지원으로 Text 사용)
+    orders_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", lazy="noload")
+    user: Mapped["User"] = relationship("User", lazy="noload")

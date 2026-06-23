@@ -27,6 +27,8 @@ from stock_picker.portfolio.schemas import (
     PortfolioDividends,
     PortfolioPerformance,
     PortfolioResponse,
+    RebalancingCalculateRequest,
+    RebalancingOrderPlan,
     RiskAnalysisResult,
 )
 
@@ -403,3 +405,98 @@ async def delete_portfolio_alert(
                 detail="알림을 찾을 수 없습니다",
             )
         await async_session.commit()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SPEC-STOCK-032: 포트폴리오 리밸런싱 자동화 엔드포인트
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@router.post(
+    "/{portfolio_id}/rebalance/calculate",
+    response_model=RebalancingOrderPlan,
+    status_code=status.HTTP_200_OK,
+)
+async def calculate_rebalancing(
+    portfolio_id: int,
+    body: RebalancingCalculateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+    redis: aioredis.Redis = Depends(get_redis_client),
+) -> RebalancingOrderPlan:
+    """포트폴리오 리밸런싱 계획을 계산한다 (SPEC-STOCK-032 RBA-001~005).
+
+    dry_run=True이면 계획만 반환하고 DB에 저장하지 않는다.
+    dry_run=False이면 계획을 DB에 저장한다.
+    소유하지 않은 포트폴리오에 접근하면 404를 반환한다 (NFR-005).
+    """
+    from stock_picker.portfolio.rebalancing import calculate_rebalancing_plan
+
+    return await calculate_rebalancing_plan(
+        portfolio_id=portfolio_id,
+        user_id=current_user.id,
+        db=db,
+        redis=redis,
+        budget=body.budget,
+        commission_rate_domestic=body.commission_rate_domestic,
+        commission_rate_foreign=body.commission_rate_foreign,
+        dry_run=body.dry_run,
+    )
+
+
+@router.get(
+    "/{portfolio_id}/rebalance/orders",
+    response_model=list[RebalancingOrderPlan],
+    status_code=status.HTTP_200_OK,
+)
+def list_rebalancing_orders(
+    portfolio_id: int,
+    limit: int = Query(default=5, description="최대 조회 건수"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+) -> list[RebalancingOrderPlan]:
+    """저장된 리밸런싱 계획 목록을 최신순으로 반환한다 (SPEC-STOCK-032 RBA-005).
+
+    소유하지 않은 포트폴리오에 접근하면 404를 반환한다 (NFR-005).
+    """
+    import json
+
+    from stock_picker.db.models import Portfolio, RebalancingPlan
+    from stock_picker.portfolio.schemas import RebalancingOrder
+
+    # 소유권 확인 (NFR-005)
+    portfolio = (
+        db.query(Portfolio)
+        .filter(Portfolio.id == portfolio_id, Portfolio.user_id == current_user.id)
+        .first()
+    )
+    if portfolio is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="포트폴리오를 찾을 수 없습니다",
+        )
+
+    plans = (
+        db.query(RebalancingPlan)
+        .filter(RebalancingPlan.portfolio_id == portfolio_id)
+        .order_by(RebalancingPlan.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    result = []
+    for p in plans:
+        orders_data = json.loads(p.orders_json)
+        orders = [RebalancingOrder(**o) for o in orders_data]
+        result.append(
+            RebalancingOrderPlan(
+                portfolio_id=p.portfolio_id,
+                budget=p.budget,
+                total_buy_amount=p.total_buy_amount,
+                total_sell_amount=p.total_sell_amount,
+                total_commission=p.total_commission,
+                orders=orders,
+                created_at=p.created_at,
+            )
+        )
+    return result

@@ -330,5 +330,44 @@ class PerformanceSummaryResponse(BaseModel):
     portfolio_id: int  # 포트폴리오 ID
     periods: list[PeriodPerformance]  # 5개 기간 성과 목록
     calculated_at: str  # 계산 시각 (ISO 8601 UTC)
-    disclaimer: str  # 면책 문구
     disclaimer: str  # 면책 문구 (REQ-PBT-NFR-003)
+
+
+# ── SPEC-STOCK-031: 포트폴리오 알림 스키마 ────────────────────────────────────
+
+
+class PortfolioAlertCreate(BaseModel):
+    """포트폴리오 알림 생성 요청 (REQ-PAL-001)."""
+
+    alert_type: Literal["portfolio_target_return", "portfolio_mdd_breach"]
+    condition_value: float
+
+    @field_validator("condition_value")
+    @classmethod
+    def condition_value_valid(cls, v: float) -> float:
+        """유효 범위 기본 검증."""
+        return v
+
+
+class PortfolioAlertUpdate(BaseModel):
+    """포트폴리오 알림 수정 요청 (REQ-PAL-001)."""
+
+    condition_value: Optional[float] = None
+    is_active: Optional[bool] = None
+
+
+class PortfolioAlertResponse(BaseModel):
+    """포트폴리오 알림 응답."""
+
+    id: int
+    user_id: int
+    portfolio_id: int
+    alert_type: str
+    condition_value: float
+    is_active: bool
+    is_triggered: bool
+    triggered_at: Optional[datetime] = None
+    triggered_message: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

@@ -20,6 +20,9 @@ from stock_picker.portfolio.schemas import (
     HoldingResponse,
     OptimizeResult,
     PerformanceSummaryResponse,
+    PortfolioAlertCreate,
+    PortfolioAlertResponse,
+    PortfolioAlertUpdate,
     PortfolioCreate,
     PortfolioDividends,
     PortfolioPerformance,
@@ -265,3 +268,138 @@ async def get_performance_summary(
         redis=redis,
         refresh=refresh,
     )
+
+
+# ── SPEC-STOCK-031: 포트폴리오 알림 CRUD 엔드포인트 ─────────────────────────
+# 동기 Session 패턴 유지 (router.py 전체 관행), 내부 서비스는 async
+# 소유권 불일치 시 HTTP 404 반환 (get_portfolio_with_holdings 관행 일치, NFR-005)
+
+
+@router.post(
+    "/{portfolio_id}/alerts",
+    response_model=PortfolioAlertResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_portfolio_alert(
+    portfolio_id: int,
+    body: PortfolioAlertCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+) -> PortfolioAlertResponse:
+    """포트폴리오 알림 생성 (SPEC-STOCK-031 REQ-PAL-001).
+
+    - 소유권 불일치: 404
+    - (user_id, portfolio_id, alert_type) 중복: 409
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    from stock_picker.db.session import AsyncSessionLocal
+    from stock_picker.portfolio.portfolio_alerts import create_portfolio_alert as svc_create
+
+    try:
+        async with AsyncSessionLocal() as async_session:
+            alert = await svc_create(
+                session=async_session,
+                user_id=current_user.id,
+                portfolio_id=portfolio_id,
+                alert_type=body.alert_type,
+                condition_value=body.condition_value,
+            )
+            if alert is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="포트폴리오를 찾을 수 없습니다",
+                )
+            await async_session.commit()
+            return PortfolioAlertResponse.model_validate(alert)
+    except IntegrityError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="동일한 알림 유형이 이미 존재합니다",
+        )
+
+
+@router.get("/{portfolio_id}/alerts", response_model=list[PortfolioAlertResponse])
+async def list_portfolio_alerts(
+    portfolio_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+) -> list[PortfolioAlertResponse]:
+    """포트폴리오 알림 목록 조회 (SPEC-STOCK-031 REQ-PAL-001)."""
+    from stock_picker.db.session import AsyncSessionLocal
+    from stock_picker.portfolio.portfolio_alerts import list_portfolio_alerts as svc_list
+
+    async with AsyncSessionLocal() as async_session:
+        alerts = await svc_list(
+            session=async_session,
+            user_id=current_user.id,
+            portfolio_id=portfolio_id,
+        )
+    if alerts is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="포트폴리오를 찾을 수 없습니다",
+        )
+    return [PortfolioAlertResponse.model_validate(a) for a in alerts]
+
+
+@router.patch(
+    "/{portfolio_id}/alerts/{alert_id}",
+    response_model=PortfolioAlertResponse,
+)
+async def update_portfolio_alert(
+    portfolio_id: int,
+    alert_id: int,
+    body: PortfolioAlertUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+) -> PortfolioAlertResponse:
+    """포트폴리오 알림 수정 (SPEC-STOCK-031 REQ-PAL-001)."""
+    from stock_picker.db.session import AsyncSessionLocal
+    from stock_picker.portfolio.portfolio_alerts import update_portfolio_alert as svc_update
+
+    async with AsyncSessionLocal() as async_session:
+        alert = await svc_update(
+            session=async_session,
+            user_id=current_user.id,
+            portfolio_id=portfolio_id,
+            alert_id=alert_id,
+            condition_value=body.condition_value,
+            is_active=body.is_active,
+        )
+        if alert is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="알림을 찾을 수 없습니다",
+            )
+        await async_session.commit()
+        return PortfolioAlertResponse.model_validate(alert)
+
+
+@router.delete(
+    "/{portfolio_id}/alerts/{alert_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_portfolio_alert(
+    portfolio_id: int,
+    alert_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+) -> None:
+    """포트폴리오 알림 삭제 (SPEC-STOCK-031 REQ-PAL-001)."""
+    from stock_picker.db.session import AsyncSessionLocal
+    from stock_picker.portfolio.portfolio_alerts import delete_portfolio_alert as svc_delete
+
+    async with AsyncSessionLocal() as async_session:
+        deleted = await svc_delete(
+            session=async_session,
+            user_id=current_user.id,
+            portfolio_id=portfolio_id,
+            alert_id=alert_id,
+        )
+        if not deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="알림을 찾을 수 없습니다",
+            )
+        await async_session.commit()

@@ -403,16 +403,23 @@ def setup_scheduler() -> AsyncIOScheduler:
 
 
 async def _run_general_alert_check() -> None:
-    """일반 알림(목표가·급등락) 점검 잡 — 10분 주기 실행.
+    """일반 알림(목표가·급등락) 및 포트폴리오 알림 점검 잡 — 10분 주기 실행.
+
+    # @MX:NOTE: [AUTO] SPEC-STOCK-031 포트폴리오 알림 점검 check_all_portfolio_alerts 추가
+    # @MX:SPEC: SPEC-STOCK-031 REQ-PAL-004
 
     예외 발생 시 로그 기록 후 종료 (graceful degradation).
     """
     from stock_picker.db.session import AsyncSessionLocal
     from stock_picker.notifications.general_alert_service import check_and_trigger_all_alerts
+    from stock_picker.portfolio.portfolio_alerts import check_all_portfolio_alerts  # SPEC-031 추가
 
     try:
         async with AsyncSessionLocal() as session:
             count = await check_and_trigger_all_alerts(session=session)
             log.info("일반 알림 점검 완료", triggered=count)
+            # SPEC-STOCK-031: 포트폴리오 목표 수익률·MDD 임계값 알림 점검
+            pf_count = await check_all_portfolio_alerts(session=session)
+            log.info("포트폴리오 알림 점검 완료", triggered=pf_count)
     except Exception:
         log.exception("일반 알림 점검 잡 오류 — 다음 주기에 재시도")

@@ -101,6 +101,56 @@ export async function apiGetPerformanceSummary(token, portfolioId, refresh = fal
     }
     return res.json();
 }
+// ── SPEC-STOCK-031: 포트폴리오 알림 API 함수 ──────────────────────────────────
+// @MX:NOTE: [AUTO] 포트폴리오 알림 목록 조회 (SPEC-STOCK-031 REQ-PAL-001)
+export async function apiListPortfolioAlerts(token, portfolioId) {
+    const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/alerts`, {
+        headers: authHeaders(token),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail ?? `알림 목록 조회 실패: ${res.status}`);
+    }
+    return res.json();
+}
+// @MX:NOTE: [AUTO] 포트폴리오 알림 생성 (SPEC-STOCK-031 REQ-PAL-001)
+export async function apiCreatePortfolioAlert(token, portfolioId, data) {
+    const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/alerts`, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail ?? `알림 생성 실패: ${res.status}`);
+    }
+    return res.json();
+}
+// @MX:NOTE: [AUTO] 포트폴리오 알림 수정 (SPEC-STOCK-031 REQ-PAL-001)
+export async function apiUpdatePortfolioAlert(token, portfolioId, alertId, data) {
+    const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/alerts/${alertId}`, {
+        method: 'PATCH',
+        headers: authHeaders(token),
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail ?? `알림 수정 실패: ${res.status}`);
+    }
+    return res.json();
+}
+// @MX:NOTE: [AUTO] 포트폴리오 알림 삭제 (SPEC-STOCK-031 REQ-PAL-001)
+export async function apiDeletePortfolioAlert(token, portfolioId, alertId) {
+    const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/alerts/${alertId}`, {
+        method: 'DELETE',
+        headers: authHeaders(token),
+    });
+    if (!res.ok && res.status !== 204) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail ?? `알림 삭제 실패: ${res.status}`);
+    }
+}
+
 // @MX:ANCHOR: [AUTO] 백테스팅 API 공개 엔드포인트 — BacktestPanel에서 호출
 // @MX:REASON: 외부 시스템(백엔드 /portfolios/{id}/backtest) 연동 지점으로 fan_in >= 3 예상
 export async function runPortfolioBacktest(token, portfolioId, startDate, endDate) {

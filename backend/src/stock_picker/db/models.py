@@ -647,6 +647,55 @@ class Alert(Base):
     user: Mapped["User"] = relationship("User", lazy="noload")
 
 
+# ── Phase J-2: 포트폴리오 알림 (SPEC-STOCK-031) ───────────────────────────────
+
+
+class PortfolioAlert(Base):
+    """포트폴리오 목표 수익률·MDD 임계값 알림 설정 (SPEC-STOCK-031).
+
+    # @MX:ANCHOR: [AUTO] 포트폴리오 알림 핵심 엔티티 — router, portfolio_alerts 서비스, 스케줄러에서 참조
+    # @MX:REASON: portfolio/router.py CRUD 엔드포인트, portfolio_alerts.py 오케스트레이션, scheduler/jobs.py 3곳 이상
+    # @MX:SPEC: SPEC-STOCK-031 REQ-PAL-001
+    """
+
+    __tablename__ = "portfolio_alerts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    portfolio_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
+    )
+    # 알림 유형: portfolio_target_return | portfolio_mdd_breach
+    alert_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    # 목표 수익률(%) 또는 MDD 임계값(%) — 음수 가능 (-15.0 등)
+    condition_value: Mapped[float] = mapped_column(Float, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_triggered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    triggered_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMPTZ(timezone=True), nullable=True
+    )
+    triggered_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        # 동일 (user_id, portfolio_id, alert_type) 중복 방지 (REQ-PAL-008)
+        UniqueConstraint(
+            "user_id", "portfolio_id", "alert_type",
+            name="uq_portfolio_alert_user_pf_type",
+        ),
+        # 활성 알림 조회 최적화
+        Index("ix_portfolio_alerts_user_active", "user_id", "is_active"),
+    )
+
+    user: Mapped["User"] = relationship("User", lazy="noload")
+
+
 # ── Phase K: 알림 채널·유형별 수신 설정 (SPEC-STOCK-025) ──────────────────────
 
 

@@ -21,6 +21,8 @@ import NewStockSuggestions from '../components/NewStockSuggestions';
 import RiskAnalysisPanel from '../components/RiskAnalysisPanel';
 // @MX:NOTE: [AUTO] BacktestPanel — SPEC-STOCK-029 백테스팅 패널 통합
 import BacktestPanel from '../components/BacktestPanel';
+// @MX:NOTE: [AUTO] PerformanceSummaryPanel — SPEC-STOCK-030 기간별 성과 요약 패널
+import PerformanceSummaryPanel from '../components/PerformanceSummaryPanel';
 import { getPortfolioDividends, type PortfolioDividends } from '../api/dividends';
 import { LivePriceBadge } from '../components/LivePriceBadge';
 import { PerformanceDonutChart } from '../components/PerformanceDonutChart';
@@ -874,6 +876,9 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
 
       {/* AI 최적화 분석 섹션 (SPEC-STOCK-026) */}
       <OptimizeSection portfolioId={portfolioId} token={token} />
+
+      {/* 기간별 성과 요약 (SPEC-STOCK-030) */}
+      <PerformanceSummaryPanel token={token} portfolioId={portfolioId} />
 
       {/* 포트폴리오 리스크 분석 (SPEC-STOCK-027) */}
       <RiskAnalysisPanel portfolioId={portfolioId} />

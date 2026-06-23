@@ -89,6 +89,18 @@ export async function apiGetRiskAnalysis(token, portfolioId, period = 90, refres
     }
     return res.json();
 }
+// @MX:ANCHOR: [AUTO] 기간별 성과 요약 API 엔드포인트 (SPEC-STOCK-030)
+// @MX:REASON: [AUTO] PerformanceSummaryPanel, Portfolio 페이지, 테스트에서 3곳 이상 참조
+export async function apiGetPerformanceSummary(token, portfolioId, refresh = false) {
+    const url = new URL(`${API_BASE}/portfolios/${portfolioId}/performance-summary`);
+    if (refresh) url.searchParams.set('refresh', 'true');
+    const res = await fetch(url.toString(), { headers: authHeaders(token) });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail ?? `성과 요약 조회 실패: ${res.status}`);
+    }
+    return res.json();
+}
 // @MX:ANCHOR: [AUTO] 백테스팅 API 공개 엔드포인트 — BacktestPanel에서 호출
 // @MX:REASON: 외부 시스템(백엔드 /portfolios/{id}/backtest) 연동 지점으로 fan_in >= 3 예상
 export async function runPortfolioBacktest(token, portfolioId, startDate, endDate) {

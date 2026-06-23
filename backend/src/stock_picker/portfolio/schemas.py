@@ -302,4 +302,33 @@ class BacktestResult(BaseModel):
     period_days: int  # 거래일 수
     excluded_tickers: list[str]  # FDR 조회 실패로 제외된 종목
     used_tickers: list[str]  # 실제 계산에 사용된 종목
+
+
+# ─── SPEC-STOCK-030: 기간별 성과 요약 스키마 ─────────────────────────────────────
+
+class PeriodPerformance(BaseModel):
+    """단일 기간(YTD/1M/3M/6M/1Y)의 성과 지표"""
+
+    # @MX:ANCHOR: [AUTO] 기간별 성과 핵심 스키마
+    # @MX:REASON: [AUTO] router, performance_summary, 프론트 API 래퍼에서 3곳 이상 참조
+    # @MX:SPEC: SPEC-STOCK-030 REQ-PS-001
+
+    period: Literal["ytd", "1m", "3m", "6m", "1y"]  # 기간 코드
+    display_label: str  # 표시 레이블 (예: "YTD", "1개월")
+    start_date: Optional[str] = None  # 기간 시작일 (YYYY-MM-DD)
+    end_date: Optional[str] = None  # 기간 종료일 (YYYY-MM-DD)
+    trading_days: int = 0  # 실제 거래일 수
+    has_data: bool  # 데이터 존재 여부
+    total_return_pct: Optional[float] = None  # 총 수익률 (%)
+    annualized_return_pct: Optional[float] = None  # 연환산 수익률 (%)
+    mdd_pct: Optional[float] = None  # 최대 낙폭 (%, ≤0)
+
+
+class PerformanceSummaryResponse(BaseModel):
+    """포트폴리오 기간별 성과 요약 응답"""
+
+    portfolio_id: int  # 포트폴리오 ID
+    periods: list[PeriodPerformance]  # 5개 기간 성과 목록
+    calculated_at: str  # 계산 시각 (ISO 8601 UTC)
+    disclaimer: str  # 면책 문구
     disclaimer: str  # 면책 문구 (REQ-PBT-NFR-003)

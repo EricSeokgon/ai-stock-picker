@@ -12,12 +12,14 @@ from stock_picker.portfolio.ai_analysis import analyze_portfolio
 from stock_picker.portfolio.dividends import calculate_portfolio_dividends
 from stock_picker.portfolio.risk_analysis import calculate_risk_analysis
 from stock_picker.portfolio.backtest import run_portfolio_backtest
+from stock_picker.portfolio.performance_summary import calculate_performance_summary
 from stock_picker.portfolio.schemas import (
     BacktestRequest,
     BacktestResult,
     HoldingCreate,
     HoldingResponse,
     OptimizeResult,
+    PerformanceSummaryResponse,
     PortfolioCreate,
     PortfolioDividends,
     PortfolioPerformance,
@@ -245,3 +247,21 @@ async def get_portfolio_dividends(
             detail="포트폴리오를 찾을 수 없습니다",
         )
     return result
+
+
+@router.get("/{portfolio_id}/performance-summary", response_model=PerformanceSummaryResponse)
+async def get_performance_summary(
+    portfolio_id: int,
+    refresh: bool = Query(default=False, description="캐시를 무시하고 재계산"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+    redis: aioredis.Redis = Depends(get_redis_client),
+) -> PerformanceSummaryResponse:
+    """기간별 성과 요약 — YTD/1M/3M/6M/1Y 수익률 및 MDD (SPEC-STOCK-030)"""
+    return await calculate_performance_summary(
+        portfolio_id=portfolio_id,
+        user_id=current_user.id,
+        db=db,
+        redis=redis,
+        refresh=refresh,
+    )

@@ -262,6 +262,46 @@ export interface BacktestResult {
   disclaimer: string;       // 면책 문구 (REQ-PBT-NFR-003)
 }
 
+// ─── SPEC-STOCK-030: 기간별 성과 요약 타입 ──────────────────────────────────
+
+export type PeriodCode = 'ytd' | '1m' | '3m' | '6m' | '1y';
+
+export interface PeriodPerformance {
+  period: PeriodCode;
+  display_label: string;
+  start_date: string | null;
+  end_date: string | null;
+  trading_days: number;
+  has_data: boolean;
+  total_return_pct: number | null;
+  annualized_return_pct: number | null;
+  mdd_pct: number | null;
+}
+
+export interface PerformanceSummaryResponse {
+  portfolio_id: number;
+  periods: PeriodPerformance[];
+  calculated_at: string;
+  disclaimer: string;
+}
+
+// @MX:ANCHOR: [AUTO] 기간별 성과 요약 API 엔드포인트 (SPEC-STOCK-030)
+// @MX:REASON: [AUTO] PerformanceSummaryPanel, Portfolio 페이지, 테스트에서 3곳 이상 참조
+export async function apiGetPerformanceSummary(
+  token: string,
+  portfolioId: number,
+  refresh = false,
+): Promise<PerformanceSummaryResponse> {
+  const url = new URL(`${API_BASE}/portfolios/${portfolioId}/performance-summary`);
+  if (refresh) url.searchParams.set('refresh', 'true');
+  const res = await fetch(url.toString(), { headers: authHeaders(token) });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { detail?: string };
+    throw new Error(err.detail ?? `성과 요약 조회 실패: ${res.status}`);
+  }
+  return res.json() as Promise<PerformanceSummaryResponse>;
+}
+
 // @MX:ANCHOR: [AUTO] 백테스팅 API 공개 엔드포인트 — BacktestPanel에서 호출
 // @MX:REASON: 외부 시스템(백엔드 /portfolios/{id}/backtest) 연동 지점으로 fan_in >= 3 예상
 export async function runPortfolioBacktest(

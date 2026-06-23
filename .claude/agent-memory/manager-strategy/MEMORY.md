@@ -2,3 +2,6 @@
 - [SPEC-STOCK-002 Overview](project_stock_002.md) — Phase 3: JWT auth, Telegram bot, portfolio sim, backtest; reuse hooks + dep risks
 - [Stock System Library Versions](reference_stock_libs.md) — verified PyPI versions for the FastAPI + Anthropic + FDR backend stack (as of 2026-06)
 - [SPEC-STOCK-002 New Library Versions](reference_stock_002_libs.md) — python-telegram-bot, python-jose, passlib versions + passlib/bcrypt risk (2026-06)
+- [SPEC-STOCK-027 Overview](project_stock_027.md) — Phase 3: risk analysis & correlation matrix, numpy-only, new risk-analysis endpoint + Redis cache + RiskAnalysisPanel
+- [SPEC-STOCK-028 Overview](project_stock_028.md) — overseas assets: market/currency cols + FX service + KRW-unified perf/risk/AI; key: holdings table has NO existing unique constraint (migration creates new)
+- [SPEC-STOCK-029 Overview](project_stock_029.md) — portfolio backtesting (buy-and-hold), new portfolio/backtest.py; key: calculate_max_drawdown takes CUMULATIVE not daily returns, pass risk_free_rate=0.035 explicitly

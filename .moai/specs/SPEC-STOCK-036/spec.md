@@ -1,6 +1,6 @@
 ---
 id: "SPEC-STOCK-036"
-version: "0.1.0"
+version: "0.2.0"
 status: "draft"
 created_at: "2026-06-24"
 priority: "medium"
@@ -11,6 +11,10 @@ labels: ["portfolio", "alert", "notification", "backend", "frontend"]
 
 ## HISTORY
 
+- 2026-06-24 (v0.2.0): plan-auditor v1 지적사항 반영 — acceptance.md GWT→EARS 전환(15건),
+  REQ-PALX-013(규칙 삭제) 추가, NFR-001 레이블 Unwanted→Ubiquitous 수정,
+  REQ-PALX-012·NFR-001·NFR-002에 대응 AC 추가(AC-16·AC-ALT-NFR-001·AC-ALT-NFR-002),
+  acceptance.md 구현 세부(함수명·열거값) 제거.
 - 2026-06-24 (v0.1.0): 초안 작성. SPEC-STOCK-031 포트폴리오 알림 인프라를 재사용하여
   평가액 임계·개별 보유종목 수익률 임계 2종을 확장. 신규 테이블 없음(필요 시
   마이그레이션 0023으로 nullable 컬럼만 추가).
@@ -116,9 +120,12 @@ WHY: 알림 시스템은 점진적으로 확장되어야 하며, 동일 기능�
 - **REQ-PALX-012 (Optional):** WHERE 사용자가 발화 알림에 대한 채널 수신을 활성화한 경우,
   THE 시스템 SHALL 이메일 또는 텔레그램으로 발화 내용을 부가 발송한다.
 
+- **REQ-PALX-013 (Event-Driven):** WHEN 인증된 사용자가 자신의 알림 규칙 삭제를 요청하면,
+  THE 시스템 SHALL 해당 규칙을 영구적으로 제거한다.
+
 ### 비기능 요구사항 (REQ-PALX-NFR-*)
 
-- **REQ-PALX-NFR-001 (Unwanted):** THE 시스템 SHALL 외부 과학 계산 라이브러리를 새로
+- **REQ-PALX-NFR-001 (Ubiquitous):** THE 시스템 SHALL 외부 과학 계산 라이브러리를 새로
   도입하지 않는다(수치 계산은 표준 수치 연산만 사용).
 
 - **REQ-PALX-NFR-002 (Ubiquitous):** THE 시스템 SHALL 알림 조건 평가 로직을 데이터 저장소 없이

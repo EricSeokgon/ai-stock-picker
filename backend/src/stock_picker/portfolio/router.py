@@ -10,12 +10,20 @@ from stock_picker.db.models import Portfolio, PortfolioHolding, User
 from stock_picker.portfolio import service
 from stock_picker.portfolio.ai_analysis import analyze_portfolio
 from stock_picker.portfolio.dividends import calculate_portfolio_dividends
+from stock_picker.portfolio.dividend_yield import (
+    get_dividend_summary,
+    get_dividend_calendar,
+    get_drip_projection,
+)
 from stock_picker.portfolio.risk_analysis import calculate_risk_analysis
 from stock_picker.portfolio.backtest import run_portfolio_backtest
 from stock_picker.portfolio.performance_summary import calculate_performance_summary
 from stock_picker.portfolio.schemas import (
     BacktestRequest,
     BacktestResult,
+    DividendCalendar,
+    DividendSummary,
+    DRIPProjection,
     HoldingCreate,
     HoldingResponse,
     OptimizeResult,
@@ -500,3 +508,84 @@ def list_rebalancing_orders(
             )
         )
     return result
+
+
+# ── SPEC-STOCK-033: 배당 수익률 분석 강화 엔드포인트 ─────────────────────────
+# 경로: /dividend/(단수) — SPEC-019 /dividends(복수)와 충돌 없음
+
+
+@router.get(
+    "/{portfolio_id}/dividend/summary",
+    response_model=DividendSummary,
+)
+async def get_dividend_summary_endpoint(
+    portfolio_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+    redis: aioredis.Redis = Depends(get_redis_client),
+) -> DividendSummary:
+    """포트폴리오 배당 수익률 요약 (SPEC-STOCK-033 REQ-DY-002).
+
+    소유하지 않은 포트폴리오 접근 시 404 반환.
+    """
+    return await get_dividend_summary(
+        portfolio_id=portfolio_id,
+        user_id=current_user.id,
+        db=db,
+        redis=redis,
+    )
+
+
+@router.get(
+    "/{portfolio_id}/dividend/calendar",
+    response_model=DividendCalendar,
+)
+async def get_dividend_calendar_endpoint(
+    portfolio_id: int,
+    year: int = Query(default=0, description="조회 연도 (기본값: 현재 연도)"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+    redis: aioredis.Redis = Depends(get_redis_client),
+) -> DividendCalendar:
+    """포트폴리오 배당 캘린더 (SPEC-STOCK-033 REQ-DY-011).
+
+    소유하지 않은 포트폴리오 접근 시 404 반환.
+    year=0이면 현재 연도 사용.
+    """
+    import datetime
+    if year == 0:
+        year = datetime.date.today().year
+
+    return await get_dividend_calendar(
+        portfolio_id=portfolio_id,
+        user_id=current_user.id,
+        db=db,
+        redis=redis,
+        year=year,
+    )
+
+
+@router.get(
+    "/{portfolio_id}/dividend/drip",
+    response_model=DRIPProjection,
+)
+async def get_drip_projection_endpoint(
+    portfolio_id: int,
+    years: int = Query(default=10, description="시뮬레이션 연수"),
+    reinvest_rate: float = Query(default=1.0, description="배당 재투자 비율 (0.0~1.0)"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+    redis: aioredis.Redis = Depends(get_redis_client),
+) -> DRIPProjection:
+    """DRIP 복리 시뮬레이션 (SPEC-STOCK-033 REQ-DY-020~021).
+
+    소유하지 않은 포트폴리오 접근 시 404 반환.
+    """
+    return await get_drip_projection(
+        portfolio_id=portfolio_id,
+        user_id=current_user.id,
+        db=db,
+        redis=redis,
+        years=years,
+        reinvest_rate=reinvest_rate,
+    )

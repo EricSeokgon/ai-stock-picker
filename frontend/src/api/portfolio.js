@@ -195,3 +195,40 @@ export async function runPortfolioBacktest(token, portfolioId, startDate, endDat
     }
     return res.json();
 }
+
+// ── SPEC-STOCK-033: 배당 수익률 분석 강화 API ──────────────────────────────
+
+// @MX:ANCHOR: [AUTO] 배당 수익률 요약 API — DividendSummaryPanel에서 호출
+// @MX:REASON: 백엔드 /portfolios/{id}/dividend/summary 연동, fan_in >= 3 예상
+export async function apiGetDividendSummary(token, portfolioId) {
+    const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/dividend/summary`, {
+        headers: authHeaders(token),
+    });
+    if (!res.ok)
+        throw new Error(`배당 수익률 요약 조회 실패: ${res.status}`);
+    return res.json();
+}
+
+// 배당 캘린더 조회 (연도 파라미터 선택 — 기본값: 현재 연도)
+export async function apiGetDividendCalendar(token, portfolioId, year = null) {
+    const params = year ? `?year=${year}` : '';
+    const res = await fetch(
+        `${API_BASE}/portfolios/${portfolioId}/dividend/calendar${params}`,
+        { headers: authHeaders(token) }
+    );
+    if (!res.ok)
+        throw new Error(`배당 캘린더 조회 실패: ${res.status}`);
+    return res.json();
+}
+
+// @MX:ANCHOR: [AUTO] DRIP 시뮬레이션 API — DRIPSimulator에서 호출
+// @MX:REASON: 백엔드 /portfolios/{id}/dividend/drip 연동, fan_in >= 3 예상
+export async function apiGetDRIPProjection(token, portfolioId, years = 10, reinvestRate = 1.0) {
+    const res = await fetch(
+        `${API_BASE}/portfolios/${portfolioId}/dividend/drip?years=${years}&reinvest_rate=${reinvestRate}`,
+        { headers: authHeaders(token) }
+    );
+    if (!res.ok)
+        throw new Error(`DRIP 시뮬레이션 조회 실패: ${res.status}`);
+    return res.json();
+}

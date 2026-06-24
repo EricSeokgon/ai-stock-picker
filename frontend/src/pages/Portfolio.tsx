@@ -25,6 +25,10 @@ import BacktestPanel from '../components/BacktestPanel';
 import PerformanceSummaryPanel from '../components/PerformanceSummaryPanel';
 // @MX:NOTE: [AUTO] PortfolioAlertPanel — SPEC-STOCK-031 포트폴리오 알림 설정 패널
 import PortfolioAlertPanel from '../components/PortfolioAlertPanel';
+// SPEC-STOCK-033: 배당 수익률 분석 강화 컴포넌트
+import DividendSummaryPanel from '../components/DividendSummaryPanel';
+import DividendCalendarView from '../components/DividendCalendarView';
+import DRIPSimulator from '../components/DRIPSimulator';
 import { getPortfolioDividends, type PortfolioDividends } from '../api/dividends';
 import { LivePriceBadge } from '../components/LivePriceBadge';
 import { PerformanceDonutChart } from '../components/PerformanceDonutChart';
@@ -890,6 +894,11 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
 
       {/* 포트폴리오 알림 설정 (SPEC-STOCK-031) */}
       <PortfolioAlertPanel portfolioId={portfolioId} />
+
+      {/* 배당 수익률 분석 (SPEC-STOCK-033) */}
+      <DividendSummaryPanel token={token} portfolioId={portfolioId} />
+      <DividendCalendarView token={token} portfolioId={portfolioId} />
+      <DRIPSimulator token={token} portfolioId={portfolioId} />
 
       {/* AI 투자 조언 섹션 (SPEC-STOCK-014) */}
       <AdviceSection token={token} />

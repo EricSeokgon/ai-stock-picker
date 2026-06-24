@@ -415,3 +415,84 @@ class RebalancingCalculateRequest(BaseModel):
     commission_rate_domestic: float = 0.00015   # KRX 국내 수수료 0.015%
     commission_rate_foreign: float = 0.0025     # NYSE/NASDAQ 해외 수수료 0.25%
     dry_run: bool = True                         # True: 계획만 반환, False: DB 저장
+
+
+# ── SPEC-STOCK-033: 배당 수익률 분석 강화 스키마 ─────────────────────────────
+
+
+# @MX:NOTE: [AUTO] DividendHolding — SPEC-033 전용, SPEC-019 HoldingDividend와 별개
+# SPEC-019 HoldingDividend는 line ~153에 있으며 수정 금지 (quantity/dps 필드 체계 다름)
+class DividendHolding(BaseModel):
+    """보유 종목별 배당 데이터 — 수익률 분석 (SPEC-STOCK-033 REQ-DY-001)
+
+    SPEC-019 HoldingDividend와 필드 구성이 상이하므로 별도 클래스명 사용.
+    """
+
+    krx_code: str
+    stock_name: str
+    shares: int
+    annual_dps: float           # 주당 연간 배당금 (KRW)
+    dividend_yield_pct: float   # annual_dps / current_price * 100
+    estimated_annual_dividend: float  # shares * annual_dps
+
+
+class DividendSummary(BaseModel):
+    """포트폴리오 배당 수익률 요약 (SPEC-STOCK-033 REQ-DY-002)
+
+    # @MX:ANCHOR: [AUTO] 배당 수익률 분석 API 응답 스키마
+    # @MX:REASON: router, dividend_yield service, 프론트 API 래퍼에서 3곳 이상 참조
+    """
+
+    portfolio_id: int
+    total_portfolio_value: float
+    total_annual_dividend: float
+    portfolio_dividend_yield_pct: float   # 가중 평균 배당수익률
+    holdings: list[DividendHolding]
+
+
+class DividendEvent(BaseModel):
+    """단일 배당 이벤트 (SPEC-STOCK-033 REQ-DY-010)"""
+
+    krx_code: str
+    stock_name: str
+    ex_dividend_date: date
+    payment_date: Optional[date]
+    dps: float
+    shares: int
+    estimated_total: float   # shares * dps
+
+
+class DividendCalendar(BaseModel):
+    """연도별 배당 캘린더 (SPEC-STOCK-033 REQ-DY-011)
+
+    # @MX:ANCHOR: [AUTO] 배당 캘린더 API 응답 스키마
+    # @MX:REASON: router, dividend_yield service, 프론트 API 래퍼에서 3곳 이상 참조
+    """
+
+    portfolio_id: int
+    year: int
+    months: dict[int, list[DividendEvent]]   # {월(1-12): [이벤트]}
+
+
+class DRIPYearData(BaseModel):
+    """DRIP 시뮬레이션 연도별 데이터 (SPEC-STOCK-033 REQ-DY-020)"""
+
+    year: int
+    portfolio_value: float
+    annual_dividend: float
+    cumulative_return_pct: float
+
+
+class DRIPProjection(BaseModel):
+    """DRIP 복리 시뮬레이션 결과 (SPEC-STOCK-033 REQ-DY-021)
+
+    # @MX:ANCHOR: [AUTO] DRIP 시뮬레이션 API 응답 스키마
+    # @MX:REASON: router, calculate_drip_projection, 프론트 API 래퍼에서 3곳 이상 참조
+    """
+
+    portfolio_id: int
+    initial_value: float
+    dividend_yield_pct: float
+    reinvest_rate: float
+    years: list[DRIPYearData]
+    disclaimer: str   # "배당률 고정, 가격 성장 미반영 — 참고용 시뮬레이션입니다"

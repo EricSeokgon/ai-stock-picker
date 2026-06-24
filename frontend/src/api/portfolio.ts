@@ -416,3 +416,101 @@ export async function runPortfolioBacktest(
   }
   return res.json() as Promise<BacktestResult>;
 }
+
+// ── SPEC-STOCK-033: 배당 수익률 분석 강화 타입 및 API ─────────────────────
+
+export interface DividendHolding {
+  krx_code: string;
+  stock_name: string;
+  shares: number;
+  annual_dps: number;
+  dividend_yield_pct: number;
+  estimated_annual_dividend: number;
+}
+
+export interface DividendSummary {
+  portfolio_id: number;
+  total_portfolio_value: number;
+  total_annual_dividend: number;
+  portfolio_dividend_yield_pct: number;
+  holdings: DividendHolding[];
+}
+
+export interface DividendEvent {
+  krx_code: string;
+  stock_name: string;
+  ex_dividend_date: string;
+  payment_date: string | null;
+  dps: number;
+  shares: number;
+  estimated_total: number;
+}
+
+export interface DividendCalendar {
+  portfolio_id: number;
+  year: number;
+  months: Record<number, DividendEvent[]>;
+}
+
+export interface DRIPYearData {
+  year: number;
+  portfolio_value: number;
+  annual_dividend: number;
+  cumulative_return_pct: number;
+}
+
+export interface DRIPProjection {
+  portfolio_id: number;
+  initial_value: number;
+  dividend_yield_pct: number;
+  reinvest_rate: number;
+  years: DRIPYearData[];
+  disclaimer: string;
+}
+
+// @MX:ANCHOR: [AUTO] 배당 수익률 요약 API — DividendSummaryPanel에서 호출
+// @MX:REASON: 백엔드 /portfolios/{id}/dividend/summary 연동, fan_in >= 3 예상
+export async function apiGetDividendSummary(
+  token: string,
+  portfolioId: number,
+): Promise<DividendSummary> {
+  const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/dividend/summary`, {
+    headers: authHeaders(token),
+  });
+  if (!res.ok)
+    throw new Error(`배당 수익률 요약 조회 실패: ${res.status}`);
+  return res.json() as Promise<DividendSummary>;
+}
+
+// 배당 캘린더 조회 (연도 파라미터 선택 — 기본값: 현재 연도)
+export async function apiGetDividendCalendar(
+  token: string,
+  portfolioId: number,
+  year: number | null = null,
+): Promise<DividendCalendar> {
+  const params = year ? `?year=${year}` : '';
+  const res = await fetch(
+    `${API_BASE}/portfolios/${portfolioId}/dividend/calendar${params}`,
+    { headers: authHeaders(token) }
+  );
+  if (!res.ok)
+    throw new Error(`배당 캘린더 조회 실패: ${res.status}`);
+  return res.json() as Promise<DividendCalendar>;
+}
+
+// @MX:ANCHOR: [AUTO] DRIP 시뮬레이션 API — DRIPSimulator에서 호출
+// @MX:REASON: 백엔드 /portfolios/{id}/dividend/drip 연동, fan_in >= 3 예상
+export async function apiGetDRIPProjection(
+  token: string,
+  portfolioId: number,
+  years = 10,
+  reinvestRate = 1.0,
+): Promise<DRIPProjection> {
+  const res = await fetch(
+    `${API_BASE}/portfolios/${portfolioId}/dividend/drip?years=${years}&reinvest_rate=${reinvestRate}`,
+    { headers: authHeaders(token) }
+  );
+  if (!res.ok)
+    throw new Error(`DRIP 시뮬레이션 조회 실패: ${res.status}`);
+  return res.json() as Promise<DRIPProjection>;
+}

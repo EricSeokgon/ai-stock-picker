@@ -771,3 +771,41 @@ class RebalancingPlan(Base):
 
     portfolio: Mapped["Portfolio"] = relationship("Portfolio", lazy="noload")
     user: Mapped["User"] = relationship("User", lazy="noload")
+
+
+# ── Phase L-2: 포트폴리오 월별 스냅샷 (SPEC-STOCK-035) ──────────────────────────
+
+
+class PortfolioMonthlySnapshot(Base):
+    """포트폴리오 월별 평가액·수익률 스냅샷 (SPEC-STOCK-035 REQ-RPT-004).
+
+    월말 또는 사용자 요청 시점에 기록되는 포트폴리오 집계 데이터.
+    (portfolio_id, month) 조합이 UNIQUE — 동일 월 upsert는 SELECT-then-write로 처리.
+    """
+
+    __tablename__ = "portfolio_monthly_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    portfolio_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # 월 키: "YYYY-MM" 7자 문자열 (예: "2026-05")
+    month: Mapped[str] = mapped_column(String(7), nullable=False)
+    # 포트폴리오 총 평가액 (KRW)
+    total_value_krw: Mapped[float] = mapped_column(Float, nullable=False)
+    # 기간 수익률 (%) — 기간 비교 불가 시 NULL
+    total_return_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # 보유 종목 수 (스냅샷 시점)
+    holding_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    # (portfolio_id, month) 복합 UNIQUE — SELECT-then-write upsert 보장
+    __table_args__ = (
+        UniqueConstraint("portfolio_id", "month", name="uq_snapshot_portfolio_month"),
+    )
+
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", lazy="noload")

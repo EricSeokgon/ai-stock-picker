@@ -576,3 +576,118 @@ export async function apiGetBenchmarkChart(
     throw new Error(`벤치마크 차트 조회 실패: ${res.status}`);
   return res.json() as Promise<BenchmarkChartData>;
 }
+
+// ─────────────────────────────────────────────────────────────
+// SPEC-STOCK-035: 포트폴리오 성과 리포트 타입 및 API
+// ─────────────────────────────────────────────────────────────
+
+export interface HoldingReportRow {
+  ticker: string;
+  name: string;
+  quantity: number;
+  avg_cost: number;
+  current_price: number;
+  pnl_amount: number;
+  pnl_pct: number;
+  weight_pct: number;
+}
+
+export interface PortfolioReportSummary {
+  portfolio_id: number;
+  generated_at: string;
+  period: string;
+  total_value_krw: number;
+  total_return_pct: number;
+  mdd_pct: number | null;
+  holdings: HoldingReportRow[];
+  dividend_summary: unknown | null;
+  benchmark: unknown | null;
+}
+
+export interface MonthlySnapshot {
+  id: number;
+  portfolio_id: number;
+  month: string;
+  total_value_krw: number;
+  total_return_pct: number | null;
+  holding_count: number;
+  created_at: string;
+}
+
+// 리포트 JSON 요약 또는 CSV Blob 조회 (SPEC-STOCK-035 REQ-RPT-001)
+export async function apiGetPortfolioReport(
+  token: string,
+  portfolioId: number,
+  format: 'json' | 'csv' = 'json',
+  period = 'YTD',
+): Promise<PortfolioReportSummary | Blob> {
+  const res = await fetch(
+    `${API_BASE}/portfolios/${portfolioId}/report?format=${format}&period=${period}`,
+    { headers: authHeaders(token) }
+  );
+  if (!res.ok)
+    throw new Error(`포트폴리오 리포트 조회 실패: ${res.status}`);
+  if (format === 'csv') {
+    return res.blob();
+  }
+  return res.json() as Promise<PortfolioReportSummary>;
+}
+
+// 리포트 종합 요약 조회 (SPEC-STOCK-035 REQ-RPT-002)
+export async function apiGetPortfolioReportSummary(
+  token: string,
+  portfolioId: number,
+  period = 'YTD',
+  includeDividend = false,
+  includeBenchmark = false,
+  benchmark = 'KOSPI',
+): Promise<PortfolioReportSummary> {
+  const params = new URLSearchParams({
+    period,
+    include_dividend: String(includeDividend),
+    include_benchmark: String(includeBenchmark),
+    benchmark,
+  });
+  const res = await fetch(
+    `${API_BASE}/portfolios/${portfolioId}/report/summary?${params}`,
+    { headers: authHeaders(token) }
+  );
+  if (!res.ok)
+    throw new Error(`포트폴리오 리포트 요약 조회 실패: ${res.status}`);
+  return res.json() as Promise<PortfolioReportSummary>;
+}
+
+// 월별 스냅샷 생성/업데이트 (SPEC-STOCK-035 REQ-RPT-004)
+export async function apiCreateMonthlySnapshot(
+  token: string,
+  portfolioId: number,
+  month: string | null = null,
+): Promise<MonthlySnapshot> {
+  const body = month ? { month } : {};
+  const res = await fetch(
+    `${API_BASE}/portfolios/${portfolioId}/report/snapshot`,
+    {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(body),
+    }
+  );
+  if (!res.ok)
+    throw new Error(`월별 스냅샷 생성 실패: ${res.status}`);
+  return res.json() as Promise<MonthlySnapshot>;
+}
+
+// 월별 스냅샷 목록 조회 (SPEC-STOCK-035 REQ-RPT-004)
+export async function apiListMonthlySnapshots(
+  token: string,
+  portfolioId: number,
+  limit = 24,
+): Promise<MonthlySnapshot[]> {
+  const res = await fetch(
+    `${API_BASE}/portfolios/${portfolioId}/report/snapshots?limit=${limit}`,
+    { headers: authHeaders(token) }
+  );
+  if (!res.ok)
+    throw new Error(`월별 스냅샷 목록 조회 실패: ${res.status}`);
+  return res.json() as Promise<MonthlySnapshot[]>;
+}

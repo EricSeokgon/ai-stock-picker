@@ -1,4 +1,6 @@
 # 포트폴리오 라우터 — CRUD + 성과 조회 + 배당 분석 엔드포인트
+from typing import Any
+
 import redis.asyncio as aioredis
 import sqlalchemy.exc
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -28,6 +30,7 @@ from stock_picker.portfolio.schemas import (
     DRIPProjection,
     HoldingCreate,
     HoldingResponse,
+    MonthlySnapshot,
     OptimizeResult,
     PerformanceSummaryResponse,
     PortfolioAlertCreate,
@@ -36,6 +39,7 @@ from stock_picker.portfolio.schemas import (
     PortfolioCreate,
     PortfolioDividends,
     PortfolioPerformance,
+    PortfolioReportSummary,
     PortfolioResponse,
     RebalancingCalculateRequest,
     RebalancingOrderPlan,
@@ -645,3 +649,176 @@ async def get_benchmark_chart(
         user_id=current_user.id,
         db=db,
     )
+
+
+# ─────────────────────────────────────────────────────────────
+# SPEC-STOCK-035: 포트폴리오 성과 리포트 엔드포인트
+# ─────────────────────────────────────────────────────────────
+
+
+@router.get("/{portfolio_id}/report")
+async def get_portfolio_report(
+    portfolio_id: int,
+    format: str = Query(default="json", description="출력 포맷: json 또는 csv"),
+    period: str = Query(default="YTD", description="기간 코드 (YTD/1M/3M)"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+    redis: aioredis.Redis = Depends(get_redis_client),
+) -> Any:
+    """포트폴리오 성과 리포트 다운로드 (SPEC-STOCK-035 REQ-RPT-001~002).
+
+    format=csv: StreamingResponse(text/csv) 반환
+    format=json: PortfolioReportSummary JSON 반환
+    소유하지 않은 포트폴리오 접근 시 404 반환.
+    지원하지 않는 포맷 요청 시 400 반환.
+    """
+    from fastapi.responses import StreamingResponse  # noqa: PLC0415
+    from stock_picker.portfolio.report import generate_csv_content, get_report_service  # noqa: PLC0415
+
+    if format not in ("json", "csv"):
+        raise HTTPException(status_code=400, detail=f"지원하지 않는 포맷: {format}. json 또는 csv를 사용하세요.")
+
+    try:
+        rows, perf = await get_report_service(db, portfolio_id, current_user.id, period, redis)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="포트폴리오를 찾을 수 없거나 접근 권한이 없습니다.")
+
+    if format == "csv":
+        csv_content = generate_csv_content(rows)
+        return StreamingResponse(
+            iter([csv_content]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=portfolio_{portfolio_id}_report.csv"},
+        )
+
+    # JSON 응답
+    from datetime import datetime, timezone  # noqa: PLC0415
+    summary = PortfolioReportSummary(
+        portfolio_id=portfolio_id,
+        generated_at=datetime.now(tz=timezone.utc),
+        period=period,
+        total_value_krw=perf.get("total_value_krw", 0.0),
+        total_return_pct=perf.get("total_return_pct", 0.0),
+        mdd_pct=perf.get("mdd_pct"),
+        holdings=rows,
+    )
+    return summary
+
+
+@router.get("/{portfolio_id}/report/summary", response_model=PortfolioReportSummary)
+async def get_portfolio_report_summary(
+    portfolio_id: int,
+    period: str = Query(default="YTD", description="기간 코드 (YTD/1M/3M)"),
+    include_dividend: bool = Query(default=False, description="배당 요약 포함 여부"),
+    include_benchmark: bool = Query(default=False, description="벤치마크 비교 포함 여부"),
+    benchmark: str = Query(default="KOSPI", description="벤치마크 지수 (KOSPI/KOSDAQ/SP500/NASDAQ)"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+    redis: aioredis.Redis = Depends(get_redis_client),
+) -> PortfolioReportSummary:
+    """포트폴리오 성과 요약 JSON (SPEC-STOCK-035 REQ-RPT-002).
+
+    배당 요약(선택), 벤치마크 비교(선택) 포함 통합 리포트를 반환한다.
+    소유하지 않은 포트폴리오 접근 시 404 반환.
+    """
+    from datetime import datetime, timezone  # noqa: PLC0415
+    from stock_picker.portfolio.report import get_report_service  # noqa: PLC0415
+
+    try:
+        rows, perf = await get_report_service(db, portfolio_id, current_user.id, period, redis)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="포트폴리오를 찾을 수 없거나 접근 권한이 없습니다.")
+
+    dividend_data = None
+    if include_dividend:
+        try:
+            from stock_picker.portfolio.dividend_yield import get_dividend_summary  # noqa: PLC0415
+            dividend_data = await get_dividend_summary(portfolio_id, current_user.id, db)
+        except Exception:
+            dividend_data = None
+
+    benchmark_data = None
+    if include_benchmark:
+        try:
+            from stock_picker.portfolio.benchmark import get_benchmark_comparison_service  # noqa: PLC0415
+            benchmark_data = await get_benchmark_comparison_service(
+                portfolio_id=portfolio_id,
+                benchmark=benchmark,
+                period=period,
+                user_id=current_user.id,
+                db=db,
+            )
+        except Exception:
+            benchmark_data = None
+
+    return PortfolioReportSummary(
+        portfolio_id=portfolio_id,
+        generated_at=datetime.now(tz=timezone.utc),
+        period=period,
+        total_value_krw=perf.get("total_value_krw", 0.0),
+        total_return_pct=perf.get("total_return_pct", 0.0),
+        mdd_pct=perf.get("mdd_pct"),
+        holdings=rows,
+        dividend_summary=dividend_data,
+        benchmark=benchmark_data,
+    )
+
+
+@router.post("/{portfolio_id}/report/snapshot", response_model=MonthlySnapshot)
+async def create_monthly_snapshot(
+    portfolio_id: int,
+    body: dict = {},
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+    redis: aioredis.Redis = Depends(get_redis_client),
+) -> MonthlySnapshot:
+    """포트폴리오 월별 스냅샷 생성/업데이트 (SPEC-STOCK-035 REQ-RPT-004).
+
+    현재 시점의 평가액·수익률·보유 종목 수를 month 키로 DB에 upsert한다.
+    소유하지 않은 포트폴리오 접근 시 404 반환.
+    """
+    from datetime import datetime, timezone  # noqa: PLC0415
+    from stock_picker.portfolio.report import get_report_service, upsert_monthly_snapshot  # noqa: PLC0415
+
+    try:
+        rows, perf = await get_report_service(db, portfolio_id, current_user.id, "YTD", redis)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="포트폴리오를 찾을 수 없거나 접근 권한이 없습니다.")
+
+    # 요청 body에 month가 없으면 현재 월 사용
+    month = body.get("month") if isinstance(body, dict) else None
+    if not month:
+        month = datetime.now(tz=timezone.utc).strftime("%Y-%m")
+
+    snapshot = upsert_monthly_snapshot(
+        db=db,
+        portfolio_id=portfolio_id,
+        month=month,
+        total_value_krw=perf.get("total_value_krw", 0.0),
+        total_return_pct=perf.get("total_return_pct"),
+        holding_count=len(rows),
+    )
+    return MonthlySnapshot.model_validate(snapshot)
+
+
+@router.get("/{portfolio_id}/report/snapshots", response_model=list[MonthlySnapshot])
+async def list_portfolio_snapshots(
+    portfolio_id: int,
+    limit: int = Query(default=24, ge=1, le=60, description="최대 반환 개수 (최대 60)"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+) -> list[MonthlySnapshot]:
+    """포트폴리오 월별 스냅샷 목록 조회 (SPEC-STOCK-035 REQ-RPT-004).
+
+    최신 월 우선으로 정렬하여 반환한다.
+    소유하지 않은 포트폴리오 접근 시 404 반환.
+    """
+    from stock_picker.portfolio.service import get_portfolio_with_holdings  # noqa: PLC0415
+    from stock_picker.portfolio.report import list_monthly_snapshots  # noqa: PLC0415
+
+    portfolio = get_portfolio_with_holdings(db, portfolio_id, current_user.id)
+    if portfolio is None:
+        raise HTTPException(status_code=404, detail="포트폴리오를 찾을 수 없거나 접근 권한이 없습니다.")
+
+    snapshots = list_monthly_snapshots(db, portfolio_id, limit)
+    return [MonthlySnapshot.model_validate(s) for s in snapshots]

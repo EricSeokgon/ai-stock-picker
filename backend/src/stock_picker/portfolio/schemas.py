@@ -1,7 +1,7 @@
 # 포트폴리오 관련 Pydantic v2 스키마 (SPEC-STOCK-017·028 확장)
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 # SPEC-STOCK-027 — 리스크 분석 스키마는 파일 하단에 추가됨
 # SPEC-STOCK-028 — 해외 자산(NYSE/NASDAQ) 지원 필드 추가
@@ -551,3 +551,60 @@ class BenchmarkChartData(BaseModel):
     benchmark: str
     period: str
     chart: list[BenchmarkChartPoint]
+
+
+# ─────────────────────────────────────────────────────────────
+# SPEC-STOCK-035: 포트폴리오 성과 리포트 스키마
+# ─────────────────────────────────────────────────────────────
+
+
+class HoldingReportRow(BaseModel):
+    """보유 종목별 손익 행 (SPEC-STOCK-035 REQ-RPT-001)
+
+    순수 함수 generate_holding_report_rows의 출력 단위.
+    모든 금액은 KRW 기준으로 통일되어 전달된다.
+    """
+
+    ticker: str              # 종목코드 (KRX 코드 또는 해외 티커)
+    name: str                # 종목명
+    quantity: float          # 보유 수량
+    avg_cost: float          # 평균 매수가 (KRW)
+    current_price: float     # 현재가 (KRW)
+    pnl_amount: float        # 평가 손익 (KRW) = (현재가 - 평균단가) × 수량
+    pnl_pct: float           # 수익률 (%) = (현재가 / 평균단가 - 1) × 100
+    weight_pct: float        # 포트폴리오 내 비중 (%) = 현재가 × 수량 / 총액 × 100
+
+
+# @MX:ANCHOR: [AUTO] PortfolioReportSummary — 030·033·034 집계 응답 스키마 (fan_in >= 3)
+# @MX:REASON: [AUTO] router(report 엔드포인트), report.py 서비스, 프론트 API 래퍼에서 3곳 이상 참조
+# @MX:SPEC: SPEC-STOCK-035 REQ-RPT-002
+class PortfolioReportSummary(BaseModel):
+    """포트폴리오 성과 리포트 종합 요약 (SPEC-STOCK-035 REQ-RPT-002)
+
+    030 성과 요약 + 033 배당 요약(선택) + 034 벤치마크(선택) + 보유 종목 손익행 통합.
+    """
+
+    portfolio_id: int
+    generated_at: datetime
+    period: str                        # "YTD", "1M", "3M", "custom:start~end" 등
+    total_value_krw: float             # 포트폴리오 총 평가액 (KRW)
+    total_return_pct: float            # 기간 수익률 (%)
+    mdd_pct: Optional[float] = None   # 최대 낙폭 (%, ≤0), 데이터 부족 시 None
+    holdings: list[HoldingReportRow]  # 보유 종목 손익 행 목록
+    dividend_summary: Optional[Any] = None   # DividendSummary (SPEC-033), 미요청 시 None
+    benchmark: Optional[Any] = None          # BenchmarkComparison (SPEC-034), 미요청 시 None
+
+
+class MonthlySnapshot(BaseModel):
+    """포트폴리오 월별 스냅샷 응답 (SPEC-STOCK-035 REQ-RPT-004)"""
+
+    # @MX:NOTE: [AUTO] from_attributes=True — ORM 모델 PortfolioMonthlySnapshot에서 직접 변환
+    id: int
+    portfolio_id: int
+    month: str                         # "YYYY-MM" 형식 (예: "2026-05")
+    total_value_krw: float
+    total_return_pct: Optional[float] = None  # 기간 비교 불가 시 None
+    holding_count: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

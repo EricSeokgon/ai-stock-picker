@@ -16,6 +16,7 @@ import DividendCalendarView from '../components/DividendCalendarView';
 import DRIPSimulator from '../components/DRIPSimulator';
 import BenchmarkComparisonPanel from '../components/BenchmarkComparisonPanel';
 import BenchmarkChartView from '../components/BenchmarkChartView';
+import PortfolioReportPanel from '../components/PortfolioReportPanel';
 import { getPortfolioDividends } from '../api/dividends';
 import { LivePriceBadge } from '../components/LivePriceBadge';
 import { PerformanceDonutChart } from '../components/PerformanceDonutChart';

@@ -254,3 +254,73 @@ export async function apiGetBenchmarkChart(token, portfolioId, benchmark = 'KOSP
         throw new Error(`벤치마크 차트 조회 실패: ${res.status}`);
     return res.json();
 }
+
+// ─────────────────────────────────────────────────────────────
+// SPEC-STOCK-035: 포트폴리오 성과 리포트 API
+// ─────────────────────────────────────────────────────────────
+
+// 리포트 JSON 요약 조회 (SPEC-STOCK-035 REQ-RPT-001)
+export async function apiGetPortfolioReport(token, portfolioId, format = 'json', period = 'YTD') {
+    const res = await fetch(
+        `${API_BASE}/portfolios/${portfolioId}/report?format=${format}&period=${period}`,
+        { headers: authHeaders(token) }
+    );
+    if (!res.ok)
+        throw new Error(`포트폴리오 리포트 조회 실패: ${res.status}`);
+    if (format === 'csv') {
+        // CSV 다운로드: Blob 반환
+        return res.blob();
+    }
+    return res.json();
+}
+
+// 리포트 종합 요약 조회 (SPEC-STOCK-035 REQ-RPT-002)
+export async function apiGetPortfolioReportSummary(
+    token,
+    portfolioId,
+    period = 'YTD',
+    includeDividend = false,
+    includeBenchmark = false,
+    benchmark = 'KOSPI'
+) {
+    const params = new URLSearchParams({
+        period,
+        include_dividend: String(includeDividend),
+        include_benchmark: String(includeBenchmark),
+        benchmark,
+    });
+    const res = await fetch(
+        `${API_BASE}/portfolios/${portfolioId}/report/summary?${params}`,
+        { headers: authHeaders(token) }
+    );
+    if (!res.ok)
+        throw new Error(`포트폴리오 리포트 요약 조회 실패: ${res.status}`);
+    return res.json();
+}
+
+// 월별 스냅샷 생성/업데이트 (SPEC-STOCK-035 REQ-RPT-004)
+export async function apiCreateMonthlySnapshot(token, portfolioId, month = null) {
+    const body = month ? { month } : {};
+    const res = await fetch(
+        `${API_BASE}/portfolios/${portfolioId}/report/snapshot`,
+        {
+            method: 'POST',
+            headers: authHeaders(token),
+            body: JSON.stringify(body),
+        }
+    );
+    if (!res.ok)
+        throw new Error(`월별 스냅샷 생성 실패: ${res.status}`);
+    return res.json();
+}
+
+// 월별 스냅샷 목록 조회 (SPEC-STOCK-035 REQ-RPT-004)
+export async function apiListMonthlySnapshots(token, portfolioId, limit = 24) {
+    const res = await fetch(
+        `${API_BASE}/portfolios/${portfolioId}/report/snapshots?limit=${limit}`,
+        { headers: authHeaders(token) }
+    );
+    if (!res.ok)
+        throw new Error(`월별 스냅샷 목록 조회 실패: ${res.status}`);
+    return res.json();
+}

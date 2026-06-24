@@ -1,6 +1,6 @@
 ---
 id: "SPEC-STOCK-035"
-version: "0.1.0"
+version: "0.2.0"
 status: "draft"
 created_at: "2026-06-24"
 updated_at: "2026-06-24"
@@ -19,6 +19,7 @@ labels: ["portfolio", "report", "csv", "snapshot", "backend", "frontend"]
 | 버전 | 날짜 | 변경 내용 |
 |------|------|-----------|
 | 0.1.0 | 2026-06-24 | 최초 작성. SPEC-030/033/034 서비스 결과를 집계하는 리포트 레이어 정의. 신규 핵심: CSV 보유 손익표 스트리밍·JSON 통합 요약·커스텀 날짜 범위·월별 스냅샷 영속화. 신규 엔드포인트 4종(`/report`·`/report/summary`·`/report/snapshot`·`/report/snapshots`). 신규 테이블·마이그레이션(0022) `portfolio_monthly_snapshots`. REQ-RPT-001~005 + NFR-001~005. |
+| 0.2.0 | 2026-06-24 | plan-auditor v1 지적사항 반영 — acceptance.md §1 EARS 주어 10건 수정(아티팩트 주어 → "THE 시스템 SHALL" 패턴 일관화). |
 
 > **REQ 접두사 설계 원칙**: 본 SPEC은 `REQ-RPT-*`(RePorT) 접두사를 사용한다. 기존 SPEC 접두사(OPT/RISK/FA/PBT/PS/PAL/RBA/DVY/BMK)와 충돌하지 않는다.
 

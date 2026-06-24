@@ -1,1 +1,2 @@
 - [Stock Picker SPEC Conventions](stock-picker-spec-conventions.md) — SPEC-STOCK-NNN numbering, Korean spec body, permanent auto-trading exclusion
+- [Project SPEC-STOCK-036](project_stock_036.md) — 포트폴리오 알림 확장: SPEC-031 인프라 재사용, 값/종목 임계 2종 신규(신규 테이블 없음)

@@ -7,6 +7,22 @@
 
 ---
 
+## [0.34.0] - 2026-06-24
+
+### Added (SPEC-STOCK-034: 포트폴리오 벤치마크 비교)
+- **벤치마크 비교 API**: 4종 시장 지수(KOSPI·KOSDAQ·S&P500·NASDAQ) 대비 포트폴리오 수익률 비교
+- **성과 지표**: 알파(연환산 초과수익), 베타(공분산/분산 비율) 산출
+- **차트 데이터**: 100 재기준화 포트폴리오·벤치마크 동시 인덱스
+- **순수 함수**: `calculate_benchmark_comparison`, `calculate_beta`, `calculate_benchmark_chart` (scipy 금지, numpy + math)
+- **소유권 검증**: HTTP 404 (non-owner), Graceful degradation (벤치마크 미제공 시 None)
+- **프론트엔드**: BenchmarkComparisonPanel, BenchmarkChartView 컴포넌트 신규
+- **테스트**: 49개 단위 테스트 (96% 커버리지)
+- **엔드포인트**: 
+  - `GET /portfolios/{id}/benchmark?benchmark=KOSPI&period=YTD` → BenchmarkComparison
+  - `GET /portfolios/{id}/benchmark/chart?benchmark=KOSPI&period=YTD` → BenchmarkChartData
+
+---
+
 ## [0.33.0] - 2026-06-24
 
 ### Added (SPEC-STOCK-033: 배당 수익률 분석 강화)

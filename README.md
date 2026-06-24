@@ -4,6 +4,16 @@
 
 ## 핵심 기능
 
+### Phase 34: 포트폴리오 벤치마크 비교 (v0.34.0)
+- **벤치마크 비교 API**: 4종 시장 지수 대비 포트폴리오 성과 분석 (KOSPI·KOSDAQ·S&P500·NASDAQ)
+- **성과 지표**: 알파(연환산 초과수익률) 및 베타(포트폴리오·벤치마크 공분산 / 벤치마크 분산) 산출
+- **차트 데이터**: 100 기준 재기준화 포트폴리오·벤치마크 동시 인덱싱 (기간 내 가격 변동 비교 가능)
+- **소유권 검증**: 포트폴리오 없거나 타 사용자 소유 시 HTTP 404
+- **Graceful degradation**: 벤치마크 데이터 미제공 시 None으로 반환, 전체 에러 없음
+- **순수 함수**: scipy 금지, numpy + math 전용 (`calculate_beta`, `calculate_benchmark_comparison`, `calculate_benchmark_chart`)
+- **프론트엔드**: BenchmarkComparisonPanel(요약 지표) + BenchmarkChartView(100 기준 재기준화 차트) 신규 컴포넌트
+- **테스트**: 49개 단위 테스트 (96% 커버리지)
+
 ### Phase 33: 배당 수익률 분석 강화 (v0.33.0)
 - **배당 분석 강화**: 가중 배당 수익률, 날짜 정밀 캘린더, DRIP 재투자 복리 시뮬레이션 (SPEC-033)
 - **배당 요약 API**: `GET /portfolios/{id}/dividend/summary` — 포트폴리오 가중 평균 배당 수익률·연간 배당 수입

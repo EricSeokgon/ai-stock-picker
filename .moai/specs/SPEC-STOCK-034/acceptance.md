@@ -32,6 +32,12 @@
 - **AC-005-2**: IF 특정 기간의 벤치마크 데이터를 확보할 수 없으면 THEN THE 시스템 SHALL 오류 없이 해당 기간의 벤치마크 수익률·초과수익·알파·베타를 미산정 값으로 반환한다.
 - **AC-005-3**: IF 일별 수익률 데이터가 20개 미만이면 THEN THE 시스템 SHALL 베타를 미산정 값으로 반환한다.
 
+### AC-BMK-NFR — 비기능 요구사항 수용 기준 (NFR-001, NFR-002, NFR-005)
+
+- **AC-BMK-NFR-001**: WHEN the benchmark comparison is calculated, THE SYSTEM SHALL produce results using only approved numerical computation libraries without relying on external statistical optimization packages.
+- **AC-BMK-NFR-002**: WHEN benchmark history data and portfolio history data are provided as function parameters, THE SYSTEM SHALL calculate the comparison result without accessing external data sources or databases.
+- **AC-BMK-NFR-005**: IF benchmark price data is unavailable for a period, THE SYSTEM SHALL return a null value for that period's benchmark metrics and continue processing the response.
+
 ---
 
 ## 2. Given-When-Then 시나리오 (BDD)

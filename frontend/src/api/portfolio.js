@@ -232,3 +232,25 @@ export async function apiGetDRIPProjection(token, portfolioId, years = 10, reinv
         throw new Error(`DRIP 시뮬레이션 조회 실패: ${res.status}`);
     return res.json();
 }
+
+// 벤치마크 비교 조회 (SPEC-STOCK-034 REQ-BMK-001~004)
+export async function apiGetBenchmarkComparison(token, portfolioId, benchmark = 'KOSPI', period = '1Y') {
+    const res = await fetch(
+        `${API_BASE}/portfolios/${portfolioId}/benchmark?benchmark=${benchmark}&period=${period}`,
+        { headers: authHeaders(token) }
+    );
+    if (!res.ok)
+        throw new Error(`벤치마크 비교 조회 실패: ${res.status}`);
+    return res.json();
+}
+
+// 벤치마크 비교 재기준화 차트 조회 (SPEC-STOCK-034 REQ-BMK-010)
+export async function apiGetBenchmarkChart(token, portfolioId, benchmark = 'KOSPI', period = '1Y') {
+    const res = await fetch(
+        `${API_BASE}/portfolios/${portfolioId}/benchmark/chart?benchmark=${benchmark}&period=${period}`,
+        { headers: authHeaders(token) }
+    );
+    if (!res.ok)
+        throw new Error(`벤치마크 차트 조회 실패: ${res.status}`);
+    return res.json();
+}

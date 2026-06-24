@@ -29,6 +29,8 @@ import PortfolioAlertPanel from '../components/PortfolioAlertPanel';
 import DividendSummaryPanel from '../components/DividendSummaryPanel';
 import DividendCalendarView from '../components/DividendCalendarView';
 import DRIPSimulator from '../components/DRIPSimulator';
+import BenchmarkComparisonPanel from '../components/BenchmarkComparisonPanel';
+import BenchmarkChartView from '../components/BenchmarkChartView';
 import { getPortfolioDividends, type PortfolioDividends } from '../api/dividends';
 import { LivePriceBadge } from '../components/LivePriceBadge';
 import { PerformanceDonutChart } from '../components/PerformanceDonutChart';
@@ -899,6 +901,10 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
       <DividendSummaryPanel token={token} portfolioId={portfolioId} />
       <DividendCalendarView token={token} portfolioId={portfolioId} />
       <DRIPSimulator token={token} portfolioId={portfolioId} />
+
+      {/* 벤치마크 비교 (SPEC-STOCK-034) */}
+      <BenchmarkComparisonPanel token={token} portfolioId={portfolioId} />
+      <BenchmarkChartView token={token} portfolioId={portfolioId} />
 
       {/* AI 투자 조언 섹션 (SPEC-STOCK-014) */}
       <AdviceSection token={token} />

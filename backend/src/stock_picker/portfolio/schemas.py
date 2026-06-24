@@ -496,3 +496,58 @@ class DRIPProjection(BaseModel):
     reinvest_rate: float
     years: list[DRIPYearData]
     disclaimer: str   # "배당률 고정, 가격 성장 미반영 — 참고용 시뮬레이션입니다"
+
+
+# ─────────────────────────────────────────────────────────────
+# SPEC-STOCK-034: 포트폴리오 벤치마크 비교 스키마
+# ─────────────────────────────────────────────────────────────
+
+
+class BenchmarkPeriodReturn(BaseModel):
+    """단일 기간 벤치마크 수익률 항목 (SPEC-STOCK-034 REQ-BMK-001)"""
+
+    period: str
+    portfolio_return_pct: float
+    benchmark_return_pct: Optional[float]
+    excess_return_pct: Optional[float]
+
+
+class BenchmarkComparison(BaseModel):
+    """포트폴리오 벤치마크 비교 응답 (SPEC-STOCK-034 REQ-BMK-001~004)
+
+    # @MX:ANCHOR: [AUTO] 벤치마크 비교 API 응답 스키마
+    # @MX:REASON: router, benchmark service, 프론트 API 래퍼에서 3곳 이상 참조
+    # @MX:SPEC: SPEC-STOCK-034
+    """
+
+    portfolio_id: int
+    benchmark: str           # "KOSPI", "KOSDAQ", "SP500", "NASDAQ"
+    period: str              # "YTD", "1M", "3M", "6M", "1Y"
+    portfolio_return_pct: float
+    benchmark_return_pct: Optional[float] = None
+    excess_return_pct: Optional[float] = None
+    alpha: Optional[float] = None    # 연환산 초과수익률 (%)
+    beta: Optional[float] = None     # None if < 20 data points
+    calculated_at: datetime
+
+
+class BenchmarkChartPoint(BaseModel):
+    """벤치마크 차트 단일 데이터 포인트 (SPEC-STOCK-034 REQ-BMK-010)"""
+
+    date: date
+    portfolio_index: float         # 기간 시작 100 기준
+    benchmark_index: Optional[float] = None
+
+
+class BenchmarkChartData(BaseModel):
+    """벤치마크 비교 차트 데이터 (SPEC-STOCK-034 REQ-BMK-010)
+
+    # @MX:ANCHOR: [AUTO] 벤치마크 차트 API 응답 스키마
+    # @MX:REASON: router, benchmark service, 프론트 API 래퍼에서 3곳 이상 참조
+    # @MX:SPEC: SPEC-STOCK-034
+    """
+
+    portfolio_id: int
+    benchmark: str
+    period: str
+    chart: list[BenchmarkChartPoint]

@@ -21,6 +21,8 @@ from stock_picker.portfolio.performance_summary import calculate_performance_sum
 from stock_picker.portfolio.schemas import (
     BacktestRequest,
     BacktestResult,
+    BenchmarkChartData,
+    BenchmarkComparison,
     DividendCalendar,
     DividendSummary,
     DRIPProjection,
@@ -588,4 +590,58 @@ async def get_drip_projection_endpoint(
         redis=redis,
         years=years,
         reinvest_rate=reinvest_rate,
+    )
+
+
+@router.get(
+    "/{portfolio_id}/benchmark",
+    response_model=BenchmarkComparison,
+)
+async def get_benchmark_comparison(
+    portfolio_id: int,
+    benchmark: str = Query(default="KOSPI", description="벤치마크 지수 (KOSPI/KOSDAQ/SP500/NASDAQ)"),
+    period: str = Query(default="1Y", description="비교 기간 (YTD/1M/3M/6M/1Y)"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+) -> BenchmarkComparison:
+    """포트폴리오 벤치마크 비교 (SPEC-STOCK-034 REQ-BMK-001~004).
+
+    알파·베타·수익률 비교를 반환한다.
+    소유하지 않은 포트폴리오 접근 시 404 반환.
+    """
+    from stock_picker.portfolio.benchmark import get_benchmark_comparison_service  # noqa: PLC0415
+
+    return await get_benchmark_comparison_service(
+        portfolio_id=portfolio_id,
+        benchmark=benchmark,
+        period=period,
+        user_id=current_user.id,
+        db=db,
+    )
+
+
+@router.get(
+    "/{portfolio_id}/benchmark/chart",
+    response_model=BenchmarkChartData,
+)
+async def get_benchmark_chart(
+    portfolio_id: int,
+    benchmark: str = Query(default="KOSPI", description="벤치마크 지수 (KOSPI/KOSDAQ/SP500/NASDAQ)"),
+    period: str = Query(default="1Y", description="비교 기간 (YTD/1M/3M/6M/1Y)"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+) -> BenchmarkChartData:
+    """포트폴리오 벤치마크 비교 재기준화 차트 (SPEC-STOCK-034 REQ-BMK-010).
+
+    100 기준으로 재기준화된 포트폴리오·벤치마크 차트 데이터를 반환한다.
+    소유하지 않은 포트폴리오 접근 시 404 반환.
+    """
+    from stock_picker.portfolio.benchmark import get_benchmark_chart_service  # noqa: PLC0415
+
+    return await get_benchmark_chart_service(
+        portfolio_id=portfolio_id,
+        benchmark=benchmark,
+        period=period,
+        user_id=current_user.id,
+        db=db,
     )

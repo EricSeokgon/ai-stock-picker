@@ -7,6 +7,20 @@
 
 ---
 
+## [0.33.0] - 2026-06-24
+
+### Added (SPEC-STOCK-033: 배당 수익률 분석 강화)
+- 포트폴리오 가중 평균 배당 수익률 계산 (보유 평가액 기반 가중치)
+- DRIP(배당 재투자) 복리 시뮬레이션 — N년 투영, 재투자 비율 0~100% 설정
+- 날짜 정밀 배당 캘린더 — 배당기준일·지급일 월별 그룹
+- REST API 3종: `GET /portfolios/{id}/dividend/summary`, `/dividend/calendar`, `/dividend/drip`
+- 순수 함수 3종 — scipy 금지, DB 없이 단위 테스트 가능
+- SPEC-019 `get_dividend_info` 재사용 (기존 `/dividends` 엔드포인트 불변)
+- 프론트엔드 패널 3종: DividendSummaryPanel, DividendCalendarView, DRIPSimulator
+- 단위 테스트 35종 (98% 커버리지)
+
+---
+
 ## [0.32.0] - 2026-06-23
 
 ### Added (SPEC-STOCK-032: 포트폴리오 리밸런싱 자동화)

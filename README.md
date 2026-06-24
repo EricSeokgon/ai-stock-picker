@@ -4,6 +4,16 @@
 
 ## 핵심 기능
 
+### Phase 33: 배당 수익률 분석 강화 (v0.33.0)
+- **배당 분석 강화**: 가중 배당 수익률, 날짜 정밀 캘린더, DRIP 재투자 복리 시뮬레이션 (SPEC-033)
+- **배당 요약 API**: `GET /portfolios/{id}/dividend/summary` — 포트폴리오 가중 평균 배당 수익률·연간 배당 수입
+- **배당 캘린더 API**: `GET /portfolios/{id}/dividend/calendar` — 월별 배당 지급 예상액
+- **DRIP 시뮬레이터 API**: `GET /portfolios/{id}/dividend/drip` — N년 투영, 재투자 비율(0~100%) 설정
+- **순수 함수**: scipy 미사용, numpy + math only, DB 테이블 없음
+- **SPEC-019 재사용**: 기존 `get_dividend_info` 및 Redis 캐시 재활용
+- **프론트엔드**: DividendSummaryPanel(요약), DividendCalendarView(캘린더), DRIPSimulator(시뮬레이터)
+- **테스트**: 35개 단위 테스트 (98% 커버리지)
+
 ### Phase 32: 포트폴리오 리밸런싱 자동화 (v0.32.0)
 - **리밸런싱 자동화**: AI 목표 비중 → 실행 가능한 매수/매도 주수 계획서 산출 (예산·수수료 반영)
 - **주문 계획서 API**: `POST /portfolios/{id}/rebalance/calculate` 미리보기 + `GET /portfolios/{id}/rebalance/orders` 저장된 계획 조회
@@ -338,7 +348,9 @@ docker pull ghcr.io/{owner}/ai-stock-picker-backend:sha-abc123
 | **테스트** | pytest 7.x, Playwright, @testing-library/react |
 | **배포** | Docker, docker-compose |
 
-## 주요 업데이트 (최신: Phase 24 - 알림 채널 연결)
+## 주요 업데이트 (최신: Phase 33 - 배당 수익률 분석 강화)
+
+**[0.33.0] - 2026-06-24** (SPEC-STOCK-033): 배당 수익률 분석 강화 — 가중 배당 수익률·DRIP 복리 시뮬레이션·날짜 정밀 캘린더 3개 API 신규
 
 **[0.24.0] - 2026-06-16** (SPEC-STOCK-024): 알림 채널 연결 — 이메일·텔레그램을 alerts·rec_change 경로에 배선, 텔레그램 Bot API 실제 발송 구현
 

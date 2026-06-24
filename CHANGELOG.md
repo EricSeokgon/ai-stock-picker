@@ -7,6 +7,27 @@
 
 ---
 
+## [0.35.0] - 2026-06-24
+
+### Added (SPEC-STOCK-035: 포트폴리오 성과 리포트 자동 생성)
+- **CSV 보유 손익표 다운로드**: 종목별 평균단가·현재가·평가손익·수익률·비중 (8열, stdlib csv 전용)
+- **JSON 통합 요약 리포트**: 기간 수익률 + 보유 종목 + 배당 요약(선택) + 벤치마크(선택) 통합 집계
+- **커스텀 날짜 범위 조회**: "custom:{시작일}~{종료일}" 형식 기간 식별자로 임의 기간 리포트
+- **월별 포트폴리오 스냅샷**: 영속화 저장(upsert)·조회, 중복 방지 (Alembic 마이그레이션 0022)
+- **순수 함수**: `generate_holding_report_rows`, `generate_csv_content` (scipy 금지, CSV stdlib 전용)
+- **서비스 레이어**: CSV 리포트·JSON 요약·커스텀 범위·스냅샷 upsert/list 서비스 함수
+- **라우터 엔드포인트 4종**:
+  - `GET /portfolios/{id}/report?format=csv|json&period=YTD`
+  - `GET /portfolios/{id}/report/summary?benchmark=&period=YTD`
+  - `POST /portfolios/{id}/report/snapshot`
+  - `GET /portfolios/{id}/report/snapshots`
+- **스키마 3종**: HoldingReportRow, PortfolioReportSummary, MonthlySnapshot
+- **DB 모델**: PortfolioMonthlySnapshot ORM 모델 (migration 0022)
+- **프론트엔드**: PortfolioReportPanel 컴포넌트 + 리포트 다운로드·조회 기능
+- **테스트**: 25개 단위 테스트 (scipy 금지·CSV stdlib 전용 검증, snapshot upsert 멱등성, 포맷 미지원 400 등)
+
+---
+
 ## [0.34.0] - 2026-06-24
 
 ### Added (SPEC-STOCK-034: 포트폴리오 벤치마크 비교)

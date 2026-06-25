@@ -106,9 +106,9 @@ WHEN 사용자가 기간 선택(7일/30일/90일/365일)을 변경하면, THE �
 
 IF 선택한 기간에 표시할 스냅샷·보유 데이터가 없으면, THEN THE 시스템 SHALL 오류 대신 해당 차트에 의미 있는 빈 상태 안내를 표시한다.
 
-### REQ-DASH-008 — 로딩 상태 (Event-driven)
+### REQ-DASH-008 — 로딩 상태 (State-driven)
 
-WHEN 대시보드 데이터를 조회하는 중이면, THE 시스템 SHALL 각 차트 영역에 로딩 표시를 노출한다.
+WHILE 대시보드 데이터를 조회하는 중이면, THE 시스템 SHALL 각 차트 영역에 로딩 표시를 노출한다.
 
 ### REQ-DASH-009 — 소유권 보호 (Unwanted)
 
@@ -120,7 +120,7 @@ IF 사용자가 자신이 소유하지 않은 포트폴리오의 대시보드 �
 
 ### REQ-DASH-NFR-001 — 계산 라이브러리 제약 (Unwanted)
 
-IF 대시보드 집계에 수치 계산이 필요하면, THEN THE 시스템 SHALL scipy를 사용하지 않고 numpy 및 표준 수학 연산만으로 계산한다.
+IF 대시보드 집계에 수치 계산이 필요하면, THEN THE 시스템 SHALL 외부 과학 계산 라이브러리를 사용하지 않고 표준 산술 연산만으로 계산한다.
 
 ### REQ-DASH-NFR-002 — 순수 함수 분리 (Ubiquitous)
 

@@ -1,11 +1,12 @@
-"""포트폴리오 알림 서비스 — 목표 수익률·MDD 임계값 알림 (SPEC-STOCK-031).
+"""포트폴리오 알림 서비스 — 목표 수익률·MDD 임계값·평가액·종목 수익률 알림 (SPEC-STOCK-031, SPEC-STOCK-036).
 
 # @MX:ANCHOR: [AUTO] check_all_portfolio_alerts: 스케줄러·테스트에서 fan_in >= 3 예상되는 진입점
 # @MX:REASON: 포트폴리오 알림 점검 오케스트레이션 진입점 — 변경 시 scheduler/jobs.py 동기화 필요
-# @MX:SPEC: SPEC-STOCK-031 REQ-PAL-002~005
+# @MX:SPEC: SPEC-STOCK-031 REQ-PAL-002~005, SPEC-STOCK-036 REQ-PAL-036-001~004
 
 NFR-001 준수: 외부 과학 계산 라이브러리 미사용 — numpy + math 표준 라이브러리만 허용.
 성과 요약 조회는 SPEC-030 calculate_performance_summary 재사용.
+SPEC-036 신규: portfolio_value_below(평가액 이하), holding_return(개별 종목 수익률) 알림 추가.
 """
 from __future__ import annotations
 
@@ -29,6 +30,61 @@ logger = logging.getLogger(__name__)
 # ────────────────────────────────────────────────────────────
 # 순수 함수: 알림 조건 평가 (DB·상태 없음)
 # ────────────────────────────────────────────────────────────
+
+# @MX:NOTE: [AUTO] check_portfolio_value_alert: 포트폴리오 평가액 이하 임계 확인 (순수함수, SPEC-036)
+def check_portfolio_value_alert(
+    alert: Any,
+    current_value_krw: float,
+) -> tuple[bool, str]:
+    """포트폴리오 평가액이 임계값 이하인지 확인 (REQ-PAL-036-001).
+
+    Args:
+        alert: PortfolioAlert ORM 또는 모의 객체 (condition_value 속성 필요).
+        current_value_krw: 현재 포트폴리오 총 평가액 (KRW).
+
+    Returns:
+        (fired, message) — fired=True이면 발화 메시지 반환.
+    """
+    fired = current_value_krw <= alert.condition_value
+    if fired:
+        msg = (
+            f"포트폴리오 평가액 {current_value_krw:,.0f}원이 "
+            f"임계값 {alert.condition_value:,.0f}원 이하입니다"
+        )
+        return True, msg
+    return False, ""
+
+
+# @MX:NOTE: [AUTO] check_holding_return_alert: 개별 종목 수익률 임계 확인, above/below 방향 지원 (순수함수, SPEC-036)
+def check_holding_return_alert(
+    alert: Any,
+    holding_return_pct: float,
+) -> tuple[bool, str]:
+    """개별 보유 종목의 수익률 임계 확인 (above/below 방향 지원, REQ-PAL-036-002).
+
+    Args:
+        alert: PortfolioAlert ORM 또는 모의 객체.
+               condition_value, condition_direction, target_krx_code 속성 필요.
+        holding_return_pct: 해당 종목의 현재 수익률(%).
+
+    Returns:
+        (fired, message) — fired=True이면 발화 메시지 반환.
+    """
+    direction = alert.condition_direction or "above"
+    if direction == "above":
+        fired = holding_return_pct >= alert.condition_value
+    else:
+        fired = holding_return_pct <= alert.condition_value
+
+    if fired:
+        direction_label = "이상" if direction == "above" else "이하"
+        msg = (
+            f"종목 {alert.target_krx_code} 수익률 {holding_return_pct:.2f}%가 "
+            f"임계값 {alert.condition_value:.2f}% {direction_label}"
+        )
+        return True, msg
+    return False, ""
+
 
 # @MX:NOTE: [AUTO] check_portfolio_return_alert: YTD 기간(periods[0]) 기준 목표 수익률 도달 조건 평가
 def check_portfolio_return_alert(
@@ -160,6 +216,20 @@ async def check_all_portfolio_alerts(session: AsyncSession) -> int:
                     triggered, msg = check_portfolio_return_alert(alert, performance)
                 elif alert.alert_type == "portfolio_mdd_breach":
                     triggered, msg = check_portfolio_mdd_alert(alert, performance)
+                elif alert.alert_type == "portfolio_value_below":
+                    # 포트폴리오 총 평가액 산출 (SPEC-036 REQ-PAL-036-001)
+                    current_value_krw = _calc_portfolio_value_krw(performance)
+                    triggered, msg = check_portfolio_value_alert(alert, current_value_krw)
+                elif alert.alert_type == "holding_return":
+                    # 개별 종목 수익률 조회 후 대상 종목 매칭 (SPEC-036 REQ-PAL-036-002)
+                    triggered, msg = False, ""
+                    current_holdings = _get_holdings_return(performance)
+                    for holding in current_holdings:
+                        if holding["ticker"] == alert.target_krx_code:
+                            triggered, msg = check_holding_return_alert(
+                                alert, holding["return_pct"]
+                            )
+                            break
                 else:
                     # 미지원 유형 건너뜀
                     continue
@@ -227,8 +297,36 @@ def _build_notification_title(alert_type: str) -> str:
     type_label_map = {
         "portfolio_target_return": "포트폴리오 목표 수익률 달성",
         "portfolio_mdd_breach": "포트폴리오 MDD 임계값 초과",
+        # SPEC-036 신규 알림 유형
+        "portfolio_value_below": "포트폴리오 평가액 임계값 이하",
+        "holding_return": "개별 종목 수익률 임계값 도달",
     }
     return f"[{type_label_map.get(alert_type, '포트폴리오 알림')}]"
+
+
+def _calc_portfolio_value_krw(performance: Any) -> float:
+    """성과 요약에서 포트폴리오 총 평가액(KRW) 산출 (SPEC-036 보조 함수).
+
+    PerformanceSummaryResponse에 total_value_krw 속성이 있으면 직접 사용,
+    없으면 0.0 반환 (스케줄러 best-effort, NFR-004).
+    """
+    return float(getattr(performance, "total_value_krw", 0.0) or 0.0)
+
+
+def _get_holdings_return(performance: Any) -> list[dict[str, Any]]:
+    """성과 요약에서 보유 종목별 수익률 목록 추출 (SPEC-036 보조 함수).
+
+    PerformanceSummaryResponse에 holdings 속성이 있으면 [{"ticker": ..., "return_pct": ...}] 변환,
+    없으면 빈 목록 반환.
+    """
+    holdings_raw = getattr(performance, "holdings", []) or []
+    result: list[dict[str, Any]] = []
+    for h in holdings_raw:
+        ticker = getattr(h, "krx_code", None) or getattr(h, "ticker", None)
+        return_pct = getattr(h, "return_pct", None)
+        if ticker is not None and return_pct is not None:
+            result.append({"ticker": ticker, "return_pct": float(return_pct)})
+    return result
 
 
 def _get_redis_client() -> Any:
@@ -316,8 +414,10 @@ async def create_portfolio_alert(
     portfolio_id: int,
     alert_type: str,
     condition_value: float,
+    target_krx_code: str | None = None,
+    condition_direction: str | None = None,
 ) -> PortfolioAlert | None:
-    """포트폴리오 알림 생성 (REQ-PAL-001).
+    """포트폴리오 알림 생성 (REQ-PAL-001, SPEC-036 확장).
 
     소유권 확인 실패 시 None 반환 (→ 라우터에서 404 처리, NFR-005).
     UNIQUE 제약 위반 시 IntegrityError 전파 (→ 라우터에서 409 처리, REQ-PAL-008).
@@ -326,8 +426,11 @@ async def create_portfolio_alert(
         session: AsyncSession.
         user_id: 요청 사용자 ID.
         portfolio_id: 대상 포트폴리오 ID.
-        alert_type: "portfolio_target_return" | "portfolio_mdd_breach".
-        condition_value: 목표 수익률(%) 또는 MDD 임계값(%).
+        alert_type: "portfolio_target_return" | "portfolio_mdd_breach"
+                    | "portfolio_value_below" | "holding_return".
+        condition_value: 목표 수익률(%) 또는 MDD 임계값(%) 또는 평가액 임계(KRW).
+        target_krx_code: 종목 알림 대상 종목코드 (holding_return 타입 전용, SPEC-036).
+        condition_direction: "above" | "below" (holding_return 타입 전용, SPEC-036).
 
     Returns:
         생성된 PortfolioAlert 또는 None (소유권 불일치).
@@ -350,11 +453,145 @@ async def create_portfolio_alert(
         condition_value=condition_value,
         is_active=True,
         is_triggered=False,
+        target_krx_code=target_krx_code,
+        condition_direction=condition_direction,
     )
     session.add(alert)
     await session.flush()
     await session.refresh(alert)
     return alert
+
+
+async def evaluate_portfolio_alerts(
+    session: AsyncSession,
+    user_id: int,
+    portfolio_id: int,
+) -> list[Any] | None:
+    """포트폴리오 알림 온디맨드 평가 (SPEC-036 REQ-PAL-036-003).
+
+    POST /portfolios/{portfolio_id}/alerts/evaluate 엔드포인트 서비스.
+    소유권 확인 실패 시 None 반환 (→ 라우터에서 404 처리, NFR-005).
+
+    Args:
+        session: AsyncSession.
+        user_id: 요청 사용자 ID.
+        portfolio_id: 대상 포트폴리오 ID.
+
+    Returns:
+        알림 평가 결과 목록 또는 None (소유권 불일치).
+    """
+    # 소유권 확인 (NFR-005)
+    pf_result = await session.execute(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == user_id,
+        )
+    )
+    if pf_result.scalar_one_or_none() is None:
+        return None
+
+    # 활성 알림 조회
+    result = await session.execute(
+        select(PortfolioAlert).where(
+            PortfolioAlert.portfolio_id == portfolio_id,
+            PortfolioAlert.user_id == user_id,
+            PortfolioAlert.is_active.is_(True),
+        )
+    )
+    alerts = list(result.scalars().all())
+
+    # 성과 요약 조회 (평가액·수익률 산출용, best-effort)
+    try:
+        performance = await calculate_performance_summary(
+            portfolio_id=portfolio_id,
+            user_id=user_id,
+            db=None,
+            redis=_get_redis_client(),
+            refresh=False,
+        )
+    except Exception:
+        performance = None
+
+    evaluate_results: list[dict[str, Any]] = []
+    for alert in alerts:
+        fired, msg = False, ""
+        try:
+            if alert.alert_type == "portfolio_target_return" and performance:
+                fired, msg = check_portfolio_return_alert(alert, performance)
+            elif alert.alert_type == "portfolio_mdd_breach" and performance:
+                fired, msg = check_portfolio_mdd_alert(alert, performance)
+            elif alert.alert_type == "portfolio_value_below" and performance:
+                current_value = _calc_portfolio_value_krw(performance)
+                fired, msg = check_portfolio_value_alert(alert, current_value)
+            elif alert.alert_type == "holding_return" and performance:
+                holdings = _get_holdings_return(performance)
+                for h in holdings:
+                    if h["ticker"] == alert.target_krx_code:
+                        fired, msg = check_holding_return_alert(alert, h["return_pct"])
+                        break
+        except Exception as e:
+            logger.error("온디맨드 알림 평가 오류 alert_id=%s: %s", alert.id, e)
+
+        evaluate_results.append({
+            "alert_id": alert.id,
+            "alert_type": alert.alert_type,
+            "fired": fired,
+            "message": msg,
+        })
+
+    return evaluate_results
+
+
+async def get_alert_history(
+    session: AsyncSession,
+    user_id: int,
+    portfolio_id: int,
+) -> list[Any] | None:
+    """포트폴리오 알림 히스토리 조회 — notifications 테이블 기반 (SPEC-036 REQ-PAL-036-004).
+
+    GET /portfolios/{portfolio_id}/alerts/history 엔드포인트 서비스.
+    소유권 확인 실패 시 None 반환 (→ 라우터에서 404 처리, NFR-005).
+
+    Args:
+        session: AsyncSession.
+        user_id: 요청 사용자 ID.
+        portfolio_id: 대상 포트폴리오 ID.
+
+    Returns:
+        알림 히스토리 목록 또는 None (소유권 불일치).
+    """
+    # 소유권 확인 (NFR-005)
+    pf_result = await session.execute(
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == user_id,
+        )
+    )
+    if pf_result.scalar_one_or_none() is None:
+        return None
+
+    # notifications 테이블에서 해당 포트폴리오 관련 알림 이력 조회
+    # krx_code = PORT_{portfolio_id} 형식으로 저장됨 (REQ-PAL-008)
+    krx_code_key = f"PORT_{portfolio_id}"
+    result = await session.execute(
+        select(Notification).where(
+            Notification.user_id == user_id,
+            Notification.krx_code == krx_code_key,
+        ).order_by(Notification.ref_date.desc())
+    )
+    notifications = list(result.scalars().all())
+
+    history: list[dict[str, Any]] = []
+    for notif in notifications:
+        history.append({
+            "notification_id": notif.id,
+            "alert_type": notif.type,
+            "message": notif.body or "",
+            "triggered_at": notif.created_at if hasattr(notif, "created_at") else datetime.now(timezone.utc),
+            "portfolio_id": portfolio_id,
+        })
+
+    return history
 
 
 async def list_portfolio_alerts(

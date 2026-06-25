@@ -21,6 +21,8 @@ from stock_picker.portfolio.risk_analysis import calculate_risk_analysis
 from stock_picker.portfolio.backtest import run_portfolio_backtest
 from stock_picker.portfolio.performance_summary import calculate_performance_summary
 from stock_picker.portfolio.schemas import (
+    AlertEvaluateResult,
+    AlertHistoryItem,
     BacktestRequest,
     BacktestResult,
     BenchmarkChartData,
@@ -822,3 +824,51 @@ async def list_portfolio_snapshots(
 
     snapshots = list_monthly_snapshots(db, portfolio_id, limit)
     return [MonthlySnapshot.model_validate(s) for s in snapshots]
+
+
+# @MX:NOTE: [AUTO] evaluate_alerts 엔드포인트 — SPEC-036 온디맨드 알림 평가 (REQ-PAL-036-003)
+@router.post(
+    "/{portfolio_id}/alerts/evaluate",
+    response_model=dict,
+)
+async def evaluate_portfolio_alerts_endpoint(
+    portfolio_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+) -> dict:
+    """포트폴리오 알림 온디맨드 평가 (SPEC-036 REQ-PAL-036-003).
+
+    활성 알림 전체를 현재 포트폴리오 성과 기준으로 평가하고
+    fired 알림 목록과 개수를 반환한다.
+    소유하지 않은 포트폴리오 접근 시 404 반환.
+    """
+    from stock_picker.portfolio.portfolio_alerts import evaluate_portfolio_alerts as svc_evaluate  # noqa: PLC0415
+
+    results = await svc_evaluate(db, portfolio_id, current_user.id)
+    if results is None:
+        raise HTTPException(status_code=404, detail="포트폴리오를 찾을 수 없거나 접근 권한이 없습니다.")
+    fired = [AlertEvaluateResult(**r) for r in results if r.get("fired")]
+    return {"fired_count": len(fired), "results": [r.model_dump() for r in fired]}
+
+
+# @MX:NOTE: [AUTO] alert_history 엔드포인트 — SPEC-036 알림 히스토리 조회 (REQ-PAL-036-004)
+@router.get(
+    "/{portfolio_id}/alerts/history",
+    response_model=list[AlertHistoryItem],
+)
+async def get_alert_history_endpoint(
+    portfolio_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+) -> list[AlertHistoryItem]:
+    """포트폴리오 알림 히스토리 조회 (SPEC-036 REQ-PAL-036-004).
+
+    해당 포트폴리오에서 발생한 알림 노티피케이션 이력을 반환한다.
+    소유하지 않은 포트폴리오 접근 시 404 반환.
+    """
+    from stock_picker.portfolio.portfolio_alerts import get_alert_history as svc_history  # noqa: PLC0415
+
+    history = await svc_history(db, portfolio_id, current_user.id)
+    if history is None:
+        raise HTTPException(status_code=404, detail="포트폴리오를 찾을 수 없거나 접근 권한이 없습니다.")
+    return [AlertHistoryItem(**item) for item in history]

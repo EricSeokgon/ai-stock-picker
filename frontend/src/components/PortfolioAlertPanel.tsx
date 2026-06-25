@@ -23,11 +23,15 @@ interface Props {
 const ALERT_TYPE_LABELS: Record<AlertType, string> = {
   portfolio_target_return: '목표 수익률 달성',
   portfolio_mdd_breach: 'MDD 임계값 초과',
+  portfolio_value_below: '포트폴리오 평가액 이하', // SPEC-036
+  holding_return: '개별 종목 수익률 임계', // SPEC-036
 };
 
 const ALERT_TYPE_HINTS: Record<AlertType, string> = {
   portfolio_target_return: '수익률이 이 값(%) 이상이면 알림 발송',
   portfolio_mdd_breach: 'MDD가 이 값(%) 이하면 알림 발송 (음수 입력, 예: -15)',
+  portfolio_value_below: '포트폴리오 평가액(원)이 이 값 이하이면 알림 발송 (SPEC-036)',
+  holding_return: '개별 종목 수익률(%)이 임계값 이상/이하이면 알림 발송 (SPEC-036)',
 };
 
 export default function PortfolioAlertPanel({ portfolioId }: Props) {

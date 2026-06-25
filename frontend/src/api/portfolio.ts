@@ -304,7 +304,12 @@ export async function apiGetPerformanceSummary(
 
 // ── SPEC-STOCK-031: 포트폴리오 알림 타입 및 API 함수 ─────────────────────────
 
-export type AlertType = 'portfolio_target_return' | 'portfolio_mdd_breach';
+// SPEC-036: portfolio_value_below, holding_return 신규 타입 추가
+export type AlertType =
+  | 'portfolio_target_return'
+  | 'portfolio_mdd_breach'
+  | 'portfolio_value_below'
+  | 'holding_return';
 
 export interface PortfolioAlert {
   id: number;
@@ -690,4 +695,49 @@ export async function apiListMonthlySnapshots(
   if (!res.ok)
     throw new Error(`월별 스냅샷 목록 조회 실패: ${res.status}`);
   return res.json() as Promise<MonthlySnapshot[]>;
+}
+
+// SPEC-036 알림 평가 결과 타입
+export interface AlertEvaluateResult {
+  alert_id: number;
+  alert_type: string;
+  fired: boolean;
+  message: string;
+}
+
+// SPEC-036 알림 히스토리 항목 타입
+export interface AlertHistoryItem {
+  notification_id: number;
+  alert_type: string;
+  message: string;
+  triggered_at: string;
+  portfolio_id: number;
+}
+
+// 알림 온디맨드 평가 (SPEC-STOCK-036 REQ-PAL-036-003)
+export async function apiEvaluateAlerts(
+  token: string,
+  portfolioId: number,
+): Promise<{ fired_count: number; results: AlertEvaluateResult[] }> {
+  const res = await fetch(
+    `${API_BASE}/portfolios/${portfolioId}/alerts/evaluate`,
+    { method: 'POST', headers: authHeaders(token) }
+  );
+  if (!res.ok)
+    throw new Error(`알림 평가 실패: ${res.status}`);
+  return res.json();
+}
+
+// 알림 히스토리 조회 (SPEC-STOCK-036 REQ-PAL-036-004)
+export async function apiGetAlertHistory(
+  token: string,
+  portfolioId: number,
+): Promise<AlertHistoryItem[]> {
+  const res = await fetch(
+    `${API_BASE}/portfolios/${portfolioId}/alerts/history`,
+    { headers: authHeaders(token) }
+  );
+  if (!res.ok)
+    throw new Error(`알림 히스토리 조회 실패: ${res.status}`);
+  return res.json();
 }

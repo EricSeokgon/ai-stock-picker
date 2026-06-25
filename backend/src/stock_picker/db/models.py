@@ -667,10 +667,14 @@ class PortfolioAlert(Base):
     portfolio_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
     )
-    # 알림 유형: portfolio_target_return | portfolio_mdd_breach
+    # 알림 유형: portfolio_target_return | portfolio_mdd_breach | portfolio_value_below | holding_return
     alert_type: Mapped[str] = mapped_column(String(30), nullable=False)
-    # 목표 수익률(%) 또는 MDD 임계값(%) — 음수 가능 (-15.0 등)
+    # 목표 수익률(%) 또는 MDD 임계값(%) 또는 평가액(KRW) — 음수 가능 (-15.0 등)
     condition_value: Mapped[float] = mapped_column(Float, nullable=False)
+    # @MX:NOTE: [AUTO] target_krx_code: 종목 알림 대상 종목코드, NULL=비종목형 알림 (SPEC-036)
+    target_krx_code: Mapped[str | None] = mapped_column(String, nullable=True)
+    # @MX:NOTE: [AUTO] condition_direction: 방향 조건 "above"/"below", NULL=above 기본값 (SPEC-036)
+    condition_direction: Mapped[str | None] = mapped_column(String(5), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_triggered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     triggered_at: Mapped[datetime | None] = mapped_column(

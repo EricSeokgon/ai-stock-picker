@@ -324,3 +324,25 @@ export async function apiListMonthlySnapshots(token, portfolioId, limit = 24) {
         throw new Error(`월별 스냅샷 목록 조회 실패: ${res.status}`);
     return res.json();
 }
+
+// 알림 온디맨드 평가 (SPEC-STOCK-036 REQ-PAL-036-003)
+export async function apiEvaluateAlerts(token, portfolioId) {
+    const res = await fetch(
+        `${API_BASE}/portfolios/${portfolioId}/alerts/evaluate`,
+        { method: 'POST', headers: authHeaders(token) }
+    );
+    if (!res.ok)
+        throw new Error(`알림 평가 실패: ${res.status}`);
+    return res.json();
+}
+
+// 알림 히스토리 조회 (SPEC-STOCK-036 REQ-PAL-036-004)
+export async function apiGetAlertHistory(token, portfolioId) {
+    const res = await fetch(
+        `${API_BASE}/portfolios/${portfolioId}/alerts/history`,
+        { headers: authHeaders(token) }
+    );
+    if (!res.ok)
+        throw new Error(`알림 히스토리 조회 실패: ${res.status}`);
+    return res.json();
+}

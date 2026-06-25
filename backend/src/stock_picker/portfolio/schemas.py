@@ -337,10 +337,21 @@ class PerformanceSummaryResponse(BaseModel):
 
 
 class PortfolioAlertCreate(BaseModel):
-    """포트폴리오 알림 생성 요청 (REQ-PAL-001)."""
+    """포트폴리오 알림 생성 요청 (REQ-PAL-001, SPEC-036 확장).
 
-    alert_type: Literal["portfolio_target_return", "portfolio_mdd_breach"]
+    # @MX:NOTE: [AUTO] alert_type: SPEC-036에서 portfolio_value_below, holding_return 2종 추가
+    """
+
+    alert_type: Literal[
+        "portfolio_target_return",
+        "portfolio_mdd_breach",
+        "portfolio_value_below",
+        "holding_return",
+    ]
     condition_value: float
+    # SPEC-036 신규 필드
+    target_krx_code: Optional[str] = None       # holding_return 타입 전용
+    condition_direction: Optional[str] = None   # "above" | "below" (holding_return 전용)
 
     @field_validator("condition_value")
     @classmethod
@@ -369,8 +380,33 @@ class PortfolioAlertResponse(BaseModel):
     triggered_at: Optional[datetime] = None
     triggered_message: Optional[str] = None
     created_at: datetime
+    # SPEC-036 신규 필드
+    target_krx_code: Optional[str] = None
+    condition_direction: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ── SPEC-STOCK-036: 알림 평가·히스토리 스키마 ────────────────────────────────
+
+
+class AlertEvaluateResult(BaseModel):
+    """단일 알림 평가 결과 (SPEC-036 REQ-PAL-036-003)."""
+
+    alert_id: int
+    alert_type: str
+    fired: bool
+    message: str
+
+
+class AlertHistoryItem(BaseModel):
+    """알림 히스토리 항목 — notifications 테이블 기반 (SPEC-036 REQ-PAL-036-004)."""
+
+    notification_id: int
+    alert_type: str
+    message: str
+    triggered_at: datetime
+    portfolio_id: int
 
 
 # ─────────────────────────────────────────────────────────────

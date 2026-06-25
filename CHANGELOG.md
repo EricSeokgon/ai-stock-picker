@@ -7,6 +7,22 @@
 
 ---
 
+## [0.38.0] - 2026-06-25
+
+### Added (SPEC-STOCK-038: 시장 시각화 대시보드)
+- **시장 시각화 대시보드** (SPEC-038): 포트폴리오 데이터 통합 차트 대시보드
+- **가치 시계열 차트**: 월별 스냅샷 기반 LineChart (7d/30d/90d/365d 기간 선택)
+- **섹터 히트맵**: 섹터별 평가액·수익률 BarChart (수익률에 따른 색상화)
+- **자산유형 배분 차트**: 국내/해외 구성 비중 PieChart
+- **벤치마크 비교 차트**: SPEC-034 벤치마크 API 재사용 멀티라인 LineChart
+- **대시보드 API 3종**: `/dashboard/value-series`, `/dashboard/sector-summary`, `/dashboard/asset-allocation`
+- **순수 함수 기반 집계 로직**: `filter_snapshots_by_range`, `aggregate_by_sector`, `aggregate_by_asset_type`
+- **프론트엔드 차트 컴포넌트 4종**: Recharts 기반, props-driven, 로딩/빈 상태 지원
+- **스키마 확장**: ValueDataPoint, ValueSeriesResponse, SectorItem, SectorResponse, AssetTypeItem, AssetAllocationResponse
+- **테스트**: 22개 신규 단위 테스트 추가 (총 985개 통과, 8개 pre-existing 실패)
+
+---
+
 ## [0.37.0] - 2026-06-25
 
 ### Added (SPEC-STOCK-037: AI 종목 추천 고도화)

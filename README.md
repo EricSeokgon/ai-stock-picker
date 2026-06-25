@@ -4,6 +4,16 @@
 
 ## 핵심 기능
 
+### Phase 38: 시장 시각화 대시보드 (v0.38.0) — SPEC-STOCK-038
+- **포트폴리오 가치 추이·섹터 분포·자산 구성·시장 대비 성과를 통합 대시보드로 시각화**
+- **기간 선택 탭** (7일/30일/90일/365일), 각 차트 독립 로딩/빈 상태
+- **신규 DB 테이블 없음** — SPEC-034·035 기존 데이터 재사용
+- **Recharts 기반 반응형 그리드** (데스크탑 2×2, 모바일 1×4)
+- **차트 4종**: 가치 시계열 LineChart, 섹터 히트맵 BarChart, 자산유형 배분 PieChart, 벤치마크 비교 멀티라인
+- **백엔드 API 3종**: `/dashboard/value-series`, `/dashboard/sector-summary`, `/dashboard/asset-allocation`
+- **순수 함수 집계**: `filter_snapshots_by_range`, `aggregate_by_sector`, `aggregate_by_asset_type` (@MX:ANCHOR)
+- **테스트**: 22개 신규 단위 테스트
+
 ### Phase 37: AI 종목 추천 고도화 (v0.37.0) — SPEC-STOCK-037
 - **포트폴리오 맥락 인식 개인화 추천**: 사용자 보유 종목·섹터·수익률 등 포트폴리오 상태를 Claude API 프롬프트에 통합하여 더 관련성 높은 종목 추천
 - **추천 근거 구조화** (reason/risk_factors/fit_score): 추천 종목이 왜 추천되었는지 명확하게 전달. fit_score 0.0~1.0으로 포트폴리오 적합도 수치화

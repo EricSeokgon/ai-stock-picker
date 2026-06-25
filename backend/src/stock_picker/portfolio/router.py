@@ -20,6 +20,7 @@ from stock_picker.portfolio.dividend_yield import (
 from stock_picker.portfolio.risk_analysis import calculate_risk_analysis
 from stock_picker.portfolio.backtest import run_portfolio_backtest
 from stock_picker.portfolio.performance_summary import calculate_performance_summary
+from stock_picker.portfolio.market_status import is_krx_open
 from stock_picker.portfolio.schemas import (
     AlertEvaluateResult,
     AlertHistoryItem,
@@ -33,6 +34,7 @@ from stock_picker.portfolio.schemas import (
     DRIPProjection,
     HoldingCreate,
     HoldingResponse,
+    MarketStatusResponse,
     MonthlySnapshot,
     OptimizeResult,
     PerformanceSummaryResponse,
@@ -57,6 +59,31 @@ from stock_picker.portfolio.schemas import (
 )
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
+
+
+# ── SPEC-STOCK-039: 시장 상태 엔드포인트 (인증 불필요 — PUBLIC) ───────────────
+# 경고: /{portfolio_id} 경로보다 먼저 정의해야 경로 충돌이 없다 (FastAPI 라우팅 순서)
+@router.get(
+    "/market-status",
+    response_model=MarketStatusResponse,
+    summary="KRX 시장 상태 조회 (공개 엔드포인트)",
+    tags=["portfolios", "market"],
+)
+def get_market_status() -> MarketStatusResponse:
+    """KRX 정규장 개장 여부를 반환한다 (SPEC-STOCK-039 REQ-MS-001).
+
+    인증 없이 접근 가능한 공개 엔드포인트.
+    폴링 클라이언트가 매 주기마다 호출하여 장 마감 시 폴링을 일시 중지한다.
+    """
+    from datetime import datetime  # noqa: PLC0415
+    from zoneinfo import ZoneInfo  # noqa: PLC0415
+
+    now_kst = datetime.now(ZoneInfo("Asia/Seoul"))
+    open_flag = is_krx_open(now_kst)
+    return MarketStatusResponse(
+        is_open=open_flag,
+        message="장 중" if open_flag else "장 마감",
+    )
 
 
 @router.post("", response_model=PortfolioResponse, status_code=status.HTTP_201_CREATED)

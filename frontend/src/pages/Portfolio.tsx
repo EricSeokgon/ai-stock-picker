@@ -1,5 +1,5 @@
 // 포트폴리오 관리 페이지
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import {
   apiListPortfolios,
@@ -15,6 +15,9 @@ import {
   type Market,
   type Currency,
 } from '../api/portfolio';
+// SPEC-STOCK-039: 시장 상태 폴링 훅 & 배지 컴포넌트
+import { useMarketPolling } from '../hooks/useMarketPolling';
+import { MarketStatusBadge } from '../components/MarketStatusBadge';
 import PortfolioScoreCard from '../components/PortfolioScoreCard';
 import RebalancingTable from '../components/RebalancingTable';
 import NewStockSuggestions from '../components/NewStockSuggestions';
@@ -672,6 +675,22 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
 
   useEffect(() => { void load(); }, [portfolioId, token]);
 
+  // SPEC-STOCK-039: KRX 시장 상태 기반 자동 폴링 (REST 방식, 60초 간격)
+  const onPoll = useCallback(async () => {
+    try {
+      const p = await apiGetPerformance(token, portfolioId);
+      setPerformance(p);
+    } catch {
+      // 폴링 오류는 무시 (다음 주기에 재시도)
+    }
+  }, [token, portfolioId]);
+
+  const { isPolling, isPaused, isMarketOpen, lastUpdated, toggle } = useMarketPolling({
+    portfolioId,
+    interval: 60,
+    onPoll,
+  });
+
   async function handleAddHolding(e: React.FormEvent) {
     e.preventDefault();
     setAddErr(null);
@@ -696,6 +715,26 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
 
   return (
     <div style={{ padding: '1rem', background: '#f8f9fa', borderRadius: '4px', marginTop: '0.5rem' }}>
+      {/* SPEC-STOCK-039: 시장 상태 배지 + 폴링 토글 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+        {isMarketOpen !== null && (
+          <MarketStatusBadge isOpen={isMarketOpen} lastUpdated={lastUpdated} />
+        )}
+        <button
+          onClick={toggle}
+          style={{
+            fontSize: '0.75rem',
+            padding: '3px 8px',
+            borderRadius: '4px',
+            border: '1px solid #ccc',
+            cursor: 'pointer',
+            background: isPolling ? '#e3f2fd' : '#fafafa',
+            color: isPolling ? '#1565c0' : '#666',
+          }}
+        >
+          {isPolling ? (isPaused ? '일시 중지' : '폴링 중') : '폴링 시작'}
+        </button>
+      </div>
       {/* 성과 요약 카드 — 모바일에서 세로 스택 */}
       {performance && (
         <div

@@ -153,6 +153,20 @@ export async function apiGetPerformance(token: string, portfolioId: number): Pro
   return res.json() as Promise<PortfolioPerformance>;
 }
 
+// ── SPEC-STOCK-039: 시장 상태 API (인증 불필요 공개 엔드포인트) ─────────────
+
+export interface MarketStatus {
+  is_open: boolean;
+  message: string;
+}
+
+/** KRX 장 개장 여부 조회 (인증 불필요, SPEC-039 REQ-MS-001). */
+export async function apiGetMarketStatus(): Promise<MarketStatus> {
+  const res = await fetch(`${API_BASE}/portfolios/market-status`);
+  if (!res.ok) throw new Error(`시장 상태 조회 실패: ${res.status}`);
+  return res.json() as Promise<MarketStatus>;
+}
+
 // ── SPEC-STOCK-026 포트폴리오 AI 최적화 타입 및 API ─────────────────────────
 
 export interface TargetWeightItem {

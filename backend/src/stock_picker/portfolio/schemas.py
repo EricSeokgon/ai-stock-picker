@@ -779,3 +779,17 @@ class AssetAllocationResponse(BaseModel):
     """자산유형별 배분 응답 (REQ-DASH-ASSET)"""
 
     assets: list[AssetTypeItem]
+
+
+# ── SPEC-STOCK-039: 시장 상태 응답 스키마 ────────────────────────────────────
+
+
+class MarketStatusResponse(BaseModel):
+    """시장 상태 응답 (SPEC-STOCK-039 REQ-MS-001).
+
+    is_open: KRX 정규장 개장 여부.
+    message: '장 중' (개장) 또는 '장 마감' (폐장).
+    """
+
+    is_open: bool
+    message: str

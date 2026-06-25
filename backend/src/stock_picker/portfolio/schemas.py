@@ -732,3 +732,50 @@ class RecommendationHistoryItem(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ─────────────────────────────────────────────────────────────
+# SPEC-STOCK-038 — 대시보드 시각화 스키마
+# ─────────────────────────────────────────────────────────────
+
+
+class ValueDataPoint(BaseModel):
+    """포트폴리오 가치 시계열 단일 데이터 포인트"""
+
+    date: str
+    total_value_krw: float
+
+
+class ValueSeriesResponse(BaseModel):
+    """포트폴리오 가치 시계열 응답 (REQ-DASH-VALUE)"""
+
+    data: list[ValueDataPoint]
+    period_days: int
+
+
+class SectorItem(BaseModel):
+    """섹터별 집계 단건"""
+
+    sector: str
+    value_krw: float
+    return_pct: float
+
+
+class SectorResponse(BaseModel):
+    """섹터별 요약 응답 (REQ-DASH-SECTOR)"""
+
+    sectors: list[SectorItem]
+
+
+class AssetTypeItem(BaseModel):
+    """자산유형별 배분 단건"""
+
+    asset_type: str
+    value_krw: float
+    weight_pct: float
+
+
+class AssetAllocationResponse(BaseModel):
+    """자산유형별 배분 응답 (REQ-DASH-ASSET)"""
+
+    assets: list[AssetTypeItem]

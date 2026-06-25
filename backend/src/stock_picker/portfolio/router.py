@@ -23,6 +23,7 @@ from stock_picker.portfolio.performance_summary import calculate_performance_sum
 from stock_picker.portfolio.schemas import (
     AlertEvaluateResult,
     AlertHistoryItem,
+    AssetAllocationResponse,
     BacktestRequest,
     BacktestResult,
     BenchmarkChartData,
@@ -51,6 +52,8 @@ from stock_picker.portfolio.schemas import (
     RecommendationHistoryItem,
     RecommendationResponse,
     RiskAnalysisResult,
+    SectorResponse,
+    ValueSeriesResponse,
 )
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
@@ -995,3 +998,172 @@ def get_recommendation_history(
         .all()
     )
     return [RecommendationHistoryItem.model_validate(r) for r in rows]
+
+
+# ─────────────────────────────────────────────────────────────
+# SPEC-STOCK-038 — 대시보드 시각화 엔드포인트
+# ─────────────────────────────────────────────────────────────
+
+
+@router.get(
+    "/{portfolio_id}/dashboard/value-series",
+    response_model=ValueSeriesResponse,
+)
+def get_dashboard_value_series(
+    portfolio_id: int,
+    days: int = Query(default=30),
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> ValueSeriesResponse:
+    """포트폴리오 가치 시계열 조회 (SPEC-STOCK-038 REQ-DASH-VALUE).
+
+    소유하지 않은 포트폴리오 접근 시 404 반환.
+    허용 기간: 7, 30, 90, 365일 — 그 외 422 반환.
+    """
+    from stock_picker.portfolio.dashboard import (  # noqa: PLC0415
+        ALLOWED_DAYS,
+        filter_snapshots_by_range,
+    )
+    from stock_picker.db.models import PortfolioMonthlySnapshot  # noqa: PLC0415
+    from stock_picker.portfolio.schemas import ValueDataPoint  # noqa: PLC0415
+
+    # 허용 기간 검증
+    if days not in ALLOWED_DAYS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"허용되지 않는 기간입니다. 허용값: {sorted(ALLOWED_DAYS)}",
+        )
+
+    # 소유권 확인
+    portfolio = service.get_portfolio_with_holdings(db, portfolio_id, current_user.id)
+    if portfolio is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="포트폴리오를 찾을 수 없거나 접근 권한이 없습니다.",
+        )
+
+    # 스냅샷 조회 — month 컬럼("YYYY-MM")을 날짜로 변환
+    from datetime import date as date_type  # noqa: PLC0415
+
+    snapshot_rows = (
+        db.query(PortfolioMonthlySnapshot)
+        .filter(PortfolioMonthlySnapshot.portfolio_id == portfolio_id)
+        .all()
+    )
+    snapshots = []
+    for row in snapshot_rows:
+        try:
+            # "YYYY-MM" → 해당 월의 첫날 date 객체로 변환
+            parsed_date = date_type.fromisoformat(row.month + "-01")
+            snapshots.append({
+                "date": parsed_date,
+                "total_value_krw": float(row.total_value_krw),
+            })
+        except (ValueError, AttributeError):
+            continue
+
+    filtered = filter_snapshots_by_range(snapshots, days=days)
+    data = [
+        ValueDataPoint(date=str(s["date"]), total_value_krw=s["total_value_krw"])
+        for s in filtered
+    ]
+    return ValueSeriesResponse(data=data, period_days=days)
+
+
+@router.get(
+    "/{portfolio_id}/dashboard/sector-summary",
+    response_model=SectorResponse,
+)
+def get_dashboard_sector_summary(
+    portfolio_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> SectorResponse:
+    """섹터별 포트폴리오 요약 조회 (SPEC-STOCK-038 REQ-DASH-SECTOR).
+
+    소유하지 않은 포트폴리오 접근 시 404 반환.
+    섹터 미지정 종목은 '기타/해외'로 분류.
+    """
+    from stock_picker.portfolio.dashboard import aggregate_by_sector  # noqa: PLC0415
+    from stock_picker.portfolio.schemas import SectorItem  # noqa: PLC0415
+
+    # 소유권 확인
+    portfolio = service.get_portfolio_with_holdings(db, portfolio_id, current_user.id)
+    if portfolio is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="포트폴리오를 찾을 수 없거나 접근 권한이 없습니다.",
+        )
+
+    # 보유 종목에서 섹터 정보 추출 (ORM 모델 → dict 변환)
+    from stock_picker.portfolio.utils import get_sector  # noqa: PLC0415
+
+    holdings_data = []
+    for h in portfolio.holdings:
+        sector = get_sector(h.krx_code)
+        # 비용 = 평균 매수가 * 수량 (KRW 기준, 해외는 환율 무시하여 단순 산출)
+        cost = float(h.avg_buy_price) * h.quantity
+        # 현재가치는 보유 종목 DB에 없으므로 비용으로 대체 (시장가 미반영)
+        current_value = cost
+        holdings_data.append({
+            "sector": sector,
+            "current_value": current_value,
+            "cost": cost,
+        })
+
+    aggregated = aggregate_by_sector(holdings_data)
+    sectors = [
+        SectorItem(
+            sector=item["sector"],
+            value_krw=item["value_krw"],
+            return_pct=item["return_pct"],
+        )
+        for item in aggregated
+    ]
+    return SectorResponse(sectors=sectors)
+
+
+@router.get(
+    "/{portfolio_id}/dashboard/asset-allocation",
+    response_model=AssetAllocationResponse,
+)
+def get_dashboard_asset_allocation(
+    portfolio_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> AssetAllocationResponse:
+    """자산유형별 배분 조회 (SPEC-STOCK-038 REQ-DASH-ASSET).
+
+    소유하지 않은 포트폴리오 접근 시 404 반환.
+    KRX → 국내, NYSE/NASDAQ → 해외.
+    """
+    from stock_picker.portfolio.dashboard import aggregate_by_asset_type  # noqa: PLC0415
+    from stock_picker.portfolio.schemas import AssetTypeItem  # noqa: PLC0415
+
+    # 소유권 확인
+    portfolio = service.get_portfolio_with_holdings(db, portfolio_id, current_user.id)
+    if portfolio is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="포트폴리오를 찾을 수 없거나 접근 권한이 없습니다.",
+        )
+
+    # 보유 종목에서 market 정보 추출 (ORM 모델 → dict 변환)
+    holdings_data = [
+        {
+            "market": h.market,
+            "current_value": float(h.avg_buy_price) * h.quantity,
+        }
+        for h in portfolio.holdings
+    ]
+
+    aggregated = aggregate_by_asset_type(holdings_data)
+    assets = [
+        AssetTypeItem(
+            asset_type=item["asset_type"],
+            value_krw=item["value_krw"],
+            weight_pct=item["weight_pct"],
+        )
+        for item in aggregated
+    ]
+    return AssetAllocationResponse(assets=assets)

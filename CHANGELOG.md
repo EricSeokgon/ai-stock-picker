@@ -7,6 +7,20 @@
 
 ---
 
+## [0.36.0] - 2026-06-25
+
+### Added (SPEC-STOCK-036: 포트폴리오 알림 확장)
+- 포트폴리오 알림 확장: 평가액 KRW 임계 알림 (`portfolio_value_below`) 신규 지원
+- 포트폴리오 알림 확장: 개별 보유 종목 수익률 임계 알림 (`holding_return`, above/below 방향 지원)
+- `POST /portfolios/{id}/alerts/evaluate` — 알림 규칙 즉시 평가 엔드포인트
+- `GET /portfolios/{id}/alerts/history` — 알림 발화 이력 조회 엔드포인트
+- 마이그레이션 0023: `portfolio_alerts` 테이블에 `target_krx_code`, `condition_direction` nullable 컬럼 추가
+- `portfolio_alerts.py` `check_all_portfolio_alerts` — 신규 2종 알림 유형 분기 추가
+- `schemas.py` `PortfolioAlertCreate/Update/Response` — `alert_type` Literal에 신규 2값 추가
+- 단위 테스트 26개 (TDD)
+
+---
+
 ## [0.35.0] - 2026-06-24
 
 ### Added (SPEC-STOCK-035: 포트폴리오 성과 리포트 자동 생성)

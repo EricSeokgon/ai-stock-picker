@@ -644,3 +644,91 @@ class MonthlySnapshot(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ── SPEC-STOCK-037: AI 개인화 추천 스키마 ────────────────────────────────────────
+
+
+class PersonalizedRecommendation(BaseModel):
+    """개인화 추천 단건 항목 (SPEC-STOCK-037 REQ-AIEX-RAT).
+
+    fit_score: Claude가 산출한 포트폴리오 적합도 점수 (0.0~1.0).
+    reason: 추천 이유 텍스트.
+    risk_factors: 투자 위험 요소 텍스트.
+    """
+
+    # @MX:ANCHOR: [AUTO] 개인화 추천 응답 핵심 스키마 — router·service·테스트에서 참조
+    # @MX:REASON: ai_recommendation.py, personalized_rec_service.py, router.py 3곳 이상 사용
+    # @MX:SPEC: SPEC-STOCK-037 REQ-AIEX-RAT
+
+    krx_code: str
+    name: Optional[str] = None
+    sector: Optional[str] = None
+    # 추천 이유 (REQ-AIEX-RAT)
+    reason: Optional[str] = None
+    # 투자 위험 요소 (REQ-AIEX-RAT)
+    risk_factors: Optional[str] = None
+    # rationale 별칭 — Claude 응답과의 호환성
+    rationale: Optional[str] = None
+    # Claude가 산출한 적합도 점수 (0.0 이상 1.0 이하)
+    fit_score: float
+
+    @field_validator("fit_score")
+    @classmethod
+    def validate_fit_score(cls, v: float) -> float:
+        """fit_score는 0.0 이상 1.0 이하여야 합니다 (REQ-AIEX-RAT)."""
+        if v < 0.0 or v > 1.0:
+            raise ValueError("fit_score는 0.0 이상 1.0 이하여야 합니다")
+        return v
+
+
+class RecommendationResponse(BaseModel):
+    """개인화 추천 응답 전체 (SPEC-STOCK-037 REQ-AIEX-PORT).
+
+    disclaimer 필드는 투자 권고가 아님을 명시하는 고정 문구.
+    """
+
+    recommendations: list[PersonalizedRecommendation]
+    # 투자 권유가 아님 명시 — 항상 포함 (REQ-AIEX-PORT)
+    disclaimer: str = "본 추천은 AI 분석 참고 정보이며 투자 권유가 아닙니다."
+
+
+class PreferenceSaveRequest(BaseModel):
+    """종목 선호 저장 요청 (SPEC-STOCK-037 REQ-AIEX-PREF).
+
+    preference는 "liked" 또는 "disliked"만 허용.
+    """
+
+    krx_code: str
+    # 선호 값: "liked" 또는 "disliked"만 허용 (REQ-AIEX-APPLY)
+    preference: str
+
+    @field_validator("preference")
+    @classmethod
+    def validate_preference(cls, v: str) -> str:
+        """preference는 'liked' 또는 'disliked'만 허용합니다."""
+        if v not in ("liked", "disliked"):
+            raise ValueError("preference는 'liked' 또는 'disliked'여야 합니다")
+        return v
+
+
+class PreferenceItem(BaseModel):
+    """선호 항목 단건 응답 (SPEC-STOCK-037 REQ-AIEX-PREF)."""
+
+    krx_code: str
+    preference: str
+    sector: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RecommendationHistoryItem(BaseModel):
+    """추천 히스토리 단건 응답 (SPEC-STOCK-037 REQ-AIEX-HIST)."""
+
+    id: int
+    portfolio_id: int
+    # JSON 직렬화된 추천 목록 (문자열로 반환)
+    recommendations: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

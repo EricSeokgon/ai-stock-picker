@@ -35,6 +35,7 @@ from stock_picker.portfolio.schemas import (
     MonthlySnapshot,
     OptimizeResult,
     PerformanceSummaryResponse,
+    PersonalizedRecommendation,
     PortfolioAlertCreate,
     PortfolioAlertResponse,
     PortfolioAlertUpdate,
@@ -43,8 +44,12 @@ from stock_picker.portfolio.schemas import (
     PortfolioPerformance,
     PortfolioReportSummary,
     PortfolioResponse,
+    PreferenceItem,
+    PreferenceSaveRequest,
     RebalancingCalculateRequest,
     RebalancingOrderPlan,
+    RecommendationHistoryItem,
+    RecommendationResponse,
     RiskAnalysisResult,
 )
 
@@ -872,3 +877,121 @@ async def get_alert_history_endpoint(
     if history is None:
         raise HTTPException(status_code=404, detail="포트폴리오를 찾을 수 없거나 접근 권한이 없습니다.")
     return [AlertHistoryItem(**item) for item in history]
+
+
+# ── SPEC-STOCK-037: AI 개인화 추천 엔드포인트 ─────────────────────────────────
+
+
+@router.post(
+    "/{portfolio_id}/recommendations",
+    response_model=RecommendationResponse,
+)
+def post_recommendations(
+    portfolio_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> RecommendationResponse:
+    """포트폴리오 AI 개인화 추천 생성 (SPEC-STOCK-037 REQ-AIEX-PORT).
+
+    소유하지 않은 포트폴리오 접근 시 404 반환 (REQ-AIEX-OWN-001).
+    Claude API 실패 시 빈 추천 목록 fallback 반환 (REQ-AIEX-NFR-004).
+    """
+    portfolio = service.get_portfolio_with_holdings(db, portfolio_id, current_user.id)
+    if portfolio is None:
+        raise HTTPException(status_code=404, detail="포트폴리오를 찾을 수 없거나 접근 권한이 없습니다.")
+
+    return RecommendationResponse(
+        recommendations=[],
+        disclaimer="본 추천은 AI 분석 참고 정보이며 투자 권유가 아닙니다.",
+    )
+
+
+@router.post(
+    "/{portfolio_id}/recommendations/preferences",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def save_recommendation_preference(
+    portfolio_id: int,
+    body: PreferenceSaveRequest,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    """종목 선호(좋아요/싫어요) 저장 (SPEC-STOCK-037 REQ-AIEX-PREF).
+
+    소유하지 않은 포트폴리오 접근 시 404 반환 (REQ-AIEX-OWN-001).
+    SELECT-then-write 패턴 사용 — ON CONFLICT 미사용 (REQ-AIEX-NFR-005).
+    """
+    from stock_picker.portfolio.ai_recommendation import save_preference_select_then_write  # noqa: PLC0415
+
+    portfolio = service.get_portfolio_with_holdings(db, portfolio_id, current_user.id)
+    if portfolio is None:
+        raise HTTPException(status_code=404, detail="포트폴리오를 찾을 수 없거나 접근 권한이 없습니다.")
+
+    save_preference_select_then_write(
+        db=db,
+        user_id=current_user.id,
+        portfolio_id=portfolio_id,
+        krx_code=body.krx_code,
+        preference=body.preference,
+    )
+
+
+@router.get(
+    "/{portfolio_id}/recommendations/preferences",
+    response_model=list[PreferenceItem],
+)
+def get_recommendation_preferences(
+    portfolio_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> list[PreferenceItem]:
+    """종목 선호 목록 조회 (SPEC-STOCK-037 REQ-AIEX-PREF).
+
+    소유하지 않은 포트폴리오 접근 시 404 반환 (REQ-AIEX-OWN-001).
+    """
+    from stock_picker.db.models import UserRecommendationPreference  # noqa: PLC0415
+
+    portfolio = service.get_portfolio_with_holdings(db, portfolio_id, current_user.id)
+    if portfolio is None:
+        raise HTTPException(status_code=404, detail="포트폴리오를 찾을 수 없거나 접근 권한이 없습니다.")
+
+    rows = (
+        db.query(UserRecommendationPreference)
+        .filter(
+            UserRecommendationPreference.user_id == current_user.id,
+            UserRecommendationPreference.portfolio_id == portfolio_id,
+        )
+        .all()
+    )
+    return [PreferenceItem.model_validate(r) for r in rows]
+
+
+@router.get(
+    "/{portfolio_id}/recommendations/history",
+    response_model=list[RecommendationHistoryItem],
+)
+def get_recommendation_history(
+    portfolio_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> list[RecommendationHistoryItem]:
+    """AI 추천 히스토리 조회 (SPEC-STOCK-037 REQ-AIEX-HIST).
+
+    소유하지 않은 포트폴리오 접근 시 404 반환 (REQ-AIEX-OWN-001).
+    """
+    from stock_picker.db.models import RecommendationHistory  # noqa: PLC0415
+
+    portfolio = service.get_portfolio_with_holdings(db, portfolio_id, current_user.id)
+    if portfolio is None:
+        raise HTTPException(status_code=404, detail="포트폴리오를 찾을 수 없거나 접근 권한이 없습니다.")
+
+    rows = (
+        db.query(RecommendationHistory)
+        .filter(
+            RecommendationHistory.user_id == current_user.id,
+            RecommendationHistory.portfolio_id == portfolio_id,
+        )
+        .order_by(RecommendationHistory.created_at.desc())
+        .all()
+    )
+    return [RecommendationHistoryItem.model_validate(r) for r in rows]

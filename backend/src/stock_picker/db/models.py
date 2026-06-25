@@ -813,3 +813,84 @@ class PortfolioMonthlySnapshot(Base):
     )
 
     portfolio: Mapped["Portfolio"] = relationship("Portfolio", lazy="noload")
+
+
+# ── Phase M: AI 개인화 추천 (SPEC-STOCK-037) ────────────────────────────────────
+
+
+class UserRecommendationPreference(Base):
+    """사용자별 종목 선호(좋아요/싫어요) 테이블 (SPEC-STOCK-037 REQ-AIEX-PREF).
+
+    SELECT-then-write(NFR-005)로 upsert — ON CONFLICT 미사용.
+    UNIQUE(user_id, portfolio_id, krx_code): 포트폴리오·종목당 선호 1개.
+    """
+
+    __tablename__ = "recommendation_preferences"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    portfolio_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
+    )
+    # 종목 코드 (KRX 또는 해외 티커)
+    krx_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    # 섹터 — 선호 적용 시 유사 섹터 판단에 사용 (nullable)
+    sector: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # 선호 값: "liked" 또는 "disliked"
+    preference: Mapped[str] = mapped_column(String(8), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        onupdate=func.now(),
+    )
+
+    __table_args__ = (
+        # (user_id, portfolio_id, krx_code) 복합 UNIQUE — 중복 선호 방지
+        UniqueConstraint(
+            "user_id", "portfolio_id", "krx_code",
+            name="uq_rec_preference_user_pf_code",
+        ),
+    )
+
+    user: Mapped["User"] = relationship("User", lazy="noload")
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", lazy="noload")
+
+
+class RecommendationHistory(Base):
+    """개인화 추천 히스토리 스냅샷 테이블 (SPEC-STOCK-037 REQ-AIEX-HIST).
+
+    개인화 추천 산출 시 결과를 JSON으로 영속화. 사용자별 과거 추천 조회에 사용.
+    """
+
+    __tablename__ = "recommendation_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    portfolio_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
+    )
+    # 추천 항목 목록 JSON 직렬화 (SQLite 호환 Text)
+    recommendations: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        # (user_id, portfolio_id, created_at) 최신순 조회 최적화
+        Index("ix_rec_history_user_pf_created", "user_id", "portfolio_id", "created_at"),
+    )
+
+    user: Mapped["User"] = relationship("User", lazy="noload")
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", lazy="noload")

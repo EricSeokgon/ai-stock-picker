@@ -1,12 +1,13 @@
 ---
 id: SPEC-STOCK-039
-version: 0.1.0
+version: 0.2.0
 status: draft
-created: 2026-06-25
-updated: 2026-06-25
+created_at: 2026-06-25
+updated_at: 2026-06-25
 author: ircp
 priority: medium
 issue_number: null
+labels: [portfolio, polling, market-status, frontend, backend]
 ---
 
 # SPEC-STOCK-039 — 실시간 가격 폴링 & 자동 갱신
@@ -72,11 +73,11 @@ issue_number: null
 
 ## 비기능 요구사항 (NFR)
 
-- **NFR-001**: THE 시스템 SHALL WebSocket을 사용하지 않고 REST 폴링만으로 자동 갱신을 구현한다.
-- **NFR-002**: THE 시스템 SHALL 장중 판정 로직을 네트워크·데이터베이스 의존 없이 단독으로 검증 가능한 순수 함수로 구현한다.
-- **NFR-003**: THE 시스템 SHALL 기본 폴링 주기를 60초로 한다.
-- **NFR-004**: THE 시스템 SHALL 이전 폴링 요청이 완료되기 전에는 새 요청을 발생시키지 않는다(디바운스/스킵).
-- **NFR-005**: THE 시스템 SHALL 시간 계산에 scipy를 사용하지 않고 표준 라이브러리만 사용한다.
+- **REQ-POLL-NFR-001**: THE 시스템 SHALL 소켓 기반 실시간 통신 없이 단방향 주기 요청만으로 자동 갱신을 구현한다.
+- **REQ-POLL-NFR-002**: THE 시스템 SHALL 장중 판정 로직을 네트워크·데이터베이스 의존 없이 단독으로 검증 가능한 순수 함수로 구현한다.
+- **REQ-POLL-NFR-003**: THE 시스템 SHALL 기본 폴링 주기를 60초로 한다.
+- **REQ-POLL-NFR-004**: THE 시스템 SHALL 이전 폴링 요청이 완료되기 전에는 새 요청을 발생시키지 않는다(디바운스/스킵).
+- **REQ-POLL-NFR-005**: THE 시스템 SHALL 시간 계산에 외부 과학 계산 라이브러리를 사용하지 않고 표준 라이브러리만 사용한다.
 
 ## Exclusions (What NOT to Build)
 

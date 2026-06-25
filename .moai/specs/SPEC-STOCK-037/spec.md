@@ -1,18 +1,20 @@
 ---
 id: SPEC-STOCK-037
-version: 0.1.0
+version: 0.2.0
 status: draft
-created: 2026-06-25
+created_at: 2026-06-25
 updated: 2026-06-25
 author: ircp
 priority: high
 issue_number: 0
+labels: [ai, recommendation, portfolio]
 ---
 
 # SPEC-STOCK-037: AI 종목 추천 고도화 (Advanced AI Stock Recommendation)
 
 ## HISTORY
 
+- v0.2.0 (2026-06-25): plan-auditor v1 지적사항 반영 — ACs GWT→EARS 전환(17건), YAML 수정(created_at·labels), NFR 접두사 REQ-AIEX-NFR-* 통일, APPLY-003 무조건 SHALL화, NFR-001 행위 기술화.
 - v0.1.0 (2026-06-25): 초안 작성. 포트폴리오 인식 추천·구조화 근거·사용자 선호 학습 3대 축 정의.
 
 ---
@@ -63,7 +65,7 @@ issue_number: 0
 
 - **REQ-AIEX-APPLY-001** (State-Driven): WHILE 사용자가 특정 종목을 싫어요로 표시한 상태이면, THE 시스템 SHALL 이후 개인화 추천에서 해당 종목을 후순위로 조정하거나 제외한다.
 - **REQ-AIEX-APPLY-002** (State-Driven): WHILE 사용자가 특정 종목을 싫어요로 표시한 상태이면, THE 시스템 SHALL 이후 개인화 추천에서 그 종목과 유사한 종목의 우선순위를 낮춘다.
-- **REQ-AIEX-APPLY-003** (Optional): WHERE 사용자가 좋아요로 표시한 종목과 유사한 종목이 존재하면, THE 시스템 SHALL 해당 종목의 우선순위를 높일 수 있다.
+- **REQ-AIEX-APPLY-003** (Optional): WHERE 사용자가 좋아요로 표시한 종목과 유사한 종목이 존재하면, THE 시스템 SHALL 해당 종목의 우선순위를 높인다.
 
 ### 추천 히스토리 (REQ-AIEX-HIST)
 
@@ -76,11 +78,11 @@ issue_number: 0
 
 ### 비기능 요구사항 (REQ-AIEX-NFR)
 
-- **NFR-001**: THE 시스템 SHALL 점수·순위 계산에 외부 수치 라이브러리 중 scipy를 사용하지 않고 numpy와 표준 수학 연산만 사용한다.
-- **NFR-002**: THE 시스템 SHALL 적합도 산출과 선호 기반 재순위 로직을 데이터베이스 의존 없이 검증 가능한 순수 함수로 제공한다.
-- **NFR-003**: THE 시스템 SHALL 소유권 위반 접근에 대해 접근 거부가 아닌 자원 없음 의미의 응답을 반환한다.
-- **NFR-004**: IF 외부 AI 분석 호출이 실패하면, THEN THE 시스템 SHALL 폴백 결과를 반환하고 추천 요청 처리를 중단하지 않는다.
-- **NFR-005**: THE 시스템 SHALL 선호 저장을 조회 후 기록(SELECT-then-write) 방식으로 데이터베이스 종류에 중립적으로 수행한다.
+- **REQ-AIEX-NFR-001**: THE 시스템 SHALL 점수·순위 계산을 표준 산술 연산만으로 수행하며, 외부 과학 계산 라이브러리에 의존하지 않는다.
+- **REQ-AIEX-NFR-002**: THE 시스템 SHALL 적합도 산출과 선호 기반 재순위 로직을 데이터베이스 의존 없이 검증 가능한 순수 함수로 제공한다.
+- **REQ-AIEX-NFR-003**: THE 시스템 SHALL 소유권 위반 접근에 대해 접근 거부가 아닌 자원 없음 의미의 응답을 반환한다.
+- **REQ-AIEX-NFR-004**: IF 외부 AI 분석 호출이 실패하면, THEN THE 시스템 SHALL 폴백 결과를 반환하고 추천 요청 처리를 중단하지 않는다.
+- **REQ-AIEX-NFR-005**: THE 시스템 SHALL 선호 저장을 조회 후 기록(SELECT-then-write) 방식으로 데이터베이스 종류에 중립적으로 수행한다.
 
 ---
 

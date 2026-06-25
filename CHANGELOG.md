@@ -7,6 +7,23 @@
 
 ---
 
+## [0.37.0] - 2026-06-25
+
+### Added (SPEC-STOCK-037: AI 종목 추천 고도화)
+- **AI 종목 추천 고도화**: 포트폴리오 맥락 인식 기반 개인화 추천 (Claude API 활용)
+- **추천 근거 구조화**: reason, risk_factors, fit_score (0.0~1.0), 면책 문구 포함
+- **사용자 선호 저장/적용**: 좋아요·싫어요 기반 추천 개인화 (SELECT-then-write)
+- **섹터 과집중 필터**: 포트폴리오 내 50% 초과 섹터 추천 자동 제외
+- **추천 이력 조회 API**: `GET /portfolios/{id}/recommendations/history` — 사용자가 선택·거절한 종목 이력
+- **DB 마이그레이션 0024**: user_recommendation_preferences, recommendation_history 테이블 추가
+- **순수 함수 기반 추천 로직**: apply_preference_filter, rank_by_portfolio_context, build_portfolio_context_prompt
+- **신규 모델**: UserRecommendationPreference, RecommendationHistory ORM 모델
+- **신규 엔드포인트**: POST/GET /portfolios/{id}/recommendations, POST/GET /portfolios/{id}/preferences, GET /portfolios/{id}/recommendations/history
+- **스키마 확장**: PersonalizedRecommendation, RecommendationResponse, PreferenceSaveRequest, PreferenceItem, RecommendationHistoryItem
+- **테스트**: 24개 단위 테스트 추가 (총 987개)
+
+---
+
 ## [0.36.0] - 2026-06-25
 
 ### Added (SPEC-STOCK-036: 포트폴리오 알림 확장)

@@ -4,6 +4,16 @@
 
 ## 핵심 기능
 
+### Phase 37: AI 종목 추천 고도화 (v0.37.0) — SPEC-STOCK-037
+- **포트폴리오 맥락 인식 개인화 추천**: 사용자 보유 종목·섹터·수익률 등 포트폴리오 상태를 Claude API 프롬프트에 통합하여 더 관련성 높은 종목 추천
+- **추천 근거 구조화** (reason/risk_factors/fit_score): 추천 종목이 왜 추천되었는지 명확하게 전달. fit_score 0.0~1.0으로 포트폴리오 적합도 수치화
+- **좋아요·싫어요 선호 저장 및 반영**: SELECT-then-write 모델로 사용자가 이전 추천을 거절하거나 선택한 내역을 저장했다가, 다음 추천 시 자동 반영
+- **섹터 과집중(50% 초과) 자동 필터링**: 포트폴리오 내 한 섹터 비중이 50% 초과면 해당 섹터 종목 추천 제외
+- **추천 이력 조회 API**: `GET /portfolios/{id}/recommendations/history` — 사용자가 선택·거절한 종목의 전체 이력 조회 및 분석
+- **DB 마이그레이션 0024**: user_recommendation_preferences, recommendation_history 신규 테이블
+- **순수 함수 기반 로직**: apply_preference_filter, rank_by_portfolio_context, build_portfolio_context_prompt
+- 24개 단위 테스트
+
 ### Phase 36: 포트폴리오 알림 확장 (v0.36.0) — SPEC-STOCK-036
 - **평가액 임계 알림** (`portfolio_value_below`): 포트폴리오 총 평가액이 KRW 임계값 이하로 내려갈 때 알림
 - **개별 종목 수익률 임계 알림** (`holding_return`): 보유 중인 개별 종목의 수익률이 조건(상향/하향)을 만족할 때 알림

@@ -755,3 +755,26 @@ export async function apiGetAlertHistory(
     throw new Error(`알림 히스토리 조회 실패: ${res.status}`);
   return res.json();
 }
+
+// AI 코멘터리 응답 타입 (SPEC-STOCK-040)
+export interface AICommentaryResponse {
+  portfolio_id: number;
+  commentary: string;
+  cached: boolean;
+  generated_at: string;
+  is_fallback: boolean;
+}
+
+// AI 포트폴리오 코멘터리 조회 (SPEC-STOCK-040 REQ-CMNT-001)
+export async function getAICommentary(
+  token: string,
+  portfolioId: number,
+): Promise<AICommentaryResponse> {
+  const res = await fetch(
+    `${API_BASE}/portfolios/${portfolioId}/ai-commentary`,
+    { headers: authHeaders(token) }
+  );
+  if (!res.ok)
+    throw new Error(`AI 코멘터리 조회 실패: ${res.status}`);
+  return res.json();
+}

@@ -346,3 +346,14 @@ export async function apiGetAlertHistory(token, portfolioId) {
         throw new Error(`알림 히스토리 조회 실패: ${res.status}`);
     return res.json();
 }
+
+// AI 포트폴리오 코멘터리 조회 (SPEC-STOCK-040 REQ-CMNT-001)
+export async function getAICommentary(token, portfolioId) {
+    const res = await fetch(
+        `${API_BASE}/portfolios/${portfolioId}/ai-commentary`,
+        { headers: authHeaders(token) }
+    );
+    if (!res.ok)
+        throw new Error(`AI 코멘터리 조회 실패: ${res.status}`);
+    return res.json();
+}

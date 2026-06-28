@@ -35,6 +35,8 @@ import DRIPSimulator from '../components/DRIPSimulator';
 import BenchmarkComparisonPanel from '../components/BenchmarkComparisonPanel';
 import BenchmarkChartView from '../components/BenchmarkChartView';
 import PortfolioReportPanel from '../components/PortfolioReportPanel';
+// @MX:NOTE: [AUTO] AICommentaryPanel — SPEC-STOCK-040 AI 포트폴리오 코멘터리 패널
+import AICommentaryPanel from '../components/AICommentaryPanel';
 import { getPortfolioDividends, type PortfolioDividends } from '../api/dividends';
 import { LivePriceBadge } from '../components/LivePriceBadge';
 import { PerformanceDonutChart } from '../components/PerformanceDonutChart';
@@ -945,6 +947,9 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
       {/* 벤치마크 비교 (SPEC-STOCK-034) */}
       <BenchmarkComparisonPanel token={token} portfolioId={portfolioId} />
       <BenchmarkChartView token={token} portfolioId={portfolioId} />
+
+      {/* AI 포트폴리오 코멘터리 (SPEC-STOCK-040) */}
+      <AICommentaryPanel portfolioId={portfolioId} />
 
       {/* AI 투자 조언 섹션 (SPEC-STOCK-014) */}
       <AdviceSection token={token} />

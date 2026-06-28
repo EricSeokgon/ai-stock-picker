@@ -793,3 +793,24 @@ class MarketStatusResponse(BaseModel):
 
     is_open: bool
     message: str
+
+
+# ── SPEC-STOCK-040: AI 포트폴리오 코멘터리 스키마 ──────────────────────────────
+
+
+class AICommentaryResponse(BaseModel):
+    """AI 포트폴리오 코멘터리 응답 (SPEC-STOCK-040 REQ-CMT-001).
+
+    # @MX:ANCHOR: [AUTO] AI 코멘터리 API 응답 스키마
+    # @MX:REASON: router, 단위 테스트, 프론트 API 래퍼에서 3곳 이상 참조
+
+    cached: True이면 인메모리 캐시에서 반환된 결과.
+    generated_at: ISO 8601 UTC 형식 생성 시각.
+    is_fallback: Claude API 실패·빈 보유 종목 등 대체 텍스트 반환 여부.
+    """
+
+    portfolio_id: int
+    commentary: str
+    cached: bool
+    generated_at: str  # ISO 8601 형식
+    is_fallback: bool = False

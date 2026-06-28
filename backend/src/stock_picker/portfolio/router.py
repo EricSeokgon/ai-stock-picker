@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from stock_picker.api.deps import get_redis_client
 from stock_picker.auth.dependencies import get_current_user, get_db_session
 from stock_picker.db.models import Portfolio, PortfolioHolding, User
+from stock_picker.portfolio import ai_analysis as ai_analysis_mod
+from stock_picker.portfolio import commentary_cache
 from stock_picker.portfolio import service
 from stock_picker.portfolio.ai_analysis import analyze_portfolio
 from stock_picker.portfolio.dividends import calculate_portfolio_dividends
@@ -22,6 +24,7 @@ from stock_picker.portfolio.backtest import run_portfolio_backtest
 from stock_picker.portfolio.performance_summary import calculate_performance_summary
 from stock_picker.portfolio.market_status import is_krx_open
 from stock_picker.portfolio.schemas import (
+    AICommentaryResponse,
     AlertEvaluateResult,
     AlertHistoryItem,
     AssetAllocationResponse,
@@ -1148,6 +1151,82 @@ def get_dashboard_sector_summary(
         for item in aggregated
     ]
     return SectorResponse(sectors=sectors)
+
+
+# ── SPEC-STOCK-040: AI 포트폴리오 코멘터리 엔드포인트 ─────────────────────────
+# @MX:NOTE: [AUTO] SPEC-STOCK-040 — GET /portfolios/{id}/ai-commentary, 인메모리 TTL=300s
+
+
+@router.get(
+    "/{portfolio_id}/ai-commentary",
+    response_model=AICommentaryResponse,
+)
+async def get_ai_commentary(
+    portfolio_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
+) -> AICommentaryResponse:
+    """포트폴리오 AI 코멘터리 조회 (SPEC-STOCK-040 REQ-CMT-001).
+
+    1. 소유권 확인 (다른 사용자 → 404)
+    2. 캐시 확인 (히트 → cached=True 반환)
+    3. 보유 종목 없음 → is_fallback=True 반환
+    4. Claude API 호출 (실패 → fallback 텍스트, 절대 500 아님)
+    5. 결과 캐시 저장 후 반환
+    """
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    portfolio = service.get_portfolio_with_holdings(db, portfolio_id, current_user.id)
+    if portfolio is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="포트폴리오를 찾을 수 없습니다",
+        )
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # 캐시 확인 — 히트 시 즉시 반환
+    cached_text = commentary_cache.get_cached_commentary(portfolio_id)
+    if cached_text is not None:
+        return AICommentaryResponse(
+            portfolio_id=portfolio_id,
+            commentary=cached_text,
+            cached=True,
+            generated_at=now_iso,
+        )
+
+    # 보유 종목 없음 — Claude 호출 불필요
+    if not portfolio.holdings:
+        return AICommentaryResponse(
+            portfolio_id=portfolio_id,
+            commentary="보유 종목이 없어 코멘터리를 생성할 수 없습니다.",
+            cached=False,
+            generated_at=now_iso,
+            is_fallback=True,
+        )
+
+    # 포트폴리오 데이터 구성 (기존 _build_portfolio_data 재사용)
+    holdings_data = ai_analysis_mod._build_portfolio_data(portfolio.holdings)
+    portfolio_data = {"holdings": holdings_data}
+
+    # Claude API 호출 — 실패 시 fallback 반환 (generate_portfolio_commentary 내부 처리)
+    import anthropic  # noqa: PLC0415
+
+    client = anthropic.AsyncAnthropic()
+    commentary = await ai_analysis_mod.generate_portfolio_commentary(
+        portfolio_data=portfolio_data,
+        anthropic_client=client,
+    )
+
+    # 결과 캐시 저장
+    commentary_cache.set_cached_commentary(portfolio_id, commentary)
+
+    return AICommentaryResponse(
+        portfolio_id=portfolio_id,
+        commentary=commentary,
+        cached=False,
+        generated_at=now_iso,
+    )
 
 
 @router.get(

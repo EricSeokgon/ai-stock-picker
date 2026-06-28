@@ -157,6 +157,68 @@ async def _call_claude_async(portfolio_data: list[dict[str, Any]]) -> dict[str, 
         raise
 
 
+# @MX:ANCHOR: [AUTO] 포트폴리오 코멘터리 생성 — router·테스트 다중 참조
+# @MX:REASON: SPEC-STOCK-040 REQ-CMT-001; router.py get_ai_commentary 및 단위 테스트 3곳 이상 호출
+async def generate_portfolio_commentary(
+    portfolio_data: dict,
+    anthropic_client=None,
+) -> str:
+    """포트폴리오 AI 코멘터리 생성 (비동기).
+
+    portfolio_data: 수익률·보유 종목·리스크 지표 등을 담은 딕셔너리.
+    anthropic_client: anthropic.AsyncAnthropic 인스턴스 (테스트 목업 주입 용이).
+    예외 발생 시 대체 텍스트 반환 (절대 500 전파하지 않음).
+    """
+    try:
+        # 프롬프트 구성 — 한국어 코멘터리 요청
+        total_value = portfolio_data.get("total_value", 0)
+        total_return_pct = portfolio_data.get("total_return_pct", 0)
+        holdings = portfolio_data.get("holdings", [])
+        risk_metrics = portfolio_data.get("risk_metrics", {})
+        sector_summary = portfolio_data.get("sector_summary", [])
+
+        prompt_parts = [
+            "다음 포트폴리오를 분석하고 한국어로 코멘터리를 작성해 주세요.\n",
+            f"총 평가액: {total_value:,.0f}원",
+            f"수익률: {total_return_pct:.1f}%\n",
+            f"보유 종목:\n{json.dumps(holdings, ensure_ascii=False, indent=2)}\n",
+        ]
+        if risk_metrics:
+            prompt_parts.append(
+                f"리스크 지표:\n{json.dumps(risk_metrics, ensure_ascii=False, indent=2)}\n"
+            )
+        if sector_summary:
+            prompt_parts.append(
+                f"섹터 요약:\n{json.dumps(sector_summary, ensure_ascii=False, indent=2)}\n"
+            )
+        prompt_parts.append(
+            "다음 내용을 포함한 3-4문장의 한국어 코멘터리를 작성해 주세요:\n"
+            "1. 전체 수익률 요약\n"
+            "2. 리스크 코멘트\n"
+            "3. 섹터 집중도 코멘트\n"
+            "4. 투자 제안 (1문장)\n"
+        )
+        prompt = "\n".join(prompt_parts)
+
+        response = await anthropic_client.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=1024,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        result = response.content[0].text
+
+        # 면책 문구가 없으면 자동 추가
+        if _DISCLAIMER not in result:
+            result = result + "\n" + _DISCLAIMER
+
+        return result
+
+    except Exception:
+        logger.exception("포트폴리오 코멘터리 생성 실패")
+        return "포트폴리오 분석을 일시적으로 제공할 수 없습니다. 잠시 후 다시 시도해 주세요."
+
+
 async def optimize_portfolio_with_claude(
     holdings_data: list[dict[str, Any]],
     portfolio_codes: list[str],

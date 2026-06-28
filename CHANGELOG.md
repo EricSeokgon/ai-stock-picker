@@ -7,6 +7,25 @@
 
 ---
 
+## [0.40.0] - 2026-06-29
+
+### Added (SPEC-STOCK-040: AI 포트폴리오 코멘터리)
+- **AI 포트폴리오 코멘터리**: Claude API(claude-haiku-4-5-20251001)로 포트폴리오 현황·성과·리스크·섹터를 한국어 자연어 코멘터리로 요약
+- **신규 엔드포인트**: `GET /portfolios/{portfolio_id}/ai-commentary` — JWT 인증 필요, 소유권 검증(404), 미인증 401
+- **코멘터리 구성**: 성과 요약·리스크 코멘트·섹터 배분 코멘트·추천 문구·면책 문구 포함
+- **인메모리 TTL 캐시**: `commentary_cache.py` 신규 모듈 — 300초 TTL, Redis·신규 DB 테이블 없음, is_cached 플래그 반환
+- **대체 응답(Fallback)**: Claude API 실패·타임아웃·자격증명 누락 시 사전 정의 코멘터리 반환, is_fallback=true
+- **AICommentaryResponse 스키마**: portfolio_id, commentary, cached, generated_at, is_fallback 필드
+- **기존 인프라 재사용**: ANTHROPIC_API_KEY, SPEC-026 _build_portfolio_data(), 성과·리스크 서비스 결과 집계
+- **신규 마이그레이션 없음**: 마이그레이션 0024 유지
+- **scipy·신규 수치 라이브러리 없음**: NFR 준수
+- **프론트엔드 AICommentaryPanel**: useAuth() 토큰 자동 사용, 캐시 배지·대체 응답 배지·생성 시각 표시
+- **portfolio.ts `getAICommentary()`**: AI 코멘터리 API 래퍼 함수 추가
+- **Portfolio.tsx 통합**: AICommentaryPanel을 AdviceSection 이전에 배치
+- **단위 테스트 15개 (TDD 15/15 통과)**: 캐시 적중/만료, 소유권 검증, AI 실패 대체 응답, 빈 포트폴리오, 면책 문구 검증
+
+---
+
 ## [0.39.0] - 2026-06-25
 
 ### Added (SPEC-STOCK-039: 실시간 가격 폴링 & 자동 갱신)

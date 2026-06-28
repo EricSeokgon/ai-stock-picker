@@ -1,9 +1,9 @@
 ---
 id: SPEC-STOCK-040
 version: 0.1.0
-status: draft
+status: completed
 created_at: 2026-06-25
-updated_at: 2026-06-25
+updated_at: 2026-06-29
 author: ircp
 priority: medium
 issue_number: null
@@ -17,6 +17,7 @@ labels: [portfolio, ai, commentary, claude-api, backend, frontend]
 | 버전 | 일자 | 작성자 | 변경 내용 |
 |------|------|--------|-----------|
 | 0.1.0 | 2026-06-25 | ircp | 최초 초안 — EARS REQ 5개 영역 + 제외 항목 + Delta Markers + MX Tag Plan |
+| 0.2.0 | 2026-06-29 | ircp | sync 완료 — TDD 15/15 통과, 프론트엔드 통합 완료, status: completed |
 
 ---
 

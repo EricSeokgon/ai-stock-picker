@@ -1,5 +1,6 @@
 # Alembic 마이그레이션 환경 설정 - 비동기 asyncpg 지원
 import asyncio
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -21,6 +22,11 @@ if config.config_file_name is not None:
 
 # 마이그레이션 대상 메타데이터
 target_metadata = Base.metadata
+
+# DATABASE_URL 환경변수가 있으면 alembic.ini보다 우선 적용
+_db_url = os.getenv("DATABASE_URL")
+if _db_url:
+    config.set_main_option("sqlalchemy.url", _db_url)
 
 
 def run_migrations_offline() -> None:

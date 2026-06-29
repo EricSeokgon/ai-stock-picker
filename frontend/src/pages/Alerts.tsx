@@ -1,6 +1,6 @@
 // 알림 설정 페이지 — 목표가·급등락 알림 관리 (SPEC-STOCK-020 REQ-FE-001)
 import { useEffect, useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../auth/AuthContext';
 import {
   fetchAlerts,
   createAlert,

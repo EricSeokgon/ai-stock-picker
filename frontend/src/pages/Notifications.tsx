@@ -1,6 +1,6 @@
 // 알림 인박스 페이지 (SPEC-STOCK-013 REQ-FE-003)
 import { useEffect, useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../auth/AuthContext';
 import {
   fetchNotifications,
   markAllNotificationsRead,

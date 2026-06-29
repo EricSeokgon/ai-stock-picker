@@ -7,6 +7,22 @@
 
 ---
 
+## [0.41.0] - 2026-06-29
+
+### Added (SPEC-STOCK-041: 포트폴리오 목표 관리)
+- **포트폴리오 목표 관리 API**: POST/GET/DELETE `/portfolios/{portfolio_id}/goals` (JWT 인증·소유권 검증)
+- **목표 달성률 자동 계산**: MIN(수량진전률, 수익률진전률) 방식, 음수는 0.0으로 클램프
+- **스케줄러 목표 달성 알림**: 60분 주기 `check_portfolio_goals()`, goal_reached_notified 플래그로 멱등성 보장
+- **소프트 삭제**: DELETE 시 is_active=False (물리삭제 없음)
+- **GET 응답 규칙**: 활성 목표 없을 시 HTTP 204 No Content (404나 빈 배열 아님)
+- **중복 방지**: 포트폴리오당 활성 목표 1개만 허용, 중복 시 409 Conflict
+- **DB 마이그레이션 0025**: `portfolio_goals` 테이블 신규 (target_amount, current_amount, target_return_pct, current_return_pct, goal_reached_notified)
+- **PortfolioGoalPanel 프론트엔드**: 목표 조회·생성·달성률 시각화·삭제 기능
+- **API 함수**: `portfolio.ts` getPortfolioGoals(), createGoal(), deleteGoal() 추가
+- **단위 테스트 25개 (TDD, 25/25 통과)**: CRUD, 달성률 계산, 소프트 삭제, 멱등성, 204 응답, 409 충돌 검증
+
+---
+
 ## [0.40.0] - 2026-06-29
 
 ### Added (SPEC-STOCK-040: AI 포트폴리오 코멘터리)

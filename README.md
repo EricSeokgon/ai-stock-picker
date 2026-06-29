@@ -4,6 +4,18 @@
 
 ## 핵심 기능
 
+### Phase 41: 포트폴리오 목표 관리 (v0.41.0) — SPEC-STOCK-041
+- **포트폴리오 목표 관리 API**: POST/GET/DELETE `/portfolios/{id}/goals` — JWT 인증·소유권 검증 포함
+- **목표 달성률 자동 계산**: MIN(수량진전률, 수익률진전률) 방식, 음수는 0.0으로 클램프
+- **목표 달성 알림 스케줄러**: 60분 주기 check_portfolio_goals() — goal_reached_notified 플래그로 멱등성 보장
+- **소프트 삭제**: DELETE 시 is_active=False (물리삭제 없음)
+- **GET 응답 규칙**: 활성 목표 없을 시 HTTP 204 No Content (404나 빈 배열 아님)
+- **중복 방지**: 포트폴리오당 활성 목표 1개만 허용, 중복 시 409 Conflict
+- **DB 마이그레이션 0025**: portfolio_goals 테이블 신규 (target_amount, current_amount, target_return_pct, current_return_pct, goal_reached_notified)
+- **프론트엔드**: `PortfolioGoalPanel` 컴포넌트 — 목표 조회·생성·달성률 시각화·삭제 기능
+- **API 함수**: `api/portfolio.ts` getPortfolioGoals(), createGoal(), deleteGoal() 추가
+- **단위 테스트 25개** (TDD, 25/25 통과): CRUD, 달성률 계산, 소프트 삭제, 멱등성, 204 응답, 409 충돌 검증
+
 ### Phase 40: AI 포트폴리오 코멘터리 (v0.40.0) — SPEC-STOCK-040
 - **AI 포트폴리오 코멘터리**: Claude API(claude-haiku-4-5)를 활용해 포트폴리오 현황·성과·리스크·섹터를 한국어 자연어 코멘터리로 요약
 - **인메모리 TTL 캐시**: 동일 포트폴리오 재호출 시 Claude 과호출 방지 (300초 TTL, Redis 미사용)

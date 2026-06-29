@@ -814,3 +814,71 @@ class AICommentaryResponse(BaseModel):
     cached: bool
     generated_at: str  # ISO 8601 형식
     is_fallback: bool = False
+
+
+# ── SPEC-STOCK-041: 포트폴리오 목표 관리 스키마 ─────────────────────────────────
+
+
+class GoalCreate(BaseModel):
+    """포트폴리오 목표 생성 요청 (REQ-GOAL-001).
+
+    target_amount 또는 target_return_rate 중 하나 이상 필수.
+    deadline만 설정 → 422 (model_validator에서 검증).
+    """
+
+    target_amount: Optional[Decimal] = None
+    target_return_rate: Optional[Decimal] = None
+    deadline: Optional[date] = None
+
+    @model_validator(mode="after")
+    def at_least_one_target_must_be_positive(self) -> "GoalCreate":
+        """target_amount 또는 target_return_rate 중 하나 이상 양수여야 한다 (REQ-GOAL-001)."""
+        has_amount = self.target_amount is not None and self.target_amount > 0
+        has_rate = self.target_return_rate is not None and self.target_return_rate > 0
+
+        if not has_amount and not has_rate:
+            raise ValueError(
+                "target_amount 또는 target_return_rate 중 하나 이상을 양수로 설정해야 합니다"
+            )
+
+        # 0 또는 음수 검증 (None이 아니면서 양수가 아닌 경우)
+        if self.target_amount is not None and self.target_amount <= 0:
+            raise ValueError("target_amount는 0보다 커야 합니다")
+        if self.target_return_rate is not None and self.target_return_rate <= 0:
+            raise ValueError("target_return_rate는 0보다 커야 합니다")
+
+        return self
+
+
+class GoalResponse(BaseModel):
+    """포트폴리오 목표 응답 (REQ-GOAL-001)."""
+
+    id: int
+    portfolio_id: int
+    target_amount: Optional[Decimal] = None
+    target_return_rate: Optional[Decimal] = None
+    deadline: Optional[date] = None
+    is_active: bool
+    goal_reached_notified: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class GoalWithProgressResponse(BaseModel):
+    """포트폴리오 목표 + 달성률 응답 (REQ-GOAL-002)."""
+
+    id: int
+    portfolio_id: int
+    target_amount: Optional[Decimal] = None
+    target_return_rate: Optional[Decimal] = None
+    deadline: Optional[date] = None
+    is_active: bool
+    goal_reached_notified: bool
+    created_at: datetime
+    # 달성률 (0.0 ~ 100.0+, 음수 불허)
+    achievement_rate: float
+    # 남은 일수: deadline 없으면 None, 과거 deadline이면 0
+    days_remaining: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)

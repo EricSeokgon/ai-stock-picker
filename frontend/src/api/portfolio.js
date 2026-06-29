@@ -357,3 +357,5 @@ export async function getAICommentary(token, portfolioId) {
         throw new Error(`AI 코멘터리 조회 실패: ${res.status}`);
     return res.json();
 }
+// SPEC-STOCK-041: 포트폴리오 목표 관리 API (sidecar — 실제 로직은 portfolio.ts)
+

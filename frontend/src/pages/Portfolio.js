@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-// 포트폴리오 관리 페이지
+// 포트폴리오 관리 페이지 (SPEC-STOCK-041 PortfolioGoalPanel 통합)
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { apiListPortfolios, apiCreatePortfolio, apiListHoldings, apiAddHolding, apiGetPerformance, apiOptimizePortfolio, } from '../api/portfolio';

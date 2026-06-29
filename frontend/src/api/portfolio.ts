@@ -778,3 +778,76 @@ export async function getAICommentary(
     throw new Error(`AI 코멘터리 조회 실패: ${res.status}`);
   return res.json();
 }
+
+// ── SPEC-STOCK-041: 포트폴리오 목표 관리 ────────────────────────────────────
+
+// 목표 생성 요청 타입 (REQ-GOAL-001)
+export interface GoalCreate {
+  target_amount?: number | null;
+  target_return_rate?: number | null;
+  deadline?: string | null; // ISO 8601 날짜 문자열 (YYYY-MM-DD)
+}
+
+// 목표 응답 타입 (REQ-GOAL-001 응답)
+export interface GoalResponse {
+  id: number;
+  portfolio_id: number;
+  target_amount: number | null;
+  target_return_rate: number | null;
+  deadline: string | null;
+  is_active: boolean;
+  goal_reached_notified: boolean;
+  created_at: string;
+}
+
+// 목표+달성률 응답 타입 (REQ-GOAL-002 응답)
+export interface GoalWithProgressResponse extends GoalResponse {
+  achievement_rate: number;      // 달성률 (0.0 ~ 이론상 무제한, 음수 클램프)
+  days_remaining: number | null; // 남은 일수 (없으면 null, 과거 deadline이면 0)
+}
+
+// 포트폴리오 목표 조회 (REQ-GOAL-002) — 활성 목표 없으면 null
+export async function getPortfolioGoal(
+  token: string,
+  portfolioId: number,
+): Promise<GoalWithProgressResponse | null> {
+  const res = await fetch(
+    `${API_BASE}/portfolios/${portfolioId}/goals`,
+    { headers: authHeaders(token) }
+  );
+  if (res.status === 204) return null; // 활성 목표 없음
+  if (!res.ok) throw new Error(`목표 조회 실패: ${res.status}`);
+  return res.json();
+}
+
+// 포트폴리오 목표 생성 (REQ-GOAL-001)
+export async function createPortfolioGoal(
+  token: string,
+  portfolioId: number,
+  payload: GoalCreate,
+): Promise<GoalResponse> {
+  const res = await fetch(
+    `${API_BASE}/portfolios/${portfolioId}/goals`,
+    {
+      method: 'POST',
+      headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!res.ok) throw new Error(`목표 생성 실패: ${res.status}`);
+  return res.json();
+}
+
+// 포트폴리오 목표 삭제 (REQ-GOAL-003)
+export async function deletePortfolioGoal(
+  token: string,
+  portfolioId: number,
+  goalId: number,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/portfolios/${portfolioId}/goals/${goalId}`,
+    { method: 'DELETE', headers: authHeaders(token) }
+  );
+  if (!res.ok && res.status !== 204)
+    throw new Error(`목표 삭제 실패: ${res.status}`);
+}

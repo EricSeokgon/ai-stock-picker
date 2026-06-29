@@ -52,6 +52,9 @@ from stock_picker.portfolio.schemas import (
     PortfolioResponse,
     PreferenceItem,
     PreferenceSaveRequest,
+    GoalCreate,
+    GoalResponse,
+    GoalWithProgressResponse,
     RebalancingCalculateRequest,
     RebalancingOrderPlan,
     RecommendationHistoryItem,
@@ -59,6 +62,13 @@ from stock_picker.portfolio.schemas import (
     RiskAnalysisResult,
     SectorResponse,
     ValueSeriesResponse,
+)
+from stock_picker.portfolio.goals import (
+    calculate_achievement_rate,
+    create_goal,
+    delete_goal,
+    get_active_goal,
+    get_days_remaining,
 )
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
@@ -1273,3 +1283,106 @@ def get_dashboard_asset_allocation(
         for item in aggregated
     ]
     return AssetAllocationResponse(assets=assets)
+
+
+# ── SPEC-STOCK-041: 포트폴리오 목표 관리 엔드포인트 ─────────────────────────────
+
+
+@router.post(
+    "/{portfolio_id}/goals",
+    response_model=GoalResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="포트폴리오 목표 설정",
+    tags=["portfolios", "goals"],
+)
+def create_portfolio_goal(
+    portfolio_id: int,
+    body: GoalCreate,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """포트폴리오 투자 목표를 생성한다 (REQ-GOAL-001).
+
+    - target_amount 또는 target_return_rate 중 하나 이상 필수.
+    - 이미 활성 목표 존재 시 409 반환.
+    - 비소유자 접근 시 404 반환.
+    """
+    return create_goal(
+        db,
+        portfolio_id=portfolio_id,
+        user_id=current_user.id,
+        target_amount=body.target_amount,
+        target_return_rate=body.target_return_rate,
+        deadline=body.deadline,
+    )
+
+
+@router.get(
+    "/{portfolio_id}/goals",
+    summary="포트폴리오 활성 목표 조회",
+    tags=["portfolios", "goals"],
+)
+async def get_portfolio_goal(
+    portfolio_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    redis: Any = Depends(get_redis_client),
+) -> Any:
+    """포트폴리오 활성 투자 목표와 달성률을 조회한다 (REQ-GOAL-002).
+
+    - 활성 목표 없음 → 204 No Content.
+    - 비소유자 접근 → 404.
+    - days_remaining: deadline 과거이면 0, 없으면 null.
+    """
+    from fastapi.responses import Response
+
+    goal = get_active_goal(db, portfolio_id=portfolio_id, user_id=current_user.id)
+    if goal is None:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    # 현재 성과 계산
+    perf = await service.calculate_performance(
+        db, portfolio_id=portfolio_id, user_id=current_user.id, redis=redis
+    )
+    current_value = perf.get("total_current", 0.0)
+    current_return_rate = perf.get("total_return_pct", 0.0)
+
+    achievement = calculate_achievement_rate(
+        current_value=current_value,
+        current_return_rate=current_return_rate,
+        target_amount=goal.target_amount,
+        target_return_rate=goal.target_return_rate,
+    )
+
+    return GoalWithProgressResponse(
+        id=goal.id,
+        portfolio_id=goal.portfolio_id,
+        target_amount=goal.target_amount,
+        target_return_rate=goal.target_return_rate,
+        deadline=goal.deadline,
+        is_active=goal.is_active,
+        goal_reached_notified=goal.goal_reached_notified,
+        created_at=goal.created_at,
+        achievement_rate=achievement,
+        days_remaining=get_days_remaining(goal.deadline),
+    )
+
+
+@router.delete(
+    "/{portfolio_id}/goals/{goal_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="포트폴리오 목표 삭제",
+    tags=["portfolios", "goals"],
+)
+def delete_portfolio_goal(
+    portfolio_id: int,
+    goal_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    """포트폴리오 투자 목표를 소프트 삭제한다 (REQ-GOAL-003).
+
+    - is_active=False 로 설정 (이력 보존).
+    - 비소유자 접근 → 404.
+    """
+    delete_goal(db, portfolio_id=portfolio_id, goal_id=goal_id, user_id=current_user.id)

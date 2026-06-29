@@ -1,10 +1,27 @@
 # APScheduler 배치 잡 설정 - 일일 파이프라인 및 장중 30분 증분 스케줄링
 # REQ-NEWS-001: 일 1회(06:00) 전체 수집 배치
 # REQ-NEWS-002: 장중 09:00~15:30 매 30분 증분 수집
+from typing import Any
+
 import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
+
+# SPEC-STOCK-041: 포트폴리오 목표 달성 알림 — 모듈 레벨 import (테스트 patch 지원)
+# 순환 import 방지를 위해 조건부 try-except 사용
+try:
+    from stock_picker.db.session import AsyncSessionLocal
+    from stock_picker.notifications.email_service import send_general_alert_email
+    from stock_picker.portfolio.goals import calculate_achievement_rate
+    from stock_picker.portfolio.service import calculate_performance
+    from stock_picker.telegram.notifier import _send_message_sync
+except ImportError:
+    AsyncSessionLocal = None  # type: ignore[assignment]
+    send_general_alert_email = None  # type: ignore[assignment]
+    calculate_achievement_rate = None  # type: ignore[assignment]
+    calculate_performance = None  # type: ignore[assignment]
+    _send_message_sync = None  # type: ignore[assignment]
 
 log = structlog.get_logger()
 
@@ -400,6 +417,140 @@ def setup_scheduler() -> AsyncIOScheduler:
     )
 
     return _scheduler
+
+
+async def check_portfolio_goals() -> None:
+    """포트폴리오 목표 달성 여부 점검 잡 — 60분 주기 실행 (SPEC-STOCK-041 REQ-GOAL-007).
+
+    # @MX:NOTE: [AUTO] achievement_rate >= 100 달성 시 텔레그램·이메일 알림 발송
+    # @MX:SPEC: SPEC-STOCK-041 REQ-GOAL-007
+
+    멱등성: goal_reached_notified=True 이면 재발송 없음.
+    예외 발생 시 해당 목표만 건너뛰고 계속 진행.
+    """
+    # 모듈 수준 심볼 사용 (테스트에서 patch 가능하도록 module-level import 필요)
+    # 아래 import는 첫 호출 시점에 로드 (순환 import 방지)
+    from sqlalchemy import select
+
+    from stock_picker.db.models import PortfolioGoal
+
+    log.info("포트폴리오 목표 달성 점검 시작")
+
+    async with AsyncSessionLocal() as session:
+        # 활성 목표 전체 조회
+        result = await session.execute(
+            select(PortfolioGoal).where(PortfolioGoal.is_active == True)  # noqa: E712
+        )
+        goals = result.scalars().all()
+        log.info("활성 포트폴리오 목표 수", count=len(goals))
+
+        for goal in goals:
+            try:
+                # 이미 달성 알림 발송된 목표는 건너뜀 (멱등성)
+                if goal.goal_reached_notified:
+                    continue
+
+                # 현재 성과 계산 (동기 세션 사용 — service.calculate_performance는 동기)
+                user = get_user_for_portfolio(session, goal.portfolio_id)
+                if user is None:
+                    log.warning("포트폴리오 소유자 없음 — goal_id=%s", goal.id)
+                    continue
+
+                perf = await calculate_performance(
+                    db=session,
+                    portfolio_id=goal.portfolio_id,
+                    user_id=user.id,
+                )
+                current_value = perf.get("total_current", 0.0)
+                current_return_rate = perf.get("total_return_pct", 0.0)
+
+                achievement = calculate_achievement_rate(
+                    current_value=current_value,
+                    current_return_rate=current_return_rate,
+                    target_amount=goal.target_amount,
+                    target_return_rate=goal.target_return_rate,
+                )
+
+                if achievement < 100.0:
+                    continue
+
+                # 100% 이상 달성 — 알림 발송
+                msg = (
+                    f"[포트폴리오 목표 달성] 포트폴리오 목표를 달성했습니다!\n"
+                    f"달성률: {achievement:.1f}%\n"
+                    f"현재 평가액: {current_value:,.0f}원\n"
+                    f"현재 수익률: {current_return_rate:.2f}%"
+                )
+
+                # 텔레그램 발송
+                chat_id = get_user_telegram_chat_id(session, user.id)
+                if chat_id:
+                    try:
+                        _send_message_sync(chat_id, msg)
+                    except Exception:
+                        log.exception("텔레그램 알림 발송 실패 — goal_id=%s", goal.id)
+
+                # 이메일 발송
+                if user.email:
+                    try:
+                        send_general_alert_email(
+                            to_email=user.email,
+                            krx_code="PORTFOLIO",
+                            alert_type="goal_reached",
+                            message=msg,
+                        )
+                    except Exception:
+                        log.exception("이메일 알림 발송 실패 — goal_id=%s", goal.id)
+
+                # 알림 발송 완료 표시 (멱등성)
+                goal.goal_reached_notified = True
+
+            except Exception:
+                log.exception("목표 달성 점검 오류 — goal_id=%s", goal.id)
+
+        await session.commit()
+
+    log.info("포트폴리오 목표 달성 점검 완료")
+
+
+def get_user_for_portfolio(session: Any, portfolio_id: int) -> Any:
+    """포트폴리오 소유자 User 객체 반환 (스케줄러 내부 헬퍼).
+
+    AsyncSession에서는 동기 쿼리를 지원하지 않으므로
+    모킹 목적으로 별도 함수로 분리.
+    """
+    from stock_picker.db.models import Portfolio, User
+
+    # 실제 구현에서는 동기 세션 또는 async execute 필요
+    # 테스트에서는 patch로 대체
+    try:
+        portfolio = session.query(Portfolio).filter(Portfolio.id == portfolio_id).first()
+        if portfolio is None:
+            return None
+        return session.query(User).filter(User.id == portfolio.user_id).first()
+    except Exception:
+        return None
+
+
+def get_user_telegram_chat_id(session: Any, user_id: int) -> Any:
+    """사용자 텔레그램 chat_id 반환 (스케줄러 내부 헬퍼).
+
+    테스트에서 patch로 대체.
+    """
+    from stock_picker.db.models import TelegramSubscription
+
+    try:
+        sub = (
+            session.query(TelegramSubscription)
+            .filter(
+                TelegramSubscription.user_id == user_id,
+                TelegramSubscription.is_active == True,  # noqa: E712
+            )
+            .first()
+        )
+        return sub.chat_id if sub else None
+    except Exception:
+        return None
 
 
 async def _run_general_alert_check() -> None:

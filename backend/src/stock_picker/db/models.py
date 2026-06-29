@@ -894,3 +894,52 @@ class RecommendationHistory(Base):
 
     user: Mapped["User"] = relationship("User", lazy="noload")
     portfolio: Mapped["Portfolio"] = relationship("Portfolio", lazy="noload")
+
+
+# ── SPEC-STOCK-041: 포트폴리오 목표 관리 ────────────────────────────────────────
+
+class PortfolioGoal(Base):
+    """포트폴리오 투자 목표 테이블 (SPEC-STOCK-041).
+
+    # @MX:ANCHOR: [AUTO] 포트폴리오 목표 핵심 엔티티
+    # @MX:REASON: goals.py 서비스, router.py 엔드포인트, scheduler/jobs.py 스케줄러에서 참조
+    # @MX:SPEC: SPEC-STOCK-041 REQ-GOAL-001~007
+
+    포트폴리오당 활성 목표 1개 제한 (is_active=True 기준).
+    소프트 삭제: DELETE 시 is_active=False, 이력 보존.
+    """
+
+    __tablename__ = "portfolio_goals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    portfolio_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
+    )
+    # target_amount: 목표 평가액 (KRW), target_return_rate: 목표 수익률(%)
+    # 둘 중 하나 이상은 반드시 설정해야 함 (Pydantic 스키마에서 검증)
+    target_amount: Mapped[Decimal | None] = mapped_column(Numeric(15, 2), nullable=True)
+    target_return_rate: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
+    # deadline: 목표 달성 기한 (설정 선택사항)
+    deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # is_active: 활성 목표 여부 (소프트 삭제 시 False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    # goal_reached_notified: 목표 달성 알림 발송 여부 (멱등성 보장)
+    goal_reached_notified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    # 연관 관계
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", lazy="noload")
+
+    __table_args__ = (
+        Index("ix_portfolio_goals_portfolio_id", "portfolio_id"),
+    )

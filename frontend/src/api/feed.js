@@ -18,6 +18,23 @@ export async function getSharedPortfolio(shareToken) {
         throw new Error(`포트폴리오 조회 실패: ${res.status}`);
     return res.json();
 }
+// 공개 포트폴리오 좋아요 취소 (인증 필요, DELETE → 204)
+export async function unlikeSharedPortfolio(shareToken, token) {
+    const res = await fetch(`${API_BASE}/shared/${shareToken}/like`, {
+        method: 'DELETE',
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+    if (res.status === 401)
+        throw new Error('로그인이 필요합니다.');
+    if (res.status === 403)
+        throw new Error('자신의 포트폴리오에는 좋아요 취소할 수 없습니다.');
+    if (res.status === 404)
+        throw new Error('공유된 포트폴리오를 찾을 수 없습니다.');
+    if (res.status !== 204)
+        throw new Error(`좋아요 취소 실패: ${res.status}`);
+}
 // 공개 포트폴리오 좋아요 (인증 필요)
 export async function likeSharedPortfolio(shareToken, token) {
     const res = await fetch(`${API_BASE}/shared/${shareToken}/like`, {

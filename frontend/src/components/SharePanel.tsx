@@ -1,7 +1,14 @@
 // 포트폴리오 공유 패널 (SPEC-STOCK-042)
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { apiCreateShare, apiDeleteShare, apiGetShare, type ShareResponse } from '../api/portfolio';
+import {
+  apiCreateShare,
+  apiDeleteShare,
+  apiGetShare,
+  getShareStats,
+  type ShareResponse,
+  type ShareViewStatItem,
+} from '../api/portfolio';
 
 interface SharePanelProps {
   portfolioId: number;
@@ -15,6 +22,8 @@ export default function SharePanel({ portfolioId }: SharePanelProps) {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [stats, setStats] = useState<ShareViewStatItem[]>([]);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
   // 마운트 시 현재 공유 상태 조회
   useEffect(() => {
@@ -25,6 +34,15 @@ export default function SharePanel({ portfolioId }: SharePanelProps) {
       .catch(() => setShareData(null))
       .finally(() => setLoading(false));
   }, [token, portfolioId]);
+
+  // 공유 데이터 존재 시 7일 조회 통계 조회
+  useEffect(() => {
+    if (!token || !shareData) return;
+    setStatsError(null);
+    getShareStats(token, portfolioId)
+      .then((res) => setStats(res.stats))
+      .catch(() => setStatsError('통계 조회 실패'));
+  }, [token, portfolioId, shareData]);
 
   // 공유 링크 생성
   async function handleCreate() {
@@ -116,11 +134,33 @@ export default function SharePanel({ portfolioId }: SharePanelProps) {
 
       {!loading && shareData && (
         <div style={{ marginTop: '0.5rem' }}>
-          {/* 공유 통계 */}
+          {/* 공유 통계 (누적) */}
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.5rem', fontSize: '0.8rem', color: '#555' }}>
             <span>조회수: <strong>{shareData.view_count}</strong></span>
             <span>좋아요: <strong>{shareData.like_count}</strong></span>
           </div>
+
+          {/* 7일 일별 조회 통계 */}
+          {statsError && (
+            <p data-testid="stats-error" style={{ color: '#c62828', fontSize: '0.75rem', margin: '0.25rem 0' }}>
+              {statsError}
+            </p>
+          )}
+          {stats.length > 0 && (
+            <div style={{ marginBottom: '0.5rem' }}>
+              <p style={{ fontSize: '0.75rem', color: '#555', margin: '0 0 0.25rem' }}>일별 조회수 (최근 7일)</p>
+              {stats.map((s) => (
+                <div
+                  key={s.date}
+                  data-testid="stat-item"
+                  style={{ display: 'flex', gap: '0.5rem', fontSize: '0.75rem', color: '#555' }}
+                >
+                  <span>{s.date}</span>
+                  <span>{s.view_count}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* 링크 표시 */}
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.5rem' }}>

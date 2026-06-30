@@ -1,7 +1,12 @@
 // 공유 포트폴리오 공개 보기 페이지 (SPEC-STOCK-042, 인증 불필요)
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getSharedPortfolio, likeSharedPortfolio, type SharePublicResponse } from '../api/feed';
+import {
+  getSharedPortfolio,
+  likeSharedPortfolio,
+  unlikeSharedPortfolio,
+  type SharePublicResponse,
+} from '../api/feed';
 import { useAuth } from '../auth/AuthContext';
 
 // 수익률 색상
@@ -22,6 +27,7 @@ export default function SharedPortfolio() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [likeCount, setLikeCount] = useState(0);
+  const [liked, setLiked] = useState(false);
   const [likeLoading, setLikeLoading] = useState(false);
   const [likeError, setLikeError] = useState<string | null>(null);
 
@@ -41,7 +47,7 @@ export default function SharedPortfolio() {
       .finally(() => setLoading(false));
   }, [shareToken]);
 
-  // 좋아요 처리
+  // 좋아요/취소 토글 처리 (session-local: 초기값 false, 서버 응답 확인 후 상태 변경)
   async function handleLike() {
     if (!shareToken) return;
     if (!token) {
@@ -51,8 +57,15 @@ export default function SharedPortfolio() {
     setLikeLoading(true);
     setLikeError(null);
     try {
-      const res = await likeSharedPortfolio(shareToken, token);
-      setLikeCount(res.like_count);
+      if (liked) {
+        await unlikeSharedPortfolio(shareToken, token);
+        setLiked(false);
+        setLikeCount((c) => c - 1);
+      } else {
+        const res = await likeSharedPortfolio(shareToken, token);
+        setLiked(true);
+        setLikeCount(res.like_count);
+      }
     } catch (e: unknown) {
       setLikeError(e instanceof Error ? e.message : '좋아요 처리에 실패했습니다.');
     } finally {
@@ -124,17 +137,17 @@ export default function SharedPortfolio() {
       {/* 좋아요 버튼 */}
       <div style={{ marginBottom: '1.5rem' }}>
         <button
+          data-testid="like-btn"
           onClick={() => void handleLike()}
           disabled={likeLoading}
-          aria-label={`좋아요 ${likeCount}개`}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: '0.4rem',
             padding: '0.45rem 1rem',
-            background: '#fff',
+            background: liked ? '#e91e63' : '#fff',
             border: '1px solid #e91e63',
-            color: '#e91e63',
+            color: liked ? '#fff' : '#e91e63',
             borderRadius: '20px',
             cursor: likeLoading ? 'default' : 'pointer',
             fontSize: '0.875rem',
@@ -142,10 +155,19 @@ export default function SharedPortfolio() {
             opacity: likeLoading ? 0.7 : 1,
           }}
         >
-          ♥ 좋아요 {likeCount.toLocaleString()}
+          {liked ? '♥ 좋아요 취소' : '♡ 좋아요'}
         </button>
+        <span
+          data-testid="like-count"
+          style={{ marginLeft: '0.5rem', fontSize: '0.875rem', color: '#666' }}
+        >
+          {likeCount.toLocaleString()}개
+        </span>
         {likeError && (
-          <span style={{ marginLeft: '0.75rem', fontSize: '0.8rem', color: '#c62828' }}>
+          <span
+            data-testid="like-error"
+            style={{ marginLeft: '0.75rem', fontSize: '0.8rem', color: '#c62828' }}
+          >
             {likeError}
           </span>
         )}

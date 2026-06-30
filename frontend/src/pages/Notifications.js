@@ -9,11 +9,13 @@ function TypeBadge({ type }) {
         price_alert: 'bg-yellow-100 text-yellow-800',
         rec_new: 'bg-green-100 text-green-800',
         rec_dropped: 'bg-red-100 text-red-800',
+        portfolio_like: 'bg-pink-100 text-pink-800',
     };
     const labels = {
         price_alert: '가격 알림',
         rec_new: '신규 추천',
         rec_dropped: '추천 탈락',
+        portfolio_like: '좋아요',
     };
     return (_jsx("span", { className: `inline-block text-xs font-medium px-2 py-0.5 rounded ${colors[type] ?? 'bg-gray-100 text-gray-700'}`, children: labels[type] ?? type }));
 }

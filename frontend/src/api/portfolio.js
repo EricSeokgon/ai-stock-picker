@@ -304,6 +304,17 @@ export async function apiGetShare(token, portfolioId) {
     }
     return res.json();
 }
+// 포트폴리오 공유 7일 조회 통계 (SPEC-STOCK-044)
+export async function getShareStats(token, portfolioId) {
+    const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/share/stats`, {
+        headers: authHeaders(token),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail ?? `통계 조회 실패: ${res.status}`);
+    }
+    return res.json();
+}
 // AI 포트폴리오 코멘터리 조회 (SPEC-STOCK-040 REQ-CMNT-001)
 export async function getAICommentary(token, portfolioId) {
     const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/ai-commentary`, { headers: authHeaders(token) });

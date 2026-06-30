@@ -7,6 +7,19 @@
 
 ---
 
+## [0.45.0] - 2026-06-30
+
+### Added (SPEC-STOCK-045: 피드 디스커버리 강화)
+- **피드 트렌딩 정렬**: GET `/feed?sort=trending` — 최근 7일 조회수 합계 기준 내림차순 정렬, share_view_stats 테이블 재사용, 통계 없는 포트폴리오 점수 0
+- **피드 키워드 검색**: GET `/feed?q=keyword` — Portfolio.name ILIKE 부분 일치 필터 (대소문자 무시)
+- **복합 필터링**: GET `/feed?sort=trending&q=keyword` — 트렌딩 정렬과 검색 동시 지원
+- **폴백 처리**: 미지원 sort 값 시 기본값 "recent"로 자동 처리 (에러 없음)
+- **프론트엔드 피드 강화**: Feed.tsx — 트렌딩 탭 버튼, 검색 입력폼, appliedQuery 상태 관리
+- **신규 DB 마이그레이션 없음**: 기존 share_view_stats(마이그레이션 0027) 재사용
+- **단위 테스트 38개 통과** (TDD): 백엔드 10 + 프론트엔드 4 + 회귀 24
+
+---
+
 ## [0.44.0] - 2026-06-30
 
 ### Added (SPEC-STOCK-044: 소셜 프론트엔드 완성)

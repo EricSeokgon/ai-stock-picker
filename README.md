@@ -4,6 +4,37 @@
 
 ## 핵심 기능
 
+### Phase 46: 공유 포트폴리오 댓글 (v0.46.0) — SPEC-STOCK-046
+- **공유 포트폴리오 댓글 작성**: POST `/shared/{token}/comments` (인증 필수) — 공유 포트폴리오에 댓글 작성, 소유자 자동 알림
+- **공유 포트폴리오 댓글 조회**: GET `/shared/{token}/comments` (무인증) — 댓글 목록 조회, 페이지네이션
+- **공유 포트폴리오 댓글 삭제**: DELETE `/shared/{token}/comments/{comment_id}` (인증 필수) — 작성자/소유자만 삭제 가능
+- **소프트 삭제**: `deleted_at` 타임스탬프로 논리 삭제 지원
+- **댓글 알림**: 댓글 작성 시 `portfolio_comment` 타입 알림 자동 생성
+- **알림 페이지 배지**: Notifications.tsx — `portfolio_comment` 타입 알림에 "댓글" 배지
+- **DB 마이그레이션 0028**: `portfolio_comments` 테이블 신규
+- **단위 테스트 25개** (TDD): 백엔드 19 + 프론트엔드 6 (CRUD, 소유권 검증, 알림)
+
+### Phase 45: 피드 디스커버리 강화 (v0.45.0) — SPEC-STOCK-045
+- **피드 트렌딩 정렬**: GET `/feed?sort=trending` — 최근 7일 조회수 기준 정렬
+- **피드 키워드 검색**: GET `/feed?q=keyword` — 포트폴리오명 부분 일치 검색
+- **복합 필터링**: 트렌딩 정렬과 검색 동시 지원
+- **프론트엔드 피드 강화**: 트렌딩 탭, 검색 입력폼
+- **단위 테스트 38개** (TDD): 백엔드 10 + 프론트엔드 4 + 회귀 24
+
+### Phase 44: 소셜 프론트엔드 완성 (v0.44.0) — SPEC-STOCK-044
+- **포트폴리오 좋아요 토글**: POST/DELETE `/shared/{share_token}/like` — optimistic UI 반영
+- **공유 통계 패널**: GET `/portfolios/{portfolio_id}/share/stats` — 지난 7일 일별 추이
+- **알림 배지 업데이트**: `portfolio_like` 타입 알림 배지 추가
+- **단위 테스트 15개**: 좋아요 토글·취소, 통계 조회 검증
+
+### Phase 43: 포트폴리오 공유 통계 & 좋아요 알림 (v0.43.0) — SPEC-STOCK-043
+- **공개 포트폴리오 좋아요 API**: POST `/shared/{share_token}/like` (인증 필수, 멱등)
+- **포트폴리오 좋아요 취소 API**: DELETE `/shared/{share_token}/like` (인증 필수)
+- **포트폴리오 공유 통계 조회**: GET `/portfolios/{portfolio_id}/share/stats` — 지난 7일 통계
+- **좋아요 알림 자동 생성**: `portfolio_like` 타입 알림
+- **DB 마이그레이션 0027**: `share_view_stats` 테이블 신규
+- **단위 테스트 24개**: 좋아요 멱등성, 통계 조회 검증
+
 ### Phase 42: 포트폴리오 공유 & 소셜 (v0.42.0) — SPEC-STOCK-042
 - **공유 토큰 발급 API (멱등)**: POST `/portfolios/{id}/share` — 소유자 전용, 재호출 시 기존 토큰 재사용
 - **공유 비활성화 API**: DELETE `/portfolios/{id}/share` — is_public=False 설정, 토큰·통계 보존

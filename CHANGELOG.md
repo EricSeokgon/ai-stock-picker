@@ -7,6 +7,24 @@
 
 ---
 
+## [0.46.0] - 2026-07-01
+
+### Added (SPEC-STOCK-046: 공유 포트폴리오 댓글)
+- **공유 포트폴리오 댓글 작성 API**: POST `/shared/{token}/comments` (인증 필수) — 공유 포트폴리오에 댓글 작성, 포트폴리오 소유자에게 자동 알림 생성
+- **공유 포트폴리오 댓글 조회 API**: GET `/shared/{token}/comments` (무인증) — 공유 포트폴리오 댓글 목록 조회, 페이지네이션 지원
+- **공유 포트폴리오 댓글 삭제 API**: DELETE `/shared/{token}/comments/{comment_id}` (인증 필수) — 댓글 작성자 또는 포트폴리오 소유자만 삭제 가능
+- **소프트 삭제**: 댓글 삭제 시 deleted_at 타임스탬프 기록, 물리삭제 없음
+- **댓글 알림**: 댓글 작성 시 `portfolio_comment` 타입 알림 자동 생성
+- **알림 페이지 배지**: Notifications.tsx — `portfolio_comment` 타입 알림에 "댓글" 한글 배지 (파란색 TypeBadge)
+- **DB 마이그레이션 0028**: `portfolio_comments` 테이블 신규 (id, portfolio_share_id FK, user_id FK, content, created_at, updated_at, deleted_at)
+- **ORM 모델**: `PortfolioComment` 모델 + `PortfolioShare.comments` relationship
+- **Pydantic 스키마**: `CommentCreate`, `CommentItem`, `CommentListResponse` 추가
+- **프론트엔드 API 함수**: `feed.ts`에 `postComment()`, `getComments()`, `deleteComment()` 추가
+- **프론트엔드 UI**: SharedPortfolio.tsx — 댓글 입력폼·댓글 목록 섹션 신규
+- **단위 테스트 25개 통과** (TDD): 백엔드 19 + 프론트엔드 6 (CRUD, 소유권 검증, 소프트 삭제, 알림 생성)
+
+---
+
 ## [0.45.0] - 2026-06-30
 
 ### Added (SPEC-STOCK-045: 피드 디스커버리 강화)

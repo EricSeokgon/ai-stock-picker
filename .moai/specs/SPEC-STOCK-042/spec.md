@@ -253,7 +253,7 @@ CREATE INDEX ix_portfolio_likes_portfolio_id ON portfolio_likes (portfolio_id);
 | T-010 | 비인증 좋아요 거부 — 인증 없이 `POST /shared/{token}/like` → 401 |
 | T-011 | 피드 정렬 — `GET /feed?sort=likes` 좋아요순·`sort=recent` 최신순 정렬 검증 |
 | T-012 | 피드 페이지네이션 — `size`/`page` 적용 + 비공개 포트폴리오 미노출 검증 |
-| T-013 | 공유 상태 조회(소유자) — 공유 레코드 존재 시 `GET /portfolios/{id}/share` → 200 + `share_token`·`is_public`·`view_count` 포함 검증 |
+| T-013 | 공유 상태 조회(소유자) — 공유 레코드 존재 시 `GET /portfolios/{id}/share` → 200 + `share_token`·`is_public`·`view_count`·`like_count` 포함 검증 |
 | T-014 | 공유 상태 조회(비소유자) — 타 사용자가 `GET /portfolios/{id}/share` → 404 검증 |
 | T-015 | 공유 비공개(비소유자) — 타 사용자가 `DELETE /portfolios/{id}/share` → 404 검증 |
 
@@ -276,7 +276,7 @@ CREATE INDEX ix_portfolio_likes_portfolio_id ON portfolio_likes (portfolio_id);
 - **AC-11** (REQ-SHARE-010): WHEN 누구든 `GET /feed?sort={likes|recent}` 를 요청하면, THE SYSTEM SHALL `sort=likes` 는 `like_count` 내림차순, `sort=recent` 는 `updated_at` 내림차순으로 정렬하고 `size` 100 초과 입력은 100 으로 클램핑한 **FeedResponse** 를 반환해야 한다.
 - **AC-12** (REQ-SHARE-011): IF 공유 레코드가 존재하지 않거나 `is_public=False` 이면, THE SYSTEM SHALL `GET /shared/{share_token}` 및 `POST /shared/{share_token}/like` 에서 **404** 를 반환하고 `GET /feed` 결과에서 해당 포트폴리오를 제외해야 한다.
 - **AC-13** (REQ-SHARE-010): WHEN 누구든 `GET /feed` 를 요청하면, THE SYSTEM SHALL 각 `FeedItem` 에 소유자 식별 정보(`user_id`·이메일)를 포함하지 않아야 한다(공개 피드 데이터 마스킹).
-- **AC-14** (REQ-SHARE-003): WHEN 포트폴리오 소유자가 `GET /portfolios/{id}/share` 를 요청하고 공유 레코드가 존재하면, THE SYSTEM SHALL `share_token`, `share_url`, `is_public`, `view_count` 를 포함한 **200 응답**을 반환해야 한다.
+- **AC-14** (REQ-SHARE-003): WHEN 포트폴리오 소유자가 `GET /portfolios/{id}/share` 를 요청하고 공유 레코드가 존재하면, THE SYSTEM SHALL `share_token`, `share_url`, `is_public`, `view_count`, `like_count` 를 포함한 **200 응답**을 반환해야 한다.
 
 ---
 

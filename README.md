@@ -4,6 +4,20 @@
 
 ## 핵심 기능
 
+### Phase 42: 포트폴리오 공유 & 소셜 (v0.42.0) — SPEC-STOCK-042
+- **공유 토큰 발급 API (멱등)**: POST `/portfolios/{id}/share` — 소유자 전용, 재호출 시 기존 토큰 재사용
+- **공유 비활성화 API**: DELETE `/portfolios/{id}/share` — is_public=False 설정, 토큰·통계 보존
+- **소유자 공유 상태 조회**: GET `/portfolios/{id}/share` — 현재 공유 상태·share_url·조회수·좋아요수 반환
+- **공개 읽기 전용 뷰**: GET `/shared/{share_token}` (무인증) — 보유 종목·수익률·조회수 노출, 원자적 view_count 증가
+- **좋아요 API**: POST `/shared/{share_token}/like` (인증 필수, 멱등) — 포트폴리오당 1회, 소유자 자기좋아요 403, 비인증 401
+- **디스커버리 피드**: GET `/feed` (무인증) — 공개 포트폴리오 목록, 좋아요순·최신순 정렬, 페이지네이션
+- **프라이버시 제어**: 비공개 공유 URL = 404 반환
+- **DB 마이그레이션 0026**: `portfolio_shares`(공유 토큰·공개 여부·조회수) + `portfolio_likes`(포트폴리오·유저 복합 UNIQUE) 신규
+- **프론트엔드 SharePanel**: 공유 링크 생성·복사·비활성화 UI
+- **프론트엔드 /feed 페이지**: 공개 포트폴리오 피드, 정렬 토글, 페이지네이션
+- **프론트엔드 /shared/:shareToken 페이지**: 읽기 전용 공유 포트폴리오 뷰, 좋아요 버튼
+- **단위 테스트 16개** (TDD, 16/16 통과): 공유 토큰 멱등성, 원자적 조회수, 좋아요 멱등성, 피드 정렬·페이지네이션 검증
+
 ### Phase 41: 포트폴리오 목표 관리 (v0.41.0) — SPEC-STOCK-041
 - **포트폴리오 목표 관리 API**: POST/GET/DELETE `/portfolios/{id}/goals` — JWT 인증·소유권 검증 포함
 - **목표 달성률 자동 계산**: MIN(수량진전률, 수익률진전률) 방식, 음수는 0.0으로 클램프

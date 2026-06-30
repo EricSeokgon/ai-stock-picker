@@ -1,8 +1,8 @@
 ---
 id: SPEC-STOCK-042
 title: 포트폴리오 공유 & 소셜
-status: draft
-version: 0.2.0
+status: completed
+version: 1.0.0
 created_at: 2026-06-30
 updated_at: 2026-06-30
 author: ircp

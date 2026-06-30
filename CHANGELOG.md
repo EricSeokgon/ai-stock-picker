@@ -7,6 +7,29 @@
 
 ---
 
+## [0.42.0] - 2026-06-30
+
+### Added (SPEC-STOCK-042: 포트폴리오 공유 & 소셜)
+- **공유 토큰 발급 API (멱등)**: POST `/portfolios/{portfolio_id}/share` — 소유자만 호출 가능, 재호출 시 기존 토큰 재사용
+- **공유 비활성화 API**: DELETE `/portfolios/{portfolio_id}/share` — is_public=False, 토큰·통계 유지
+- **소유자 공유 상태 조회**: GET `/portfolios/{portfolio_id}/share` — share_url·view_count·like_count 반환
+- **공개 읽기 전용 뷰**: GET `/shared/{share_token}` (무인증) — 원자적 view_count 증가(UPDATE SET view_count = view_count + 1), 비공개 시 404
+- **좋아요 API**: POST `/shared/{share_token}/like` (인증 필수) — UNIQUE 제약으로 멱등성 보장, 소유자 자기좋아요 403, 비인증 401
+- **디스커버리 피드**: GET `/feed` (무인증) — 공개 포트폴리오 목록, sort=likes|recent 정렬, page·page_size 페이지네이션
+- **share_token**: `secrets.token_urlsafe(16)` 22자, VARCHAR(32) 저장
+- **공개 API 라우터 분리**: `public_router.py` — 인증 불필요 라우터 별도 모듈
+- **DB 마이그레이션 0026**: `portfolio_shares`(id, portfolio_id UNIQUE FK, share_token UNIQUE VARCHAR(32), is_public, view_count, created_at, updated_at) + `portfolio_likes`(id, portfolio_id FK, user_id FK, created_at; UNIQUE(portfolio_id, user_id))
+- **ORM 모델 추가**: `PortfolioShare`, `PortfolioLike` (models.py)
+- **Pydantic 스키마 추가**: ShareCreate, ShareResponse, SharePublicResponse, LikeResponse, FeedItem, FeedResponse
+- **SharePanel 컴포넌트**: 공유 링크 생성·복사·비활성화 UI (포트폴리오 상세 페이지 통합)
+- **Feed 페이지** (`/feed`, 공개): 공개 포트폴리오 카드 그리드, 좋아요순·최신순 정렬 토글, 페이지네이션
+- **SharedPortfolio 페이지** (`/shared/:shareToken`, 공개): 읽기 전용 포트폴리오 뷰, 보유 종목 테이블, 좋아요 버튼
+- **NavBar "피드" 링크**: App.tsx에 공개 라우트(/feed, /shared/:shareToken) 추가
+- **feed.ts API 모듈**: getFeed(), getSharedPortfolio(), likeSharedPortfolio() 함수 추가
+- **단위 테스트 16개 (TDD 16/16 통과)**: T-001~T-015 + T-008b — 공유 멱등성·원자적 조회수·좋아요 중복 방지·소유자 403·피드 정렬·페이지네이션 검증
+
+---
+
 ## [0.41.0] - 2026-06-29
 
 ### Added (SPEC-STOCK-041: 포트폴리오 목표 관리)

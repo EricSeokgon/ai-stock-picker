@@ -62,7 +62,9 @@ from stock_picker.portfolio.schemas import (
     RiskAnalysisResult,
     SectorResponse,
     ValueSeriesResponse,
+    ShareResponse,
 )
+from stock_picker.portfolio import sharing
 from stock_picker.portfolio.goals import (
     calculate_achievement_rate,
     create_goal,
@@ -1386,3 +1388,69 @@ def delete_portfolio_goal(
     - 비소유자 접근 → 404.
     """
     delete_goal(db, portfolio_id=portfolio_id, goal_id=goal_id, user_id=current_user.id)
+
+
+# ── SPEC-STOCK-042: 포트폴리오 공유 소유자 엔드포인트 ───────────────────────────
+
+
+@router.post(
+    "/{portfolio_id}/share",
+    response_model=ShareResponse,
+    summary="포트폴리오 공유 생성/재활성화",
+    tags=["portfolios", "sharing"],
+)
+def create_portfolio_share(
+    portfolio_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> ShareResponse:
+    """포트폴리오 공유 링크를 생성하거나 재활성화한다 (REQ-SHARE-001).
+
+    - 기존 공유 레코드 존재 시 is_public=True 재활성화 (token 재사용, 멱등성).
+    - 비소유자 접근 → 404.
+    """
+    share = sharing.create_or_reactivate_share(
+        db, portfolio_id=portfolio_id, user_id=current_user.id
+    )
+    return ShareResponse.model_validate(share)
+
+
+@router.delete(
+    "/{portfolio_id}/share",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="포트폴리오 공유 비활성화",
+    tags=["portfolios", "sharing"],
+)
+def delete_portfolio_share(
+    portfolio_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    """포트폴리오 공유를 비활성화한다 (REQ-SHARE-004, 소프트 삭제).
+
+    - is_public=False 설정 (token/counts 보존).
+    - 비소유자 접근 → 404.
+    """
+    sharing.deactivate_share(db, portfolio_id=portfolio_id, user_id=current_user.id)
+
+
+@router.get(
+    "/{portfolio_id}/share",
+    response_model=ShareResponse,
+    summary="포트폴리오 공유 상태 조회",
+    tags=["portfolios", "sharing"],
+)
+def get_portfolio_share(
+    portfolio_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> ShareResponse:
+    """포트폴리오 공유 상태를 조회한다 (REQ-SHARE-003, 소유자 전용).
+
+    - 비소유자 접근 → 404.
+    - 공유 레코드 없음 → 404.
+    """
+    share = sharing.get_share_status(
+        db, portfolio_id=portfolio_id, user_id=current_user.id
+    )
+    return ShareResponse.model_validate(share)

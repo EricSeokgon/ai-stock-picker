@@ -898,6 +898,89 @@ class RecommendationHistory(Base):
 
 # ── SPEC-STOCK-041: 포트폴리오 목표 관리 ────────────────────────────────────────
 
+class PortfolioShare(Base):
+    """포트폴리오 공유 링크 테이블 (SPEC-STOCK-042).
+
+    # @MX:ANCHOR: [AUTO] 포트폴리오 공유 핵심 엔티티
+    # @MX:REASON: sharing.py 서비스, portfolio router, 공개 피드 엔드포인트에서 참조
+    # @MX:SPEC: SPEC-STOCK-042 REQ-SHARE-001~005
+
+    share_token: secrets.token_urlsafe(16) 생성 (22자, VARCHAR(32)).
+    is_public=False는 소프트 삭제 (token/counts 보존).
+    포트폴리오당 공유 레코드 1개 (portfolio_id UNIQUE).
+    view_count: 원자적 UPDATE SET view_count = view_count + 1.
+    """
+
+    __tablename__ = "portfolio_shares"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    portfolio_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
+    )
+    # share_token: 고유 공유 토큰 (22자, VARCHAR(32))
+    share_token: Mapped[str] = mapped_column(String(32), nullable=False)
+    # share_url: 상대 경로 공유 URL (/shared/{token})
+    share_url: Mapped[str] = mapped_column(String(128), nullable=False)
+    # is_public: 공개 여부 (소프트 삭제 시 False, token/counts 보존)
+    is_public: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    # view_count: 조회수 (원자적 증가)
+    view_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    # 연관 관계
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", lazy="noload")
+    likes: Mapped[list["PortfolioLike"]] = relationship(
+        "PortfolioLike", back_populates="share", lazy="noload", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        Index("ix_portfolio_shares_portfolio_id", "portfolio_id"),
+        Index("ix_portfolio_shares_is_public", "is_public"),
+        UniqueConstraint("share_token", name="uq_portfolio_shares_token"),
+        UniqueConstraint("portfolio_id", name="uq_portfolio_shares_portfolio_id"),
+    )
+
+
+class PortfolioLike(Base):
+    """포트폴리오 좋아요 테이블 (SPEC-STOCK-042).
+
+    (share_id, user_id) 복합 유니크 — 중복 좋아요 DB 레벨 방지.
+    소유자 좋아요 금지는 앱 레벨에서 강제 (403).
+    like_count는 COUNT(*) 쿼리로 파생 (비정규화 카운터 없음).
+    """
+
+    __tablename__ = "portfolio_likes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    share_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolio_shares.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # 연관 관계
+    share: Mapped["PortfolioShare"] = relationship("PortfolioShare", back_populates="likes", lazy="noload")
+
+    __table_args__ = (
+        Index("ix_portfolio_likes_share_id", "share_id"),
+        Index("ix_portfolio_likes_user_id", "user_id"),
+        UniqueConstraint("share_id", "user_id", name="uq_portfolio_likes_share_user"),
+    )
+
+
 class PortfolioGoal(Base):
     """포트폴리오 투자 목표 테이블 (SPEC-STOCK-041).
 

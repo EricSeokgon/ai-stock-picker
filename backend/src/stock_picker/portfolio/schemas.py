@@ -882,3 +882,81 @@ class GoalWithProgressResponse(BaseModel):
     days_remaining: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SPEC-STOCK-042: 포트폴리오 공유 & 소셜 스키마
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class ShareCreate(BaseModel):
+    """포트폴리오 공유 생성 요청 (REQ-SHARE-001).
+
+    요청 바디 없음 — portfolio_id는 경로 파라미터에서 추출.
+    """
+
+    pass
+
+
+class ShareResponse(BaseModel):
+    """포트폴리오 공유 생성/조회 응답 (REQ-SHARE-001, REQ-SHARE-003).
+
+    소유자 전용 응답: share_token, share_url, view_count 포함.
+    """
+
+    id: int
+    portfolio_id: int
+    share_token: str
+    share_url: str
+    is_public: bool
+    view_count: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SharePublicResponse(BaseModel):
+    """공개 공유 포트폴리오 응답 (REQ-SHARE-002).
+
+    비인증 사용자도 조회 가능. like_count는 COUNT(*) 파생값.
+    """
+
+    share_token: str
+    share_url: str
+    portfolio_id: int
+    portfolio_name: str
+    view_count: int
+    like_count: int
+
+
+class LikeResponse(BaseModel):
+    """좋아요 응답 (REQ-LIKE-001).
+
+    like_count는 좋아요 후 현재 총 좋아요 수.
+    """
+
+    like_count: int
+
+
+class FeedItem(BaseModel):
+    """피드 단일 항목 (REQ-FEED-001)."""
+
+    share_token: str
+    share_url: str
+    portfolio_id: int
+    portfolio_name: str
+    view_count: int
+    like_count: int
+
+
+class FeedResponse(BaseModel):
+    """피드 목록 응답 (REQ-FEED-001).
+
+    sort: "recent" (updated_at DESC, 기본값) | "likes" (like_count DESC).
+    page: 1-based, size: 최대 100.
+    """
+
+    items: list[FeedItem]
+    total: int
+    page: int
+    size: int

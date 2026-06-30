@@ -53,6 +53,26 @@ def like_shared_portfolio(
     return LikeResponse(**result)
 
 
+@like_router.delete(
+    "/shared/{token}/like",
+    status_code=204,
+    summary="공유 포트폴리오 좋아요 취소",
+)
+def unlike_shared_portfolio(
+    token: str,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    """공유 포트폴리오 좋아요를 취소한다 (REQ-UNLIKE-001, 인증 필요).
+
+    - 자신의 포트폴리오 취소 → 403.
+    - 좋아요 없어도 204 (멱등성).
+    - 비공개/미존재 공유 → 404.
+    - 미인증 → 401.
+    """
+    sharing.remove_like(db, share_token=token, user_id=current_user.id)
+
+
 @shared_router.get(
     "/feed",
     response_model=FeedResponse,

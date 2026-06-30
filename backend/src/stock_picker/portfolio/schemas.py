@@ -960,3 +960,19 @@ class FeedResponse(BaseModel):
     total: int
     page: int
     size: int
+
+
+class ShareViewStatItem(BaseModel):
+    """일별 조회수 통계 항목 (SPEC-STOCK-043 REQ-STAT-002)."""
+
+    date: str
+    view_count: int
+
+
+class ShareStatsResponse(BaseModel):
+    """포트폴리오 공유 조회수 통계 응답 (SPEC-STOCK-043 REQ-STAT-002).
+
+    stats: 최근 7일 일별 조회수 (오름차순, 0-fill).
+    """
+
+    stats: list[ShareViewStatItem]

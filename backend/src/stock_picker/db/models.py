@@ -981,6 +981,33 @@ class PortfolioLike(Base):
     )
 
 
+class ShareViewStat(Base):
+    """포트폴리오 공유 일별 조회수 통계 테이블 (SPEC-STOCK-043).
+
+    # @MX:NOTE: [AUTO] 날짜별 조회수 집계 — portfolio_shares.view_count(누적)와 별개 테이블
+    # @MX:SPEC: SPEC-STOCK-043 REQ-STAT-001
+
+    upsert 패턴: INSERT ... ON CONFLICT (share_id, stat_date) DO UPDATE SET view_count = view_count + 1
+    stat_date: KST(Asia/Seoul) 기준 날짜
+    """
+
+    __tablename__ = "share_view_stats"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    share_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolio_shares.id", ondelete="CASCADE"), nullable=False
+    )
+    stat_date: Mapped[date] = mapped_column(Date, nullable=False)
+    view_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("share_id", "stat_date", name="uq_share_view_stats_share_date"),
+        Index("ix_share_view_stats_share_id_date", "share_id", "stat_date"),
+    )
+
+
 class PortfolioGoal(Base):
     """포트폴리오 투자 목표 테이블 (SPEC-STOCK-041).
 

@@ -62,6 +62,7 @@ from stock_picker.portfolio.schemas import (
     SectorResponse,
     ValueSeriesResponse,
     ShareResponse,
+    ShareStatsResponse,
 )
 from stock_picker.portfolio import sharing
 from stock_picker.portfolio.goals import (
@@ -1453,3 +1454,27 @@ def get_portfolio_share(
         db, portfolio_id=portfolio_id, user_id=current_user.id
     )
     return ShareResponse.model_validate(share)
+
+
+@router.get(
+    "/{portfolio_id}/share/stats",
+    response_model=ShareStatsResponse,
+    summary="포트폴리오 공유 조회수 통계",
+    tags=["portfolios", "sharing"],
+)
+def get_portfolio_share_stats(
+    portfolio_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> ShareStatsResponse:
+    """포트폴리오 공유 일별 조회수 통계를 조회한다 (REQ-STAT-002, 소유자 전용).
+
+    - 최근 7일 일별 조회수 (오름차순, 0-fill).
+    - 비소유자 접근 → 404.
+    - 공유 레코드 없음 → 200 (7개 항목 모두 view_count=0).
+    - 미인증 → 401.
+    """
+    result = sharing.get_share_stats(
+        db, portfolio_id=portfolio_id, user_id=current_user.id
+    )
+    return ShareStatsResponse(**result)

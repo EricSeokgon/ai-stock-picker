@@ -756,6 +756,57 @@ export async function apiGetAlertHistory(
   return res.json();
 }
 
+// ── SPEC-STOCK-042: 포트폴리오 공유 타입 및 API ──────────────────────────────
+
+// 공유 응답 타입
+export interface ShareResponse {
+  share_token: string;
+  is_public: boolean;
+  share_url: string;
+  view_count: number;
+  like_count: number;
+  created_at: string;
+}
+
+// @MX:ANCHOR: [AUTO] 포트폴리오 공유 API — SharePanel, Portfolio 페이지에서 호출
+// @MX:REASON: 공유 생성/삭제/조회 세 함수가 공통 엔드포인트를 사용하는 외부 시스템 연동 지점
+export async function apiCreateShare(token: string, portfolioId: number): Promise<ShareResponse> {
+  const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/share`, {
+    method: 'POST',
+    headers: authHeaders(token),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { detail?: string };
+    throw new Error(err.detail ?? `공유 링크 생성 실패: ${res.status}`);
+  }
+  return res.json() as Promise<ShareResponse>;
+}
+
+// 포트폴리오 공유 비활성화 (SPEC-STOCK-042)
+export async function apiDeleteShare(token: string, portfolioId: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/share`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  });
+  if (!res.ok && res.status !== 204) {
+    const err = await res.json().catch(() => ({})) as { detail?: string };
+    throw new Error(err.detail ?? `공유 비활성화 실패: ${res.status}`);
+  }
+}
+
+// 포트폴리오 현재 공유 상태 조회 — 없으면 null 반환 (SPEC-STOCK-042)
+export async function apiGetShare(token: string, portfolioId: number): Promise<ShareResponse | null> {
+  const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/share`, {
+    headers: authHeaders(token),
+  });
+  if (res.status === 204) return null;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as { detail?: string };
+    throw new Error(err.detail ?? `공유 상태 조회 실패: ${res.status}`);
+  }
+  return res.json() as Promise<ShareResponse>;
+}
+
 // AI 코멘터리 응답 타입 (SPEC-STOCK-040)
 export interface AICommentaryResponse {
   portfolio_id: number;

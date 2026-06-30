@@ -2,7 +2,6 @@
 # 테스트 실행: backend/.venv/bin/pytest backend/tests/unit/test_portfolio_sharing_042.py -v
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 
 # ─────────────────────────────────────────────────────────────────────────────

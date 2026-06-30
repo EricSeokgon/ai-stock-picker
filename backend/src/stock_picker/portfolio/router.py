@@ -41,7 +41,6 @@ from stock_picker.portfolio.schemas import (
     MonthlySnapshot,
     OptimizeResult,
     PerformanceSummaryResponse,
-    PersonalizedRecommendation,
     PortfolioAlertCreate,
     PortfolioAlertResponse,
     PortfolioAlertUpdate,

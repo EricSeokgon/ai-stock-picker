@@ -941,6 +941,9 @@ class PortfolioShare(Base):
     likes: Mapped[list["PortfolioLike"]] = relationship(
         "PortfolioLike", back_populates="share", lazy="noload", cascade="all, delete-orphan"
     )
+    comments: Mapped[list["PortfolioComment"]] = relationship(
+        "PortfolioComment", back_populates="share", lazy="noload", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("ix_portfolio_shares_portfolio_id", "portfolio_id"),
@@ -1052,4 +1055,45 @@ class PortfolioGoal(Base):
 
     __table_args__ = (
         Index("ix_portfolio_goals_portfolio_id", "portfolio_id"),
+    )
+
+
+class PortfolioComment(Base):
+    """포트폴리오 공유 댓글 테이블 (SPEC-STOCK-046).
+
+    # @MX:ANCHOR: [AUTO] 포트폴리오 댓글 핵심 엔티티
+    # @MX:REASON: sharing.py 서비스, public_router.py 엔드포인트에서 참조
+    # @MX:SPEC: SPEC-STOCK-046 REQ-CMT-001~010
+
+    share_id: portfolio_shares.id FK (포트폴리오 공유 레코드 참조)
+    user_id: users.id FK (작성자)
+    content: 최대 500자 댓글 본문
+    created_at: 생성 시각 (KST 변환은 서비스 레이어)
+    """
+
+    __tablename__ = "portfolio_comments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    share_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolio_shares.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    # 댓글 본문 (최대 500자)
+    content: Mapped[str] = mapped_column(String(500), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    # 연관 관계
+    share: Mapped["PortfolioShare"] = relationship("PortfolioShare", back_populates="comments", lazy="noload")
+    author: Mapped["User"] = relationship("User", lazy="noload")
+
+    __table_args__ = (
+        # (share_id, created_at) 인덱스: 최신순 조회 최적화
+        Index("ix_portfolio_comments_share_created", "share_id", "created_at"),
+        Index("ix_portfolio_comments_user_id", "user_id"),
     )

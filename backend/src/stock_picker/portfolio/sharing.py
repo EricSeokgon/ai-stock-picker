@@ -1,8 +1,9 @@
 # SPEC-STOCK-042: 포트폴리오 공유 & 소셜 서비스 모듈
 # SPEC-STOCK-043: unlike, portfolio_like 알림, share_view_stats 확장
+# SPEC-STOCK-046: 공유 포트폴리오 댓글 (add_comment, list_comments, remove_comment)
 # @MX:ANCHOR: [AUTO] 포트폴리오 공유 서비스 진입점
 # @MX:REASON: router.py(소유자 엔드포인트), 공개 라우터(shared/feed), stats 엔드포인트에서 참조 (fan_in >= 3)
-# @MX:SPEC: SPEC-STOCK-042, SPEC-STOCK-043
+# @MX:SPEC: SPEC-STOCK-042, SPEC-STOCK-043, SPEC-STOCK-046
 import secrets
 from datetime import date, datetime, timedelta  # noqa: TCH003
 from typing import Any
@@ -16,6 +17,7 @@ from sqlalchemy.orm import Session
 from stock_picker.db.models import (
     Notification,
     Portfolio,
+    PortfolioComment,
     PortfolioLike,
     PortfolioShare,
     ShareViewStat,
@@ -475,3 +477,178 @@ def get_feed(
         "page": page,
         "size": size,
     }
+
+
+# ── SPEC-STOCK-046: 공유 포트폴리오 댓글 서비스 ────────────────────────────────
+
+
+def _get_public_share_or_404(db: Session, share_token: str) -> PortfolioShare:
+    """공개 공유 레코드 조회. 비공개/미존재 → 404."""
+    share = (
+        db.query(PortfolioShare)
+        .filter(
+            PortfolioShare.share_token == share_token,
+            PortfolioShare.is_public.is_(True),
+        )
+        .first()
+    )
+    if share is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="공유 포트폴리오를 찾을 수 없습니다",
+        )
+    return share
+
+
+def add_comment(db: Session, share_token: str, user_id: int, content: str) -> dict[str, Any]:
+    """공유 포트폴리오에 댓글을 작성한다 (SPEC-STOCK-046 REQ-CMT-001).
+
+    - 비공개/미존재 토큰 → 404
+    - 비소유자 댓글 작성 시 portfolio_comment 알림 생성 (일별 중복 억제)
+    - 결과: CommentItem 구조의 dict 반환
+    """
+    share = _get_public_share_or_404(db, share_token)
+
+    # 댓글 저장
+    comment = PortfolioComment(
+        share_id=share.id,
+        user_id=user_id,
+        content=content.strip(),
+    )
+    db.add(comment)
+    db.commit()
+    db.refresh(comment)
+
+    # 작성자 정보 조회 (username 포함)
+    commenter: User | None = db.query(User).filter(User.id == user_id).first()
+    commenter_name = commenter.username if commenter is not None else "사용자"
+
+    # 포트폴리오 소유자 조회 (알림 대상)
+    portfolio = (
+        db.query(Portfolio)
+        .filter(Portfolio.id == share.portfolio_id)
+        .first()
+    )
+
+    # 비소유자가 댓글을 남긴 경우에만 알림 생성
+    if portfolio is not None and portfolio.user_id != user_id:
+        kst_today: date = datetime.now(tz=_KST).date()
+        notification = Notification(
+            user_id=portfolio.user_id,
+            type="portfolio_comment",
+            krx_code=f"P{portfolio.id}",
+            title=f"{commenter_name}님이 댓글을 남겼습니다",
+            body=content[:100] if len(content) > 100 else content,
+            is_read=False,
+            ref_date=kst_today,
+        )
+        db.add(notification)
+        try:
+            db.commit()
+        except IntegrityError:
+            # 당일 동일 알림 중복 — 무시 (멱등성)
+            db.rollback()
+
+    return {
+        "id": comment.id,
+        "user_id": comment.user_id,
+        "username": commenter_name,
+        "content": comment.content,
+        "created_at": comment.created_at,
+    }
+
+
+def list_comments(
+    db: Session,
+    share_token: str,
+    page: int = 1,
+    size: int = 20,
+) -> dict[str, Any]:
+    """공유 포트폴리오 댓글 목록 조회 (SPEC-STOCK-046 REQ-CMT-005).
+
+    - 비공개/미존재 토큰 → 404
+    - 최신순 정렬 (created_at DESC)
+    - 페이지네이션 (최대 size=100)
+    """
+    share = _get_public_share_or_404(db, share_token)
+    size = min(size, 100)
+
+    # 전체 댓글 수 (페이지네이션 total)
+    total: int = (
+        db.query(PortfolioComment)
+        .filter(PortfolioComment.share_id == share.id)
+        .count()
+    )
+
+    # 최신순 조회 (created_at DESC) + User join (username)
+    rows = (
+        db.query(PortfolioComment, User)
+        .join(User, PortfolioComment.user_id == User.id)
+        .filter(PortfolioComment.share_id == share.id)
+        .order_by(PortfolioComment.created_at.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+        .all()
+    )
+
+    items = [
+        {
+            "id": c.id,
+            "user_id": c.user_id,
+            "username": u.username,
+            "content": c.content,
+            "created_at": c.created_at,
+        }
+        for c, u in rows
+    ]
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "size": size,
+    }
+
+
+def remove_comment(db: Session, share_token: str, comment_id: int, user_id: int) -> None:
+    """공유 포트폴리오 댓글을 삭제한다 (SPEC-STOCK-046 REQ-CMT-007).
+
+    - 비공개/미존재 토큰 → 404
+    - 존재하지 않는 댓글 → 404
+    - 삭제 권한: 댓글 작성자 OR 포트폴리오 소유자 (모더레이션)
+    - 권한 없음 → 403
+    """
+    share = _get_public_share_or_404(db, share_token)
+
+    # 댓글 조회
+    comment: PortfolioComment | None = (
+        db.query(PortfolioComment)
+        .filter(
+            PortfolioComment.id == comment_id,
+            PortfolioComment.share_id == share.id,
+        )
+        .first()
+    )
+    if comment is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="댓글을 찾을 수 없습니다",
+        )
+
+    # 포트폴리오 소유자 확인 (모더레이션 권한)
+    portfolio = (
+        db.query(Portfolio)
+        .filter(Portfolio.id == share.portfolio_id)
+        .first()
+    )
+    is_author = comment.user_id == user_id
+    is_owner = portfolio is not None and portfolio.user_id == user_id
+
+    if not (is_author or is_owner):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="삭제 권한이 없습니다",
+        )
+
+    db.delete(comment)
+    db.commit()

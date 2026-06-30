@@ -20,7 +20,7 @@ from stock_picker.notifications.general_alert_router import router as general_al
 from stock_picker.notifications.preferences_router import router as preferences_router
 from stock_picker.screener.router import router as screener_router
 from stock_picker.portfolio.router import router as portfolio_router
-from stock_picker.portfolio.public_router import shared_router, like_router
+from stock_picker.portfolio.public_router import shared_router, like_router, comment_router
 from stock_picker.realtime.ws_router import router as ws_router
 from stock_picker.watchlist.router import router as watchlist_router
 
@@ -122,6 +122,7 @@ def create_app() -> FastAPI:
     app.include_router(portfolio_router)
     app.include_router(shared_router)
     app.include_router(like_router)
+    app.include_router(comment_router)
     app.include_router(backtest_router)
     app.include_router(ws_router, tags=["realtime"])
     app.include_router(watchlist_router, prefix="/watchlist", tags=["watchlist"])

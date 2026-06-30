@@ -8,7 +8,7 @@ from typing import Any, Literal, Optional
 
 from datetime import date
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class PortfolioCreate(BaseModel):
@@ -976,3 +976,51 @@ class ShareStatsResponse(BaseModel):
     """
 
     stats: list[ShareViewStatItem]
+
+
+# ── SPEC-STOCK-046: 공유 포트폴리오 댓글 스키마 ────────────────────────────────
+
+
+class CommentCreate(BaseModel):
+    """댓글 작성 요청 스키마 (SPEC-STOCK-046 REQ-CMT-001).
+
+    content: 댓글 본문 (1~500자, 앞뒤 공백 자동 제거)
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    content: str = Field(min_length=1, max_length=500)
+
+
+class CommentItem(BaseModel):
+    """댓글 목록 항목 스키마 (SPEC-STOCK-046 REQ-CMT-005).
+
+    id: 댓글 ID
+    user_id: 작성자 ID
+    username: 작성자 닉네임 (users.username)
+    content: 댓글 본문
+    created_at: 생성 시각
+    """
+
+    id: int
+    user_id: int
+    username: str
+    content: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CommentListResponse(BaseModel):
+    """댓글 목록 응답 스키마 (SPEC-STOCK-046 REQ-CMT-005).
+
+    items: 댓글 항목 목록 (최신순)
+    total: 전체 댓글 수
+    page: 현재 페이지 (1-based)
+    size: 페이지 크기
+    """
+
+    items: list[CommentItem]
+    total: int
+    page: int
+    size: int

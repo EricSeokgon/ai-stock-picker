@@ -8,19 +8,21 @@ import {
   type Notification,
 } from '../api/notifications';
 
-// 타입별 뱃지 색상
+// 타입별 뱃지 색상 (SPEC-STOCK-046: portfolio_comment 추가)
 function TypeBadge({ type }: { type: string }) {
   const colors: Record<string, string> = {
     price_alert: 'bg-yellow-100 text-yellow-800',
     rec_new: 'bg-green-100 text-green-800',
     rec_dropped: 'bg-red-100 text-red-800',
     portfolio_like: 'bg-pink-100 text-pink-800',
+    portfolio_comment: 'bg-purple-100 text-purple-800',
   };
   const labels: Record<string, string> = {
     price_alert: '가격 알림',
     rec_new: '신규 추천',
     rec_dropped: '추천 탈락',
     portfolio_like: '좋아요',
+    portfolio_comment: '댓글',
   };
   return (
     <span

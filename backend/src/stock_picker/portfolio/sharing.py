@@ -392,11 +392,14 @@ def get_feed(
     sort: str = "recent",
     page: int = 1,
     size: int = 20,
+    q: str | None = None,
 ) -> dict[str, Any]:
-    """공개 공유 피드 조회 (REQ-FEED-001).
+    """공개 공유 피드 조회 (REQ-FEED-001 / REQ-FEED-002 ~ REQ-FEED-007).
 
-    sort: "recent" (updated_at DESC, 기본값) | "likes" (like_count DESC).
+    sort: "recent" (updated_at DESC, 기본값) | "likes" (like_count DESC) | "trending" (7일 조회 합계 DESC).
+    q:    포트폴리오 이름 부분 검색 (대소문자 무시, 빈 값 → 무시).
     page: 1-based. size: 최대 100으로 캡.
+    미지원 sort 값 → recent 폴백 (REQ-FEED-006).
     """
     # @MX:NOTE: [AUTO] size 상한 100 — 과도한 페이지 크기 방지
     size = min(size, 100)
@@ -421,13 +424,34 @@ def get_feed(
         .filter(PortfolioShare.is_public.is_(True))
     )
 
+    # 이름 검색 필터 — q 비어있으면 무시 (REQ-FEED-005)
+    if q and q.strip():
+        base_query = base_query.filter(Portfolio.name.ilike(f"%{q}%"))
+
     # 정렬
     if sort == "likes":
         base_query = base_query.order_by(
             func.coalesce(like_count_subq.c.like_count, 0).desc()
         )
+    elif sort == "trending":
+        # @MX:NOTE: [AUTO] 최근 7일(KST 기준) 조회수 합계 DESC — 0 조회는 마지막 (REQ-FEED-002/003)
+        start_date = datetime.now(tz=_KST).date() - timedelta(days=6)
+        trending_subq = (
+            db.query(
+                ShareViewStat.share_id,
+                func.sum(ShareViewStat.view_count).label("recent_views"),
+            )
+            .filter(ShareViewStat.stat_date >= start_date)
+            .group_by(ShareViewStat.share_id)
+            .subquery()
+        )
+        base_query = (
+            base_query
+            .outerjoin(trending_subq, trending_subq.c.share_id == PortfolioShare.id)
+            .order_by(func.coalesce(trending_subq.c.recent_views, 0).desc())
+        )
     else:
-        # 기본: 최신순 (updated_at DESC)
+        # 기본: 최신순 (updated_at DESC) — 미지원 sort 도 이 분기 (REQ-FEED-006)
         base_query = base_query.order_by(PortfolioShare.updated_at.desc())
 
     total = base_query.count()

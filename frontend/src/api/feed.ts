@@ -45,12 +45,16 @@ export interface LikeResponse {
 
 // @MX:ANCHOR: [AUTO] 피드 조회 API — Feed 페이지에서 호출
 // @MX:REASON: 공개 엔드포인트로 여러 컴포넌트에서 참조될 수 있는 외부 시스템 연동 지점
+// @MX:SPEC: SPEC-STOCK-042, SPEC-STOCK-045
 export async function getFeed(
-  sort: 'likes' | 'recent',
+  sort: 'likes' | 'recent' | 'trending',
   page: number,
   size: number,
+  q?: string,
 ): Promise<FeedResponse> {
   const params = new URLSearchParams({ sort, page: String(page), size: String(size) });
+  // q 비어있으면 파라미터 생략 (REQ-FEED-005)
+  if (q && q.trim()) params.set('q', q.trim());
   const res = await fetch(`${API_BASE}/feed?${params.toString()}`);
   if (!res.ok) throw new Error(`피드 조회 실패: ${res.status}`);
   return res.json() as Promise<FeedResponse>;

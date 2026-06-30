@@ -79,15 +79,24 @@ def unlike_shared_portfolio(
     summary="공개 공유 포트폴리오 피드",
 )
 def get_sharing_feed(
-    sort: str = Query(default="recent", description="정렬 기준: recent (최신순) | likes (좋아요순)"),
+    sort: str = Query(
+        default="recent",
+        description="정렬 기준: recent (최신순) | likes (좋아요순) | trending (7일 조회 합계순)",
+    ),
     page: int = Query(default=1, ge=1, description="페이지 번호 (1-based)"),
     size: int = Query(default=20, ge=1, le=100, description="페이지 크기 (최대 100)"),
+    q: str | None = Query(
+        default=None,
+        description="포트폴리오 이름 부분 검색 (대소문자 무시, 빈 값 → 무시)",
+    ),
     db: Session = Depends(get_db_session),
 ) -> FeedResponse:
     """공개 공유 포트폴리오 피드를 조회한다 (REQ-FEED-001, 인증 불필요).
 
     - sort=recent: updated_at DESC (기본값).
     - sort=likes: like_count DESC.
+    - sort=trending: 최근 7일 조회수 합계 DESC.
+    - q: 포트폴리오 이름 부분 검색 (ILIKE).
     """
-    result = sharing.get_feed(db, sort=sort, page=page, size=size)
+    result = sharing.get_feed(db, sort=sort, page=page, size=size, q=q)
     return FeedResponse(**result)

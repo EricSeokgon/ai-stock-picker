@@ -12,15 +12,18 @@ function formatRate(rate: number): string {
   return `${rate >= 0 ? '+' : ''}${rate.toFixed(2)}%`;
 }
 
-// @MX:NOTE: [AUTO] Feed 페이지 — 공개 포트폴리오 피드, 좋아요순/최신순 정렬 (SPEC-STOCK-042)
+// @MX:NOTE: [AUTO] Feed 페이지 — 공개 포트폴리오 피드, 좋아요순/최신순/트렌딩 정렬 + 이름 검색 (SPEC-STOCK-042, SPEC-STOCK-045)
 export default function Feed() {
   const navigate = useNavigate();
   const [items, setItems] = useState<FeedItem[]>([]);
-  const [sort, setSort] = useState<'likes' | 'recent'>('likes');
+  const [sort, setSort] = useState<'likes' | 'recent' | 'trending'>('likes');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 검색: query = 입력창 값, appliedQuery = 실제 적용된 검색어
+  const [query, setQuery] = useState('');
+  const [appliedQuery, setAppliedQuery] = useState('');
 
   const PAGE_SIZE = 20;
 
@@ -30,11 +33,11 @@ export default function Feed() {
     setItems([]);
   }, [sort]);
 
-  // 페이지 또는 정렬 변경 시 데이터 조회
+  // 페이지·정렬·검색어 변경 시 데이터 조회
   useEffect(() => {
     setLoading(true);
     setError(null);
-    getFeed(sort, page, PAGE_SIZE)
+    getFeed(sort, page, PAGE_SIZE, appliedQuery || undefined)
       .then((data) => {
         setItems(data.items);
         setTotal(data.total);
@@ -43,7 +46,7 @@ export default function Feed() {
         setError(e instanceof Error ? e.message : '피드 조회에 실패했습니다.');
       })
       .finally(() => setLoading(false));
-  }, [sort, page]);
+  }, [sort, page, appliedQuery]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -58,20 +61,62 @@ export default function Feed() {
     fontWeight: active ? 600 : 400,
   });
 
+  // 검색 제출 핸들러
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    setAppliedQuery(query.trim());
+    setPage(1);
+  }
+
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
         <h2 style={{ margin: 0, color: '#0d47a1' }}>포트폴리오 피드</h2>
         {/* 정렬 토글 */}
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button style={sortBtnStyle(sort === 'likes')} onClick={() => setSort('likes')}>
+          <button style={sortBtnStyle(sort === 'likes')} onClick={() => { setSort('likes'); setPage(1); }}>
             좋아요순
           </button>
-          <button style={sortBtnStyle(sort === 'recent')} onClick={() => setSort('recent')}>
+          <button style={sortBtnStyle(sort === 'recent')} onClick={() => { setSort('recent'); setPage(1); }}>
             최신순
+          </button>
+          <button style={sortBtnStyle(sort === 'trending')} onClick={() => { setSort('trending'); setPage(1); }}>
+            트렌딩
           </button>
         </div>
       </div>
+
+      {/* 검색 입력창 (REQ-FEED-004) */}
+      <form onSubmit={handleSearch} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="포트폴리오 이름 검색..."
+          aria-label="포트폴리오 이름 검색"
+          style={{
+            flex: 1,
+            padding: '0.4rem 0.75rem',
+            border: '1px solid #ccc',
+            borderRadius: '4px',
+            fontSize: '0.875rem',
+          }}
+        />
+        <button
+          type="submit"
+          style={{
+            padding: '0.4rem 0.9rem',
+            background: '#1976d2',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '0.875rem',
+          }}
+        >
+          검색
+        </button>
+      </form>
 
       {error && (
         <div

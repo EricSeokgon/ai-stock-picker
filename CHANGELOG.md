@@ -7,6 +7,18 @@
 
 ---
 
+## [0.44.0] - 2026-06-30
+
+### Added (SPEC-STOCK-044: 소셜 프론트엔드 완성)
+- **포트폴리오 좋아요 토글**: SharedPortfolio.tsx + SharePanel.tsx — POST/DELETE `/shared/{share_token}/like` 엔드포인트, session-local optimistic state로 UI 즉시 반영
+- **좋아요 상태 관리**: 좋아요 POST 200 (상태 업데이트) / 좋아요 취소 DELETE 204 (완료) → like toggle button 상태 동기화
+- **공유 통계 패널** (SharePanel): GET `/portfolios/{portfolio_id}/share/stats` — 지난 7일 일별 조회·좋아요 추이 시각화 (오름차순, 0-filled)
+- **알림 배지 업데이트**: Notifications.tsx — `portfolio_like` 타입 알림에 "좋아요" 한글 배지 (분홍색 TypeBadge)
+- **프론트엔드 API 확장**: feed.ts `unlikeSharedPortfolio()` 함수 추가 (DELETE 엔드포인트 래퍼)
+- **단위 테스트 15개** (TDD, 15/15 통과): 좋아요 토글·취소, 중복 좋아요 방지, 통계 조회(오름차순·0-fill), 알림 배지 타입 검증
+
+---
+
 ## [0.43.0] - 2026-06-30
 
 ### Added (SPEC-STOCK-043: 포트폴리오 공유 통계 & 좋아요 알림)

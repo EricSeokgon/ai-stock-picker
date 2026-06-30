@@ -7,6 +7,21 @@
 
 ---
 
+## [0.43.0] - 2026-06-30
+
+### Added (SPEC-STOCK-043: 포트폴리오 공유 통계 & 좋아요 알림)
+- **공개 포트폴리오 좋아요 API**: POST `/shared/{share_token}/like` (인증 필수) — 포트폴리오 한 건당 1회 좋아요, 소유자 자기좋아요 403, 멱등성 보장 (좋아요 기존 존재 시 204)
+- **포트폴리오 좋아요 취소 API**: DELETE `/shared/{share_token}/like` (인증 필수) — 좋아요 취소, 존재하지 않으면 404
+- **포트폴리오 공유 통계 조회**: `GET /portfolios/{portfolio_id}/share/stats` (인증·소유권 필수) — 지난 7일 일별 조회수·좋아요수 추이 반환
+- **좋아요 알림 자동 생성**: 좋아요 POST 시 자동으로 `portfolio_like` Notification 타입 인박스 알림 생성 (UNIQUE 제약으로 중복 방지)
+- **공개 포트폴리오 조회 시 통계 집계**: GET `/shared/{share_token}` 호출 시 `share_view_stats` 테이블에 일일 조회 기록 upsert (원자적 처리)
+- **DB 마이그레이션 0027**: `share_view_stats` 테이블 신규 (id, portfolio_id FK, stat_date, view_count, like_count, created_at, updated_at; UNIQUE(portfolio_id, stat_date))
+- **ORM 모델**: `ShareViewStat` 모델 (models.py)
+- **Pydantic 스키마**: `ShareViewStatItem`, `ShareStatsResponse` 스키마 추가
+- **단위 테스트 24개** (TDD 24/24 통과): 좋아요 멱등성, 좋아요 취소, 소유자 자기좋아요 403, 통계 조회, 원자적 view_count 집계, 지난 7일 필터링 검증
+
+---
+
 ## [0.42.0] - 2026-06-30
 
 ### Added (SPEC-STOCK-042: 포트폴리오 공유 & 소셜)

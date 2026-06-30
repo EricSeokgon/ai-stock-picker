@@ -606,6 +606,16 @@ curl -X POST http://localhost:8000/health
 | `GET` | `/portfolios/{id}/performance` | 포트폴리오 성과 분석 |
 | `POST` | `/portfolios/{id}/ai-analysis` | 포트폴리오 AI 분석 (claude-haiku-4-5) (Phase 4 신규) |
 
+### 공개 포트폴리오 공유 (Public Portfolio Sharing) — Phase 42·43 신규 (SPEC-STOCK-042·043)
+
+| 메서드 | 경로 | 설명 | 응답 |
+|--------|------|------|------|
+| `GET` | `/shared/{share_token}` | 공개 포트폴리오 읽기 전용 뷰 (무인증) | `{ portfolio_id, name, holdings, view_count, like_count, ... }` |
+| `POST` | `/shared/{share_token}/like` | 공개 포트폴리오 좋아요 (인증 필수) | `{ status: "liked"/"already_liked", like_count }` |
+| `DELETE` | `/shared/{share_token}/like` | 공개 포트폴리오 좋아요 취소 (인증 필수) | `{ status: "unliked", like_count }` |
+| `GET` | `/portfolios/{portfolio_id}/share/stats` | 포트폴리오 공유 통계 조회 — 지난 7일 (인증·소유권 필수) | `{ portfolio_id, stats: [ { date, view_count, like_count } ] }` |
+| `GET` | `/feed` | 공개 포트폴리오 디스커버리 피드 (무인증) | `{ portfolios: [ { portfolio_id, owner_name, view_count, like_count, ... } ], page }` |
+
 ### 백테스팅 (Backtesting) — Phase 13 완성 (SPEC-STOCK-012)
 
 | 메서드 | 경로 | 설명 |

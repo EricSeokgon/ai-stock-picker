@@ -7,6 +7,25 @@
 
 ---
 
+## [0.49.0] - 2026-07-01
+
+### Added (SPEC-STOCK-049: 포트폴리오 거래 내역 & 실현손익)
+- **포트폴리오 거래 내역 & 실현손익**: 매수/매도 거래를 포트폴리오 원장에 기록, 이동평균 원가법으로 실현손익 산출
+- **거래 기록 API**: `POST /portfolios/{id}/transactions` (인증 필수, 소유권 검증) — BUY/SELL 거래 기록, 수량·가격·거래일시 저장
+- **거래 내역 조회 API**: `GET /portfolios/{id}/transactions` (인증 필수) — 종목 필터, 페이지네이션, 가장 최근 거래순 정렬
+- **거래 삭제 API**: `DELETE /portfolios/{id}/transactions/{transaction_id}` (인증 필수, 소유권 검증) — 물리삭제
+- **실현손익 조회 API**: `GET /portfolios/{id}/transactions/pnl` (인증 필수) — 종목별·전체 실현손익 계산(이동평균 원가법), 매도 수량·평균 원가·매도가·실현손익 수치
+- **수치 앵커**: BUY 10@1000 · BUY 10@2000 · SELL 5@3000 → 실현손익 7,500원 검증 완료
+- **독립 원장**: 기존 포트폴리오 홀딩스와 독립, 자동 갱신 없음
+- **DB 마이그레이션 0030**: `portfolio_transactions` 테이블 신규 (id, portfolio_id FK, symbol, side[BUY/SELL], quantity, price, transaction_date, created_at, updated_at)
+- **ORM 모델**: `PortfolioTransaction` 모델 + relationship 추가
+- **Pydantic 스키마**: `TransactionCreate`, `TransactionItem`, `TransactionListResponse`, `StockPnl`, `RealizedPnlResponse` 추가
+- **프론트엔드 API 함수**: `api/portfolio.ts` — `addTransaction()`, `listTransactions()`, `deleteTransaction()`, `getRealizedPnl()` 추가
+- **프론트엔드 UI**: `Portfolio.tsx` — TransactionTab 컴포넌트, 거래 입력폼·내역 목록·실현손익 조회 기능
+- **단위 테스트 12개 통과** (TDD): 백엔드 9 + 프론트엔드 3 (거래 CRUD, 필터링, 실현손익 계산, 수치 검증)
+
+---
+
 ## [0.48.0] - 2026-07-01
 
 ### Added (SPEC-STOCK-048: 공유 포트폴리오 댓글 대댓글)

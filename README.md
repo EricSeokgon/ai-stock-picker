@@ -4,6 +4,15 @@
 
 ## 핵심 기능
 
+### Phase 49: 포트폴리오 거래 내역 & 실현손익 (v0.49.0) — SPEC-STOCK-049
+- **거래 기록 API**: POST `/portfolios/{id}/transactions` (인증 필수) — 매수/매도 거래 기록
+- **거래 내역 조회**: GET `/portfolios/{id}/transactions` (인증 필수) — 종목 필터, 페이지네이션
+- **실현손익 조회**: GET `/portfolios/{id}/transactions/pnl` (인증 필수) — 이동평균 원가법 실현손익 산출
+- **거래 삭제**: DELETE `/portfolios/{id}/transactions/{transaction_id}` (인증 필수)
+- **수치 앵커**: BUY 10@1000 · BUY 10@2000 · SELL 5@3000 → 실현손익 7,500원 ✓
+- **DB 마이그레이션 0030**: `portfolio_transactions` 테이블 신규
+- **단위 테스트 12개** (TDD): 백엔드 9 + 프론트엔드 3
+
 ### Phase 48: 공유 포트폴리오 댓글 대댓글 (v0.48.0) — SPEC-STOCK-048
 - **댓글 대댓글 작성**: POST `/shared/{token}/comments` (parent_comment_id 선택) — 최상위 댓글에만 답글 허용
 - **중첩 조회**: GET `/shared/{token}/comments` — 최상위 댓글 페이지네이션 + 각 항목의 `replies` 배열(오래된순)

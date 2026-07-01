@@ -4,6 +4,15 @@
 
 ## 핵심 기능
 
+### Phase 48: 공유 포트폴리오 댓글 대댓글 (v0.48.0) — SPEC-STOCK-048
+- **댓글 대댓글 작성**: POST `/shared/{token}/comments` (parent_comment_id 선택) — 최상위 댓글에만 답글 허용
+- **중첩 조회**: GET `/shared/{token}/comments` — 최상위 댓글 페이지네이션 + 각 항목의 `replies` 배열(오래된순)
+- **대댓글 알림**: 부모 댓글 작성자에게 `portfolio_comment` 타입 알림, SPEC-047 딥링크 자동 적용
+- **1단계 스레딩**: 답글에 대한 답글 거부(HTTP 400/409)
+- **프론트엔드 UI**: 각 최상위 댓글에 답글 액션 제공, 새 답글 리로드 없이 표시
+- **DB 마이그레이션 0029**: `portfolio_comments.parent_comment_id` nullable self-FK 추가
+- **단위 테스트 12개** (TDD): 백엔드 9 + 프론트엔드 3
+
 ### Phase 47: 공유 포트폴리오 알림 딥링크 (v0.47.0) — SPEC-STOCK-047
 - **알림 딥링크**: 좋아요/댓글 알림 클릭 시 해당 공유 포트폴리오로 즉시 이동
 - **백엔드 링크 산출**: 알림 응답에 nullable `link` 필드 추가, N+1 회피 배치 쿼리

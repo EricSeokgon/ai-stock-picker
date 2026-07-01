@@ -7,6 +7,19 @@
 
 ---
 
+## [0.48.0] - 2026-07-01
+
+### Added (SPEC-STOCK-048: 공유 포트폴리오 댓글 대댓글)
+- **공유 포트폴리오 댓글 대댓글**: `portfolio_comments` 테이블에 `parent_comment_id` nullable self-FK 컬럼 1개 추가(마이그레이션 0029) — 최상위 댓글에만 답글 허용(2단계 이상 중첩 차단)
+- **대댓글 작성 및 중첩 조회**: `add_comment(parent_comment_id)` 및 `list_comments` 확장 — 최상위 댓글은 페이지네이션, 각 항목에 `replies` 배열(오래된순) 포함, N+1 회피 배치 쿼리
+- **대댓글 알림**: 부모 댓글 작성자에게만 `portfolio_comment` 타입 알림 자동 생성(소유자 중복 알림 방지), SPEC-047 딥링크 자동 동작
+- **1단계 스레딩 강제**: 답글의 `parent_comment_id`가 NULL이 아니면 거부(HTTP 400/409)
+- **프론트엔드 UI**: `SharedPortfolio.tsx` — 최상위 댓글별 답글 버튼·입력폼·중첩 렌더(리로드 없음)
+- **db 마이그레이션 0029**: `parent_comment_id`(Integer FK, ondelete=CASCADE, nullable) + 인덱스
+- **단위 테스트 12개 통과** (TDD): 백엔드 9 + 프론트엔드 3 (대댓글 CRUD, 부모 검증, 알림, 중첩 렌더)
+
+---
+
 ## [0.47.0] - 2026-07-01
 
 ### Added (SPEC-STOCK-047: 공유 포트폴리오 알림 딥링크)

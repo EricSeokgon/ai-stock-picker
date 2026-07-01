@@ -63,8 +63,12 @@ from stock_picker.portfolio.schemas import (
     ValueSeriesResponse,
     ShareResponse,
     ShareStatsResponse,
+    TransactionCreate,
+    TransactionListResponse,
+    RealizedPnlResponse,
 )
 from stock_picker.portfolio import sharing
+from stock_picker.portfolio import transactions as txn_service
 from stock_picker.portfolio.goals import (
     calculate_achievement_rate,
     create_goal,
@@ -1478,3 +1482,91 @@ def get_portfolio_share_stats(
         db, portfolio_id=portfolio_id, user_id=current_user.id
     )
     return ShareStatsResponse(**result)
+
+
+# ── SPEC-STOCK-049: 거래 원장 엔드포인트 ──────────────────────────────────────
+
+
+@router.post(
+    "/{portfolio_id}/transactions",
+    status_code=status.HTTP_201_CREATED,
+    summary="거래 원장 추가 (매수/매도)",
+    tags=["portfolios", "transactions"],
+)
+def create_transaction(
+    portfolio_id: int,
+    payload: TransactionCreate,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """포트폴리오에 매수 또는 매도 거래를 수동 기록한다 (SPEC-STOCK-049 REQ-TXN-001·002).
+
+    - txn_type: 'BUY' 또는 'SELL' (대문자)
+    - quantity, price: 양수 필수
+    - SELL 시 순보유수량 초과 → 400
+    - 비소유자 접근 → 403
+    - 미인증 → 401
+    """
+    return txn_service.add_transaction(
+        db=db,
+        portfolio_id=portfolio_id,
+        user_id=current_user.id,
+        data=payload,
+    )
+
+
+@router.get(
+    "/{portfolio_id}/transactions",
+    response_model=TransactionListResponse,
+    summary="거래 목록 조회",
+    tags=["portfolios", "transactions"],
+)
+def get_transactions(
+    portfolio_id: int,
+    krx_code: str | None = Query(None, description="종목코드 필터 (선택)"),
+    page: int = Query(1, ge=1, description="페이지 번호 (1-based)"),
+    page_size: int = Query(20, ge=1, le=200, description="페이지 크기"),
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """포트폴리오 거래 목록을 최신순으로 조회한다 (SPEC-STOCK-049 REQ-TXN-006·007).
+
+    - krx_code 지정 시 해당 종목 거래만 반환
+    - 비소유자 접근 → 403
+    - 미인증 → 401
+    """
+    return txn_service.list_transactions(
+        db=db,
+        portfolio_id=portfolio_id,
+        user_id=current_user.id,
+        krx_code=krx_code,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get(
+    "/{portfolio_id}/transactions/pnl",
+    response_model=RealizedPnlResponse,
+    summary="실현손익 조회 (이동평균 원가법)",
+    tags=["portfolios", "transactions"],
+)
+def get_portfolio_realized_pnl(
+    portfolio_id: int,
+    krx_code: str | None = Query(None, description="종목코드 필터 (선택)"),
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """이동평균 원가법으로 종목별 실현손익을 계산한다 (SPEC-STOCK-049 REQ-TXN-009~013).
+
+    - BUY 10@1000, BUY 10@2000, SELL 5@3000 → realized=7500 (AC-049-009)
+    - krx_code 지정 시 해당 종목만 계산
+    - 비소유자 접근 → 403
+    - 미인증 → 401
+    """
+    return txn_service.get_realized_pnl(
+        db=db,
+        portfolio_id=portfolio_id,
+        user_id=current_user.id,
+        krx_code=krx_code,
+    )

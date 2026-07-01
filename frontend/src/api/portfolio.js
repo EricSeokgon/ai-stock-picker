@@ -348,3 +348,50 @@ export async function deletePortfolioGoal(token, portfolioId, goalId) {
     if (!res.ok && res.status !== 204)
         throw new Error(`목표 삭제 실패: ${res.status}`);
 }
+
+// ── SPEC-STOCK-049: 거래 원장 API ──────────────────────────────────────────
+
+/** 매수/매도 거래 추가 (SPEC-STOCK-049 REQ-TXN-001·002) */
+export async function addTransaction(token, portfolioId, payload) {
+    const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/transactions`, {
+        method: 'POST',
+        headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`거래 추가 실패: ${res.status}`);
+    return res.json();
+}
+
+/** 거래 목록 조회 (SPEC-STOCK-049 REQ-TXN-006) */
+export async function listTransactions(token, portfolioId, params = {}) {
+    const q = new URLSearchParams();
+    if (params.krx_code) q.set('krx_code', params.krx_code);
+    if (params.page) q.set('page', String(params.page));
+    if (params.page_size) q.set('page_size', String(params.page_size));
+    const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/transactions?${q.toString()}`, {
+        headers: authHeaders(token),
+    });
+    if (!res.ok) throw new Error(`거래 목록 조회 실패: ${res.status}`);
+    return res.json();
+}
+
+/** 거래 삭제 (SPEC-STOCK-049 REQ-TXN-008) */
+export async function deleteTransaction(token, portfolioId, transactionId) {
+    const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/transactions/${transactionId}`, {
+        method: 'DELETE',
+        headers: authHeaders(token),
+    });
+    if (!res.ok && res.status !== 204)
+        throw new Error(`거래 삭제 실패: ${res.status}`);
+}
+
+/** 실현손익 조회 — 이동평균 원가법 (SPEC-STOCK-049 REQ-TXN-009) */
+export async function getRealizedPnl(token, portfolioId, krxCode) {
+    const q = new URLSearchParams();
+    if (krxCode) q.set('krx_code', krxCode);
+    const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/transactions/pnl?${q.toString()}`, {
+        headers: authHeaders(token),
+    });
+    if (!res.ok) throw new Error(`실현손익 조회 실패: ${res.status}`);
+    return res.json();
+}

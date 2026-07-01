@@ -241,6 +241,10 @@ class Portfolio(Base):
     holdings: Mapped[list["PortfolioHolding"]] = relationship(
         "PortfolioHolding", back_populates="portfolio", cascade="all, delete-orphan"
     )
+    # SPEC-STOCK-049: 거래 원장 관계
+    transactions: Mapped[list["PortfolioTransaction"]] = relationship(
+        "PortfolioTransaction", back_populates="portfolio", cascade="all, delete-orphan", lazy="noload"
+    )
 
 
 class PortfolioHolding(Base):
@@ -281,6 +285,41 @@ class PortfolioHolding(Base):
             name="uq_holding_portfolio_ticker_market",
         ),
     )
+
+
+# ── SPEC-STOCK-049: 거래 원장 ──────────────────────────────────────────────────
+
+
+class PortfolioTransaction(Base):
+    """포트폴리오 거래 원장 테이블 — 개별 매수/매도 수동 기록 (SPEC-STOCK-049)
+
+    # @MX:ANCHOR: [AUTO] 거래 원장 핵심 엔티티 — transactions.py 서비스·router.py 엔드포인트에서 참조
+    # @MX:REASON: add_transaction, list_transactions, get_realized_pnl 등 3개 이상 함수에서 사용
+    # @MX:SPEC: SPEC-STOCK-049 REQ-TXN-001
+    """
+
+    __tablename__ = "portfolio_transactions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    portfolio_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
+    )
+    # krx_code: KRX 종목코드 또는 해외 티커 (홀딩스 컬럼명 규약 재사용)
+    krx_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    # txn_type: 'BUY' 또는 'SELL'
+    txn_type: Mapped[str] = mapped_column(String(4), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    price: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    txn_date: Mapped[date] = mapped_column(Date, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    # 연관 관계
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", back_populates="transactions", lazy="noload")
 
 
 # ── Phase E: 관심종목 위시리스트 ───────────────────────────────────────────────

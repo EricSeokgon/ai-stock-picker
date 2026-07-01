@@ -962,6 +962,246 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
   );
 }
 
+// ── SPEC-STOCK-049: 거래 내역 탭 컴포넌트 ─────────────────────────────────────
+// @MX:NOTE: [AUTO] TransactionTab — 매수/매도 수동 기록·거래 목록·실현손익 UI
+// @MX:SPEC: SPEC-STOCK-049 REQ-TXN-001~013
+
+import {
+  addTransaction,
+  listTransactions,
+  getRealizedPnl,
+  type TransactionItem,
+  type TransactionListResponse,
+  type RealizedPnlResponse,
+} from '../api/portfolio';
+
+/** 거래 내역 탭 Props */
+interface TransactionTabProps {
+  portfolioId: number;
+}
+
+/** 거래 내역 & 실현손익 탭 컴포넌트 (SPEC-STOCK-049) */
+export function TransactionTab({ portfolioId }: TransactionTabProps) {
+  const { token } = useAuth();
+
+  // 거래 목록 상태
+  const [txns, setTxns] = useState<TransactionItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+
+  // 실현손익 상태
+  const [pnlData, setPnlData] = useState<RealizedPnlResponse>({
+    items: [],
+    total_realized_pnl: '0',
+  });
+
+  // 폼 상태
+  const [krxCode, setKrxCode] = useState('');
+  const [txnType, setTxnType] = useState<'BUY' | 'SELL'>('BUY');
+  const [quantity, setQuantity] = useState('');
+  const [price, setPrice] = useState('');
+  const [txnDate, setTxnDate] = useState(new Date().toISOString().slice(0, 10));
+  const [note, setNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 거래 목록 & 실현손익 로드
+  const loadData = useCallback(async () => {
+    if (!token) return;
+    try {
+      const [txnRes, pnlRes] = await Promise.all([
+        listTransactions(token, portfolioId, { page, page_size: pageSize }),
+        getRealizedPnl(token, portfolioId),
+      ]);
+      setTxns(txnRes.transactions);
+      setTotal(txnRes.total);
+      setPnlData(pnlRes);
+    } catch (e) {
+      // 데이터 로드 오류 — 무시하고 빈 상태 유지
+    }
+  }, [token, portfolioId, page]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // 거래 추가 제출
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await addTransaction(token, portfolioId, {
+        krx_code: krxCode,
+        txn_type: txnType,
+        quantity: parseInt(quantity, 10),
+        price: parseFloat(price),
+        txn_date: txnDate,
+        note: note || null,
+      });
+      setKrxCode('');
+      setQuantity('');
+      setPrice('');
+      setNote('');
+      await loadData();
+    } catch (e) {
+      setError('거래 추가에 실패했습니다');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div data-testid="transaction-tab">
+      {/* 거래 추가 폼 */}
+      <form onSubmit={handleSubmit} style={{ marginBottom: 16 }}>
+        <h4>거래 추가</h4>
+        {error && <p style={{ color: 'red' }}>{error}</p>}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            data-testid="txn-krx-code-input"
+            type="text"
+            placeholder="종목코드 (예: 005930)"
+            value={krxCode}
+            onChange={(e) => setKrxCode(e.target.value)}
+            required
+          />
+          <select
+            data-testid="txn-type-select"
+            value={txnType}
+            onChange={(e) => setTxnType(e.target.value as 'BUY' | 'SELL')}
+          >
+            <option value="BUY">매수</option>
+            <option value="SELL">매도</option>
+          </select>
+          <input
+            data-testid="txn-quantity-input"
+            type="number"
+            placeholder="수량"
+            min={1}
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            required
+          />
+          <input
+            data-testid="txn-price-input"
+            type="number"
+            placeholder="가격"
+            min={0.01}
+            step="0.01"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            required
+          />
+          <input
+            data-testid="txn-date-input"
+            type="date"
+            value={txnDate}
+            onChange={(e) => setTxnDate(e.target.value)}
+            required
+          />
+          <input
+            data-testid="txn-note-input"
+            type="text"
+            placeholder="메모 (선택)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+          <button data-testid="txn-submit-btn" type="submit" disabled={submitting}>
+            {submitting ? '추가 중...' : '거래 추가'}
+          </button>
+        </div>
+      </form>
+
+      {/* 실현손익 요약 */}
+      <div data-testid="pnl-section" style={{ marginBottom: 16 }}>
+        <h4>실현손익 (이동평균 원가법)</h4>
+        <p>
+          총 실현손익:{' '}
+          <strong data-testid="pnl-total">{pnlData.total_realized_pnl}</strong>
+        </p>
+        {pnlData.items.length > 0 && (
+          <table>
+            <thead>
+              <tr>
+                <th>종목코드</th>
+                <th>실현손익</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pnlData.items.map((item) => (
+                <tr key={item.krx_code} data-testid={`pnl-row-${item.krx_code}`}>
+                  <td>{item.krx_code}</td>
+                  <td>{item.realized_pnl}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* 거래 목록 */}
+      <div data-testid="txn-list">
+        <h4>거래 내역 ({total}건)</h4>
+        {txns.length === 0 ? (
+          <p>거래 내역이 없습니다.</p>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th>날짜</th>
+                <th>종목</th>
+                <th>유형</th>
+                <th>수량</th>
+                <th>가격</th>
+                <th>메모</th>
+              </tr>
+            </thead>
+            <tbody>
+              {txns.map((txn) => (
+                <tr key={txn.id} data-testid={`txn-row-${txn.id}`}>
+                  <td>{txn.txn_date}</td>
+                  <td>{txn.krx_code}</td>
+                  <td style={{ color: txn.txn_type === 'BUY' ? '#2563eb' : '#dc2626' }}>
+                    {txn.txn_type}
+                  </td>
+                  <td>{txn.quantity}</td>
+                  <td>{txn.price}</td>
+                  <td>{txn.note ?? '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {/* 페이지네이션 */}
+        {total > pageSize && (
+          <div style={{ marginTop: 8 }}>
+            <button
+              data-testid="txn-prev-btn"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              이전
+            </button>
+            <span style={{ margin: '0 8px' }}>
+              {page} / {Math.ceil(total / pageSize)}
+            </span>
+            <button
+              data-testid="txn-next-btn"
+              disabled={page >= Math.ceil(total / pageSize)}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              다음
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Portfolio() {
   const { token } = useAuth();
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);

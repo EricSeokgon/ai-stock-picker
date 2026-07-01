@@ -1037,3 +1037,78 @@ class CommentListResponse(BaseModel):
     total: int
     page: int
     size: int
+
+
+# ── SPEC-STOCK-049: 거래 원장 스키마 ──────────────────────────────────────────
+
+
+class TransactionCreate(BaseModel):
+    """거래 원장 생성 요청 (SPEC-STOCK-049 REQ-TXN-001)"""
+
+    krx_code: str
+    txn_type: Literal["BUY", "SELL"]
+    quantity: int
+    price: Decimal
+    txn_date: date
+    note: Optional[str] = None
+
+    @field_validator("quantity")
+    @classmethod
+    def quantity_positive(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("수량은 1 이상이어야 합니다")
+        return v
+
+    @field_validator("price")
+    @classmethod
+    def price_positive(cls, v: Decimal) -> Decimal:
+        if v <= 0:
+            raise ValueError("가격은 0보다 커야 합니다")
+        return v
+
+    @field_validator("krx_code")
+    @classmethod
+    def code_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("종목코드는 비어있을 수 없습니다")
+        return v.strip()
+
+
+class TransactionItem(BaseModel):
+    """거래 원장 항목 응답"""
+
+    id: int
+    portfolio_id: int
+    krx_code: str
+    txn_type: str
+    quantity: int
+    price: Decimal
+    txn_date: date
+    note: Optional[str]
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TransactionListResponse(BaseModel):
+    """거래 목록 응답 (SPEC-STOCK-049 REQ-TXN-006·007)"""
+
+    transactions: list[TransactionItem]
+    total: int
+    page: int
+    page_size: int
+
+
+class StockPnl(BaseModel):
+    """종목별 실현손익 (SPEC-STOCK-049 REQ-TXN-009)"""
+
+    krx_code: str
+    realized_pnl: Decimal
+    total_sold_qty: int
+
+
+class RealizedPnlResponse(BaseModel):
+    """실현손익 응답 (SPEC-STOCK-049 REQ-TXN-012)"""
+
+    items: list[StockPnl]
+    total_realized_pnl: Decimal

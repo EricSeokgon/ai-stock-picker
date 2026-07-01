@@ -1,5 +1,7 @@
 // 알림 인박스 페이지 (SPEC-STOCK-013 REQ-FE-003)
+// SPEC-STOCK-047: 딥링크 클릭 이동 지원
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import {
   fetchNotifications,
@@ -35,6 +37,7 @@ function TypeBadge({ type }: { type: string }) {
 
 export default function NotificationsPage() {
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +77,20 @@ export default function NotificationsPage() {
     try {
       await markAllNotificationsRead(token);
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  // SPEC-STOCK-047: 딥링크 알림 클릭 — 읽음 처리 후 이동 (REQ-NLINK-009, REQ-NLINK-011)
+  const handleLinkClick = async (n: Notification) => {
+    if (!token || !n.link) return;
+    try {
+      if (!n.is_read) {
+        const updated = await markNotificationRead(token, n.id);
+        setNotifications((prev) => prev.map((x) => (x.id === n.id ? updated : x)));
+      }
+      navigate(n.link);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -127,6 +144,16 @@ export default function NotificationsPage() {
                   <p className="text-xs text-gray-400 mt-1">
                     {new Date(n.created_at).toLocaleString('ko-KR')}
                   </p>
+                  {/* SPEC-STOCK-047: 딥링크 버튼 — link 있는 알림에만 노출 (REQ-NLINK-008) */}
+                  {n.link && (
+                    <button
+                      data-testid={`notification-link-${n.id}`}
+                      onClick={() => void handleLinkClick(n)}
+                      className="text-xs text-indigo-600 hover:underline mt-1"
+                    >
+                      포트폴리오 보기 →
+                    </button>
+                  )}
                 </div>
                 {!n.is_read && (
                   <button

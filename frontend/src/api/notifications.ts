@@ -65,6 +65,8 @@ export interface Notification {
   related_alert_id: number | null;
   created_at: string;
   read_at: string | null;
+  // SPEC-STOCK-047: 딥링크 (portfolio_like/portfolio_comment 활성 공유시 /shared/{token})
+  link: string | null;
 }
 
 export async function fetchNotifications(

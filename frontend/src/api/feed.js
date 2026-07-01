@@ -60,6 +60,7 @@ export async function likeSharedPortfolio(shareToken, token) {
     return res.json();
 }
 // ── SPEC-STOCK-046: 댓글 API ─────────────────────────────────────────────────
+// SPEC-STOCK-048: 대댓글 지원 (parent_comment_id, replies)
 // 공유 포트폴리오 댓글 목록 조회 (인증 불필요)
 export async function getComments(shareToken, page = 1, size = 20) {
     const params = new URLSearchParams({ page: String(page), size: String(size) });
@@ -70,15 +71,20 @@ export async function getComments(shareToken, page = 1, size = 20) {
         throw new Error(`댓글 목록 조회 실패: ${res.status}`);
     return res.json();
 }
-// 공유 포트폴리오 댓글 작성 (인증 필요)
-export async function addComment(shareToken, content, token) {
+// 공유 포트폴리오 댓글/대댓글 작성 (인증 필요, SPEC-STOCK-048 REQ-REPLY-001)
+export async function addComment(shareToken, content, token, parentCommentId) {
+    // 대댓글인 경우 parent_comment_id 포함 (SPEC-STOCK-048 REQ-REPLY-001)
+    const body = { content };
+    if (parentCommentId !== undefined) {
+        body['parent_comment_id'] = parentCommentId;
+    }
     const res = await fetch(`${API_BASE}/shared/${shareToken}/comments`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify(body),
     });
     if (res.status === 401)
         throw new Error('로그인이 필요합니다.');

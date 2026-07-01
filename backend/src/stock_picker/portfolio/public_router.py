@@ -159,6 +159,7 @@ def add_comment(
         share_token=token,
         user_id=current_user.id,
         content=body.content,
+        parent_comment_id=body.parent_comment_id,
     )
     return CommentItem(**result)
 

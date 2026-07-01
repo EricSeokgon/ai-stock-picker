@@ -1059,15 +1059,16 @@ class PortfolioGoal(Base):
 
 
 class PortfolioComment(Base):
-    """포트폴리오 공유 댓글 테이블 (SPEC-STOCK-046).
+    """포트폴리오 공유 댓글 테이블 (SPEC-STOCK-046, SPEC-STOCK-048).
 
     # @MX:ANCHOR: [AUTO] 포트폴리오 댓글 핵심 엔티티
     # @MX:REASON: sharing.py 서비스, public_router.py 엔드포인트에서 참조
-    # @MX:SPEC: SPEC-STOCK-046 REQ-CMT-001~010
+    # @MX:SPEC: SPEC-STOCK-046 REQ-CMT-001~010, SPEC-STOCK-048 REQ-REPLY-001~015
 
     share_id: portfolio_shares.id FK (포트폴리오 공유 레코드 참조)
     user_id: users.id FK (작성자)
     content: 최대 500자 댓글 본문
+    parent_comment_id: 대댓글 대상 댓글 ID (NULL=최상위, 단일 레벨만 허용)
     created_at: 생성 시각 (KST 변환은 서비스 레이어)
     """
 
@@ -1082,6 +1083,12 @@ class PortfolioComment(Base):
     )
     # 댓글 본문 (최대 500자)
     content: Mapped[str] = mapped_column(String(500), nullable=False)
+    # 대댓글 부모 ID: NULL이면 최상위 댓글, 값이 있으면 단일 레벨 대댓글 (SPEC-STOCK-048 REQ-REPLY-001)
+    parent_comment_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("portfolio_comments.id", ondelete="CASCADE"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMPTZ(timezone=True),
         server_default=func.now(),
@@ -1091,9 +1098,25 @@ class PortfolioComment(Base):
     # 연관 관계
     share: Mapped["PortfolioShare"] = relationship("PortfolioShare", back_populates="comments", lazy="noload")
     author: Mapped["User"] = relationship("User", lazy="noload")
+    # 대댓글 목록 (서비스 레이어에서 배치 로딩, lazy="noload")
+    replies: Mapped[list["PortfolioComment"]] = relationship(
+        "PortfolioComment",
+        foreign_keys="PortfolioComment.parent_comment_id",
+        back_populates="parent",
+        lazy="noload",
+    )
+    parent: Mapped["PortfolioComment | None"] = relationship(
+        "PortfolioComment",
+        foreign_keys="PortfolioComment.parent_comment_id",
+        back_populates="replies",
+        remote_side="PortfolioComment.id",
+        lazy="noload",
+    )
 
     __table_args__ = (
         # (share_id, created_at) 인덱스: 최신순 조회 최적화
         Index("ix_portfolio_comments_share_created", "share_id", "created_at"),
         Index("ix_portfolio_comments_user_id", "user_id"),
+        # parent_comment_id 인덱스: 배치 대댓글 조회 최적화 (migration 0029)
+        Index("ix_portfolio_comments_parent_id", "parent_comment_id"),
     )

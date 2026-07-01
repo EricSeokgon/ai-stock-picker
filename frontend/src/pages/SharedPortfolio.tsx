@@ -1,5 +1,6 @@
 // 공유 포트폴리오 공개 보기 페이지 (SPEC-STOCK-042, 인증 불필요)
 // SPEC-STOCK-046: 댓글 UI 추가
+// SPEC-STOCK-048: 대댓글 UI (답글 버튼, 답글 입력창, 대댓글 목록)
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
@@ -45,6 +46,12 @@ export default function SharedPortfolio() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // 대댓글 상태 (SPEC-STOCK-048 REQ-REPLY-001)
+  const [replyingToId, setReplyingToId] = useState<number | null>(null);
+  const [replyContent, setReplyContent] = useState('');
+  const [replySubmitLoading, setReplySubmitLoading] = useState(false);
+  const [replySubmitError, setReplySubmitError] = useState<string | null>(null);
 
   // 공유 포트폴리오 데이터 조회
   useEffect(() => {
@@ -108,6 +115,30 @@ export default function SharedPortfolio() {
       setCommentTotal((t) => t - 1);
     } catch (e: unknown) {
       setCommentError(e instanceof Error ? e.message : '댓글 삭제에 실패했습니다.');
+    }
+  }
+
+  // 대댓글 작성 핸들러 (SPEC-STOCK-048 REQ-REPLY-001)
+  async function handleReplySubmit(parentCommentId: number) {
+    if (!shareToken || !replyContent.trim() || !token) return;
+    setReplySubmitLoading(true);
+    setReplySubmitError(null);
+    try {
+      const created = await addComment(shareToken, replyContent, token, parentCommentId);
+      // 부모 댓글의 replies 배열에 새 대댓글 추가
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === parentCommentId
+            ? { ...c, replies: [...(c.replies ?? []), created] }
+            : c,
+        ),
+      );
+      setReplyContent('');
+      setReplyingToId(null);
+    } catch (e: unknown) {
+      setReplySubmitError(e instanceof Error ? e.message : '답글 작성에 실패했습니다.');
+    } finally {
+      setReplySubmitLoading(false);
     }
   }
 
@@ -343,35 +374,129 @@ export default function SharedPortfolio() {
                 style={{
                   padding: '0.75rem 0',
                   borderBottom: '1px solid #eee',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  gap: '0.5rem',
                 }}
               >
-                <div>
-                  <span style={{ fontWeight: 600, fontSize: '0.85rem', color: '#333' }}>{c.username}</span>
-                  <span style={{ fontSize: '0.75rem', color: '#999', marginLeft: '0.5rem' }}>
-                    {new Date(c.created_at).toLocaleString('ko-KR')}
-                  </span>
-                  <p style={{ margin: '0.2rem 0 0', fontSize: '0.875rem', color: '#444' }}>{c.content}</p>
+                {/* 최상위 댓글 */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <div>
+                    <span style={{ fontWeight: 600, fontSize: '0.85rem', color: '#333' }}>{c.username}</span>
+                    <span style={{ fontSize: '0.75rem', color: '#999', marginLeft: '0.5rem' }}>
+                      {new Date(c.created_at).toLocaleString('ko-KR')}
+                    </span>
+                    <p style={{ margin: '0.2rem 0 0', fontSize: '0.875rem', color: '#444' }}>{c.content}</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.25rem', flexShrink: 0 }}>
+                    {token && (
+                      <button
+                        data-testid={`reply-btn-${c.id}`}
+                        onClick={() => {
+                          setReplyingToId(replyingToId === c.id ? null : c.id);
+                          setReplyContent('');
+                          setReplySubmitError(null);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#1976d2',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          padding: '0.2rem 0.4rem',
+                        }}
+                      >
+                        답글
+                      </button>
+                    )}
+                    {token && (
+                      <button
+                        data-testid={`comment-delete-btn-${c.id}`}
+                        onClick={() => void handleCommentDelete(c.id)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#999',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          padding: '0.2rem 0.4rem',
+                        }}
+                      >
+                        삭제
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {token && (
-                  <button
-                    data-testid={`comment-delete-btn-${c.id}`}
-                    onClick={() => void handleCommentDelete(c.id)}
-                    style={{
-                      flexShrink: 0,
-                      background: 'none',
-                      border: 'none',
-                      color: '#999',
-                      cursor: 'pointer',
-                      fontSize: '0.8rem',
-                      padding: '0.2rem 0.4rem',
-                    }}
-                  >
-                    삭제
-                  </button>
+
+                {/* 답글 입력창 (SPEC-STOCK-048 REQ-REPLY-001) */}
+                {token && replyingToId === c.id && (
+                  <div data-testid={`reply-input-area-${c.id}`} style={{ marginTop: '0.5rem', marginLeft: '1.5rem' }}>
+                    <textarea
+                      data-testid={`reply-input-${c.id}`}
+                      value={replyContent}
+                      onChange={(e) => setReplyContent(e.target.value)}
+                      placeholder="답글을 입력하세요..."
+                      maxLength={500}
+                      rows={2}
+                      style={{ width: '100%', fontSize: '0.85rem', padding: '0.4rem', boxSizing: 'border-box', resize: 'vertical' }}
+                    />
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                      <button
+                        data-testid={`reply-submit-btn-${c.id}`}
+                        onClick={() => void handleReplySubmit(c.id)}
+                        disabled={replySubmitLoading || !replyContent.trim()}
+                        style={{
+                          background: '#1976d2',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '0.3rem 0.75rem',
+                          fontSize: '0.8rem',
+                          cursor: replySubmitLoading || !replyContent.trim() ? 'default' : 'pointer',
+                          opacity: replySubmitLoading || !replyContent.trim() ? 0.6 : 1,
+                        }}
+                      >
+                        {replySubmitLoading ? '게시 중...' : '답글 게시'}
+                      </button>
+                      <button
+                        onClick={() => { setReplyingToId(null); setReplyContent(''); }}
+                        style={{ background: 'none', border: 'none', color: '#888', fontSize: '0.8rem', cursor: 'pointer' }}
+                      >
+                        취소
+                      </button>
+                    </div>
+                    {replySubmitError && (
+                      <p data-testid={`reply-submit-error-${c.id}`} style={{ color: '#c62828', fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                        {replySubmitError}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* 대댓글 목록 (SPEC-STOCK-048 REQ-REPLY-005) */}
+                {c.replies && c.replies.length > 0 && (
+                  <ul data-testid={`replies-list-${c.id}`} style={{ listStyle: 'none', padding: '0 0 0 1.5rem', margin: '0.5rem 0 0' }}>
+                    {c.replies.map((r) => (
+                      <li
+                        key={r.id}
+                        data-testid={`reply-item-${r.id}`}
+                        style={{
+                          padding: '0.5rem 0',
+                          borderTop: '1px solid #f5f5f5',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          gap: '0.5rem',
+                        }}
+                      >
+                        <div>
+                          <span style={{ fontSize: '0.75rem', color: '#888', marginRight: '0.3rem' }}>↳</span>
+                          <span style={{ fontWeight: 600, fontSize: '0.82rem', color: '#555' }}>{r.username}</span>
+                          <span style={{ fontSize: '0.7rem', color: '#aaa', marginLeft: '0.4rem' }}>
+                            {new Date(r.created_at).toLocaleString('ko-KR')}
+                          </span>
+                          <p style={{ margin: '0.15rem 0 0 1.1rem', fontSize: '0.85rem', color: '#555' }}>{r.content}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </li>
             ))}

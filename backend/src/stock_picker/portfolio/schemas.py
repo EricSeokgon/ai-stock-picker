@@ -982,23 +982,28 @@ class ShareStatsResponse(BaseModel):
 
 
 class CommentCreate(BaseModel):
-    """댓글 작성 요청 스키마 (SPEC-STOCK-046 REQ-CMT-001).
+    """댓글/대댓글 작성 요청 스키마 (SPEC-STOCK-046 REQ-CMT-001, SPEC-STOCK-048 REQ-REPLY-001).
 
     content: 댓글 본문 (1~500자, 앞뒤 공백 자동 제거)
+    parent_comment_id: 대댓글 대상 댓글 ID (None이면 최상위 댓글)
     """
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
     content: str = Field(min_length=1, max_length=500)
+    # 대댓글 작성 시 부모 댓글 ID 지정 (SPEC-STOCK-048 REQ-REPLY-001)
+    parent_comment_id: int | None = None
 
 
 class CommentItem(BaseModel):
-    """댓글 목록 항목 스키마 (SPEC-STOCK-046 REQ-CMT-005).
+    """댓글/대댓글 목록 항목 스키마 (SPEC-STOCK-046 REQ-CMT-005, SPEC-STOCK-048 REQ-REPLY-005).
 
     id: 댓글 ID
     user_id: 작성자 ID
     username: 작성자 닉네임 (users.username)
     content: 댓글 본문
+    parent_comment_id: 부모 댓글 ID (None이면 최상위)
+    replies: 대댓글 목록 (최상위 댓글에만 존재, 단일 레벨)
     created_at: 생성 시각
     """
 
@@ -1006,16 +1011,24 @@ class CommentItem(BaseModel):
     user_id: int
     username: str
     content: str
+    # 부모 댓글 ID (SPEC-STOCK-048 REQ-REPLY-005)
+    parent_comment_id: int | None = None
+    # 대댓글 목록 (최상위 댓글에만 존재, 단일 레벨, SPEC-STOCK-048 REQ-REPLY-005)
+    replies: list["CommentItem"] = []
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 
+# Pydantic v2 자기참조 모델 재빌드 (SPEC-STOCK-048)
+CommentItem.model_rebuild()
+
+
 class CommentListResponse(BaseModel):
     """댓글 목록 응답 스키마 (SPEC-STOCK-046 REQ-CMT-005).
 
-    items: 댓글 항목 목록 (최신순)
-    total: 전체 댓글 수
+    items: 댓글 항목 목록 (최신순, 최상위만 — 대댓글은 replies 내부)
+    total: 최상위 댓글 수 (SPEC-STOCK-048 REQ-REPLY-008)
     page: 현재 페이지 (1-based)
     size: 페이지 크기
     """

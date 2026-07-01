@@ -1,6 +1,7 @@
 # SPEC-STOCK-042: 포트폴리오 공유 & 소셜 서비스 모듈
 # SPEC-STOCK-043: unlike, portfolio_like 알림, share_view_stats 확장
 # SPEC-STOCK-046: 공유 포트폴리오 댓글 (add_comment, list_comments, remove_comment)
+# SPEC-STOCK-048: 댓글 대댓글 (parent_comment_id, replies 배치 로딩)
 # @MX:ANCHOR: [AUTO] 포트폴리오 공유 서비스 진입점
 # @MX:REASON: router.py(소유자 엔드포인트), 공개 라우터(shared/feed), stats 엔드포인트에서 참조 (fan_in >= 3)
 # @MX:SPEC: SPEC-STOCK-042, SPEC-STOCK-043, SPEC-STOCK-046
@@ -500,20 +501,61 @@ def _get_public_share_or_404(db: Session, share_token: str) -> PortfolioShare:
     return share
 
 
-def add_comment(db: Session, share_token: str, user_id: int, content: str) -> dict[str, Any]:
-    """공유 포트폴리오에 댓글을 작성한다 (SPEC-STOCK-046 REQ-CMT-001).
+def add_comment(
+    db: Session,
+    share_token: str,
+    user_id: int,
+    content: str,
+    parent_comment_id: int | None = None,
+) -> dict[str, Any]:
+    """공유 포트폴리오에 댓글 또는 대댓글을 작성한다.
+
+    SPEC-STOCK-046 REQ-CMT-001 (최상위 댓글)
+    SPEC-STOCK-048 REQ-REPLY-001~009 (대댓글)
 
     - 비공개/미존재 토큰 → 404
-    - 비소유자 댓글 작성 시 portfolio_comment 알림 생성 (일별 중복 억제)
-    - 결과: CommentItem 구조의 dict 반환
+    - parent_comment_id 지정 시:
+        * 부모 댓글 미존재 → 404
+        * 부모 댓글이 다른 share에 속함 → 400
+        * 부모 댓글이 이미 대댓글(단일 레벨만 허용) → 400
+        * 알림: 부모 작성자(자기 자신 제외)에게 전송
+    - parent_comment_id 미지정 시: 포트폴리오 소유자 알림 (기존 동작)
+    - 결과: CommentItem 구조의 dict 반환 (parent_comment_id, replies 포함)
     """
     share = _get_public_share_or_404(db, share_token)
+
+    # 대댓글 유효성 검증 (SPEC-STOCK-048 REQ-REPLY-002~004)
+    parent: PortfolioComment | None = None
+    if parent_comment_id is not None:
+        parent = (
+            db.query(PortfolioComment)
+            .filter(PortfolioComment.id == parent_comment_id)
+            .first()
+        )
+        if parent is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="부모 댓글을 찾을 수 없습니다",
+            )
+        # 부모 댓글이 같은 공유에 속해야 함
+        if parent.share_id != share.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="부모 댓글이 같은 공유에 속하지 않습니다",
+            )
+        # 단일 레벨만 허용 — 부모가 이미 대댓글이면 거부 (REQ-REPLY-004)
+        if parent.parent_comment_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="대댓글에는 답글을 달 수 없습니다",
+            )
 
     # 댓글 저장
     comment = PortfolioComment(
         share_id=share.id,
         user_id=user_id,
         content=content.strip(),
+        parent_comment_id=parent_comment_id,
     )
     db.add(comment)
     db.commit()
@@ -523,37 +565,65 @@ def add_comment(db: Session, share_token: str, user_id: int, content: str) -> di
     commenter: User | None = db.query(User).filter(User.id == user_id).first()
     commenter_name = commenter.username if commenter is not None else "사용자"
 
-    # 포트폴리오 소유자 조회 (알림 대상)
-    portfolio = (
-        db.query(Portfolio)
-        .filter(Portfolio.id == share.portfolio_id)
-        .first()
-    )
+    # 알림 전송 로직 (SPEC-STOCK-048 REQ-REPLY-009)
+    kst_today: date = datetime.now(tz=_KST).date()
 
-    # 비소유자가 댓글을 남긴 경우에만 알림 생성
-    if portfolio is not None and portfolio.user_id != user_id:
-        kst_today: date = datetime.now(tz=_KST).date()
-        notification = Notification(
-            user_id=portfolio.user_id,
-            type="portfolio_comment",
-            krx_code=f"P{portfolio.id}",
-            title=f"{commenter_name}님이 댓글을 남겼습니다",
-            body=content[:100] if len(content) > 100 else content,
-            is_read=False,
-            ref_date=kst_today,
+    if parent_comment_id is not None and parent is not None:
+        # 대댓글: 부모 댓글 작성자에게 알림 (자기 자신 제외)
+        notify_user_id = parent.user_id
+        if notify_user_id != user_id:
+            portfolio = (
+                db.query(Portfolio)
+                .filter(Portfolio.id == share.portfolio_id)
+                .first()
+            )
+            portfolio_id_val = portfolio.id if portfolio is not None else share.portfolio_id
+            notification = Notification(
+                user_id=notify_user_id,
+                type="portfolio_comment",
+                krx_code=f"P{portfolio_id_val}",
+                title=f"{commenter_name}님이 답글을 남겼습니다",
+                body=content[:100] if len(content) > 100 else content,
+                is_read=False,
+                ref_date=kst_today,
+            )
+            db.add(notification)
+            try:
+                db.commit()
+            except IntegrityError:
+                # 당일 동일 알림 중복 — 무시 (멱등성)
+                db.rollback()
+    else:
+        # 최상위 댓글: 포트폴리오 소유자에게 알림 (기존 동작 유지, REQ-CMT-009)
+        portfolio = (
+            db.query(Portfolio)
+            .filter(Portfolio.id == share.portfolio_id)
+            .first()
         )
-        db.add(notification)
-        try:
-            db.commit()
-        except IntegrityError:
-            # 당일 동일 알림 중복 — 무시 (멱등성)
-            db.rollback()
+        if portfolio is not None and portfolio.user_id != user_id:
+            notification = Notification(
+                user_id=portfolio.user_id,
+                type="portfolio_comment",
+                krx_code=f"P{portfolio.id}",
+                title=f"{commenter_name}님이 댓글을 남겼습니다",
+                body=content[:100] if len(content) > 100 else content,
+                is_read=False,
+                ref_date=kst_today,
+            )
+            db.add(notification)
+            try:
+                db.commit()
+            except IntegrityError:
+                # 당일 동일 알림 중복 — 무시 (멱등성)
+                db.rollback()
 
     return {
         "id": comment.id,
         "user_id": comment.user_id,
         "username": commenter_name,
         "content": comment.content,
+        "parent_comment_id": comment.parent_comment_id,
+        "replies": [],
         "created_at": comment.created_at,
     }
 
@@ -564,32 +634,69 @@ def list_comments(
     page: int = 1,
     size: int = 20,
 ) -> dict[str, Any]:
-    """공유 포트폴리오 댓글 목록 조회 (SPEC-STOCK-046 REQ-CMT-005).
+    """공유 포트폴리오 댓글 목록 조회 (SPEC-STOCK-046 REQ-CMT-005, SPEC-STOCK-048 REQ-REPLY-005~008).
 
     - 비공개/미존재 토큰 → 404
     - 최신순 정렬 (created_at DESC)
     - 페이지네이션 (최대 size=100)
+    - SPEC-STOCK-048: 최상위 댓글만 items에 포함, 대댓글은 replies에 중첩 (N+1 방지 배치 로딩)
+    - total은 최상위 댓글 수만 카운트 (REQ-REPLY-008)
     """
     share = _get_public_share_or_404(db, share_token)
     size = min(size, 100)
 
-    # 전체 댓글 수 (페이지네이션 total)
+    # 최상위 댓글 수만 카운트 (REQ-REPLY-008)
     total: int = (
         db.query(PortfolioComment)
-        .filter(PortfolioComment.share_id == share.id)
+        .filter(
+            PortfolioComment.share_id == share.id,
+            PortfolioComment.parent_comment_id.is_(None),
+        )
         .count()
     )
 
-    # 최신순 조회 (created_at DESC) + User join (username)
-    rows = (
+    # 최상위 댓글 최신순 조회 + User join (username)
+    top_rows = (
         db.query(PortfolioComment, User)
         .join(User, PortfolioComment.user_id == User.id)
-        .filter(PortfolioComment.share_id == share.id)
+        .filter(
+            PortfolioComment.share_id == share.id,
+            PortfolioComment.parent_comment_id.is_(None),
+        )
         .order_by(PortfolioComment.created_at.desc())
         .offset((page - 1) * size)
         .limit(size)
         .all()
     )
+
+    top_comment_ids = [c.id for c, _ in top_rows]
+
+    # 대댓글 배치 로딩 — N+1 방지 (REQ-REPLY-011)
+    reply_rows: list[tuple[PortfolioComment, User]] = []
+    if top_comment_ids:
+        reply_rows = (
+            db.query(PortfolioComment, User)
+            .join(User, PortfolioComment.user_id == User.id)
+            .filter(PortfolioComment.parent_comment_id.in_(top_comment_ids))
+            .order_by(PortfolioComment.created_at.asc())
+            .all()
+        )
+
+    # 대댓글을 parent_id 별로 그룹핑
+    replies_by_parent: dict[int, list[dict[str, Any]]] = {}
+    for r, u in reply_rows:
+        pid = r.parent_comment_id
+        if pid not in replies_by_parent:
+            replies_by_parent[pid] = []
+        replies_by_parent[pid].append({
+            "id": r.id,
+            "user_id": r.user_id,
+            "username": u.username,
+            "content": r.content,
+            "parent_comment_id": r.parent_comment_id,
+            "replies": [],
+            "created_at": r.created_at,
+        })
 
     items = [
         {
@@ -597,9 +704,11 @@ def list_comments(
             "user_id": c.user_id,
             "username": u.username,
             "content": c.content,
+            "parent_comment_id": None,
+            "replies": replies_by_parent.get(c.id, []),
             "created_at": c.created_at,
         }
-        for c, u in rows
+        for c, u in top_rows
     ]
 
     return {

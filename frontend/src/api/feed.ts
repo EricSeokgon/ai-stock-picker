@@ -103,17 +103,22 @@ export async function likeSharedPortfolio(
 }
 
 // ── SPEC-STOCK-046: 댓글 API ─────────────────────────────────────────────────
+// SPEC-STOCK-048: 대댓글 지원 (parent_comment_id, replies)
 
-// 댓글 항목 타입
+// 댓글/대댓글 항목 타입 (SPEC-STOCK-048 REQ-REPLY-005)
 export interface CommentItem {
   id: number;
   user_id: number;
   username: string;
   content: string;
+  // 부모 댓글 ID (null이면 최상위 댓글, SPEC-STOCK-048 REQ-REPLY-001)
+  parent_comment_id: number | null;
+  // 대댓글 목록 (최상위 댓글에만 존재, 단일 레벨, SPEC-STOCK-048 REQ-REPLY-005)
+  replies: CommentItem[];
   created_at: string;
 }
 
-// 댓글 목록 응답 타입
+// 댓글 목록 응답 타입 (total은 최상위 댓글만 카운트, SPEC-STOCK-048 REQ-REPLY-008)
 export interface CommentListResponse {
   items: CommentItem[];
   total: number;
@@ -134,19 +139,25 @@ export async function getComments(
   return res.json() as Promise<CommentListResponse>;
 }
 
-// 공유 포트폴리오 댓글 작성 (인증 필요)
+// 공유 포트폴리오 댓글/대댓글 작성 (인증 필요, SPEC-STOCK-048 REQ-REPLY-001)
 export async function addComment(
   shareToken: string,
   content: string,
   token: string,
+  parentCommentId?: number,
 ): Promise<CommentItem> {
+  // 대댓글인 경우 parent_comment_id 포함 (SPEC-STOCK-048 REQ-REPLY-001)
+  const body: Record<string, unknown> = { content };
+  if (parentCommentId !== undefined) {
+    body['parent_comment_id'] = parentCommentId;
+  }
   const res = await fetch(`${API_BASE}/shared/${shareToken}/comments`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify(body),
   });
   if (res.status === 401) throw new Error('로그인이 필요합니다.');
   if (res.status === 404) throw new Error('공유된 포트폴리오를 찾을 수 없습니다.');

@@ -7,6 +7,17 @@
 
 ---
 
+## [0.47.0] - 2026-07-01
+
+### Added (SPEC-STOCK-047: 공유 포트폴리오 알림 딥링크)
+- **공유 포트폴리오 알림 딥링크**: Notification 응답에 `link` 필드 추가 — `portfolio_like`/`portfolio_comment` 알림이 활성 공개 공유를 참조하면 `link = "/shared/{share_token}"` 자동 산출
+- **백엔드 링크 산출 로직** (`inbox_router.py`): 목록·단건 응답에서 알림 타입 필터링 및 배치 쿼리로 N+1 방지, 비공개/삭제된 공유는 `link = null`
+- **프론트엔드 딥링크 렌더** (`Notifications.tsx`): `link` 있는 알림을 클릭 가능 요소로 렌더, 클릭 시 읽음 처리 후 해당 공유 포트폴리오로 이동
+- **신규 테이블·마이그레이션 없음**: 기존 Notification + PortfolioShare 조인만 사용
+- **단위 테스트 14개 통과** (TDD): 백엔드 10 + 프론트엔드 4 (링크 산출·렌더·클릭 동작)
+
+---
+
 ## [0.46.0] - 2026-07-01
 
 ### Added (SPEC-STOCK-046: 공유 포트폴리오 댓글)

@@ -4,6 +4,15 @@
 
 ## 핵심 기능
 
+### Phase 50: 거래 기반 홀딩스 동기화 (v0.50.0) — SPEC-STOCK-050
+- **거래 원장 기반 홀딩스 동기화**: 포트폴리오 거래 원장을 진실 소스로 삼아 이동평균 원가법으로 홀딩스를 재계산·동기화
+- **미리보기 API**: GET `/portfolios/{id}/holdings/sync/preview` (인증 필수) — 원장 파생 홀딩스 비교, added/updated/removed 분류, DB 미변경
+- **적용 API**: POST `/portfolios/{id}/holdings/sync` (인증 필수) — 원장 파생 값으로 홀딩스 upsert/remove
+- **이동평균 원가 계산**: 원장 리플레이, BUY·SELL 거래 처리, 원장 불일치 거부(409)
+- **프론트엔드 UI**: HoldingsSyncPanel — 미리보기 버튼, 차이 표시, 적용 버튼(리로드 없음)
+- **신규 테이블·마이그레이션 없음**: 기존 테이블 재사용
+- **단위 테스트 12개** (TDD): 백엔드 10 + 프론트엔드 2
+
 ### Phase 49: 포트폴리오 거래 내역 & 실현손익 (v0.49.0) — SPEC-STOCK-049
 - **거래 기록 API**: POST `/portfolios/{id}/transactions` (인증 필수) — 매수/매도 거래 기록
 - **거래 내역 조회**: GET `/portfolios/{id}/transactions` (인증 필수) — 종목 필터, 페이지네이션

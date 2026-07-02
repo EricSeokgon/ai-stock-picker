@@ -7,6 +7,26 @@
 
 ---
 
+## [0.50.0] - 2026-07-01
+
+### Added (SPEC-STOCK-050: 거래 기반 홀딩스 동기화)
+- **거래 기반 홀딩스 동기화**: 포트폴리오 거래 원장을 진실 소스로 삼아 이동평균 원가법으로 홀딩스를 재계산·동기화
+- **홀딩스 동기화 미리보기 API**: `GET /portfolios/{id}/holdings/sync/preview` (인증 필수) — 원장 파생 홀딩스와 저장된 홀딩스 비교, 종목별 added/updated/removed 분류, DB 미변경
+- **홀딩스 동기화 적용 API**: `POST /portfolios/{id}/holdings/sync` (인증 필수, 소유권 검증) — 원장 파생 값으로 홀딩스 upsert/remove, 이동평균 원가법 기반, 누적 SELL > BUY 거부(409)
+- **홀딩스 동기화 서비스**: `backend/src/stock_picker/portfolio/holdings_sync.py` — `compute_ledger_positions()` (원장 리플레이), `preview_sync()` (미리보기), `apply_sync()` (적용)
+- **이동평균 원가 재계산**: SPEC-049 실현손익과 동일 규약, 종목별 (quantity, avg_buy_price) 산출
+- **전량 매도 시 홀딩 제거**: 누적 수량 = 0 종목은 홀딩스에서 삭제
+- **원장 불일치 처리**: 누적 SELL > 누적 BUY 시 동기화 전체 거부, 홀딩스 미변경
+- **원장 없는 수동 홀딩스 보존**: 거래 원장에 대응 거래가 없는 종목은 동기화 대상 외 보존
+- **KRX 시장 대상**: `portfolio_transactions`에 market 컬럼이 없으므로 KRX 홀딩스만 동기화(해외 시장은 향후 SPEC)
+- **프론트엔드 동기화 패널**: HoldingsSyncPanel 컴포넌트 — 미리보기 버튼(차이 표시)·적용 버튼(리로드 없음)
+- **신규 테이블·마이그레이션 없음**: 기존 `portfolio_transactions`(마이그 0030)·`portfolio_holdings`(SPEC-028) 재사용
+- **Pydantic 스키마**: `SyncPreviewItem`, `SyncPreviewResponse`, `SyncApplyResponse` 추가
+- **프론트엔드 API 함수**: `api/portfolio.ts` — `previewHoldingsSync()`, `applyHoldingsSync()` 추가
+- **단위 테스트 12개 통과** (TDD): 백엔드 10 + 프론트엔드 2 (원장 리플레이, 이동평균, 미리보기 분류, 적용·저장, 소유권·불일치 거부, API 컨트랙트)
+
+---
+
 ## [0.49.0] - 2026-07-01
 
 ### Added (SPEC-STOCK-049: 포트폴리오 거래 내역 & 실현손익)

@@ -78,8 +78,11 @@ describe('History 페이지', () => {
     // 프라미스를 해소하지 않은 채로 렌더
     vi.mocked(recommendationsApi.getRecommendationHistory).mockReturnValue(new Promise(() => {}));
     renderHistory();
-    expect(screen.getByRole('status')).toBeInTheDocument();
-    expect(screen.getByText('히스토리를 불러오는 중...')).toBeInTheDocument();
+    // 페이지 내 MarketSentimentWidget도 role="status"를 사용하므로
+    // 히스토리 로딩 텍스트를 기준으로 status 컨테이너를 좁혀서 검증
+    const loadingText = screen.getByText('히스토리를 불러오는 중...');
+    expect(loadingText).toBeInTheDocument();
+    expect(loadingText.closest('[role="status"]')).toBeInTheDocument();
   });
 
   it('날짜별로 그룹화된 추천 목록을 렌더링한다', async () => {

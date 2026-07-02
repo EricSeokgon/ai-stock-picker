@@ -2,7 +2,7 @@
 // 날짜 입력 → API 호출 → 지표 표시 + 차트
 import React, { useState } from 'react';
 import { runPortfolioBacktest } from '../api/portfolio.js';
-import { BacktestChart } from './BacktestChart.js';
+import { BacktestChart } from './BacktestChart.jsx';
 
 /**
  * 수익률/MDD 포맷 헬퍼

@@ -6,9 +6,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // --- vi.mock 선언 (hoisted) ---
-vi.mock('react-router-dom', () => ({
-  useParams: vi.fn(() => ({ shareToken: 'tok-abc' })),
-}));
+vi.mock('react-router-dom', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react-router-dom')>();
+  return {
+    ...actual,
+    useParams: vi.fn(() => ({ shareToken: 'tok-abc' })),
+    useNavigate: vi.fn(() => vi.fn()),
+  };
+});
 
 vi.mock('../auth/AuthContext', () => ({
   useAuth: vi.fn(() => ({ token: 'test-jwt' })),
@@ -18,6 +23,7 @@ vi.mock('../api/feed', () => ({
   getSharedPortfolio: vi.fn(),
   likeSharedPortfolio: vi.fn(),
   unlikeSharedPortfolio: vi.fn(),
+  getComments: vi.fn(),
 }));
 
 vi.mock('../api/portfolio', () => ({
@@ -42,6 +48,7 @@ import {
   getSharedPortfolio,
   likeSharedPortfolio,
   unlikeSharedPortfolio,
+  getComments,
 } from '../api/feed';
 import { apiGetShare, getShareStats } from '../api/portfolio';
 import { fetchNotifications, markAllNotificationsRead } from '../api/notifications';
@@ -51,6 +58,7 @@ const mockedUseAuth = useAuth as ReturnType<typeof vi.fn>;
 const mockedGetSharedPortfolio = getSharedPortfolio as ReturnType<typeof vi.fn>;
 const mockedLike = likeSharedPortfolio as ReturnType<typeof vi.fn>;
 const mockedUnlike = unlikeSharedPortfolio as ReturnType<typeof vi.fn>;
+const mockedGetComments = getComments as ReturnType<typeof vi.fn>;
 const mockedApiGetShare = apiGetShare as ReturnType<typeof vi.fn>;
 const mockedGetShareStats = getShareStats as ReturnType<typeof vi.fn>;
 const mockedFetchNotifications = fetchNotifications as ReturnType<typeof vi.fn>;
@@ -101,6 +109,7 @@ beforeEach(() => {
   mockedGetSharedPortfolio.mockResolvedValue(mockPublicPortfolio);
   mockedLike.mockResolvedValue({ like_count: 6, liked: true });
   mockedUnlike.mockResolvedValue(undefined);
+  mockedGetComments.mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
   mockedApiGetShare.mockResolvedValue(mockShareData);
   mockedGetShareStats.mockResolvedValue({ stats: mockStats });
   mockedFetchNotifications.mockResolvedValue([]);
@@ -221,7 +230,7 @@ describe('AC-044-005/006: SharedPortfolio 비인증 사용자 처리', () => {
     await user.click(screen.getByTestId('like-btn'));
 
     await waitFor(() => {
-      expect(screen.getByText(/로그인/)).toBeInTheDocument();
+      expect(screen.getByTestId('like-error')).toHaveTextContent(/로그인/);
     });
   });
 });

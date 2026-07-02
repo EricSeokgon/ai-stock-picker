@@ -39,6 +39,8 @@ import PortfolioReportPanel from '../components/PortfolioReportPanel';
 import AICommentaryPanel from '../components/AICommentaryPanel';
 // @MX:NOTE: [AUTO] PortfolioGoalPanel — SPEC-STOCK-041 포트폴리오 목표 관리 패널
 import PortfolioGoalPanel from '../components/PortfolioGoalPanel';
+// @MX:NOTE: [AUTO] HoldingsSyncPanel — SPEC-STOCK-050 거래 기반 홀딩스 동기화 패널
+import HoldingsSyncPanel from '../components/HoldingsSyncPanel';
 import { getPortfolioDividends, type PortfolioDividends } from '../api/dividends';
 import { LivePriceBadge } from '../components/LivePriceBadge';
 import { PerformanceDonutChart } from '../components/PerformanceDonutChart';
@@ -919,6 +921,9 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
           </button>
         </form>
       </div>
+
+      {/* 거래 기반 홀딩스 동기화 (SPEC-STOCK-050) */}
+      <HoldingsSyncPanel portfolioId={portfolioId} onSynced={() => void load()} />
 
       {/* 배당 분석 섹션 (SPEC-STOCK-019) */}
       <DividendsSection portfolioId={portfolioId} token={token} />

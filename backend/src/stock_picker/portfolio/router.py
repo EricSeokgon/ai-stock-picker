@@ -66,9 +66,12 @@ from stock_picker.portfolio.schemas import (
     TransactionCreate,
     TransactionListResponse,
     RealizedPnlResponse,
+    SyncPreviewResponse,
+    SyncApplyResponse,
 )
 from stock_picker.portfolio import sharing
 from stock_picker.portfolio import transactions as txn_service
+from stock_picker.portfolio import holdings_sync as sync_service
 from stock_picker.portfolio.goals import (
     calculate_achievement_rate,
     create_goal,
@@ -1569,4 +1572,62 @@ def get_portfolio_realized_pnl(
         portfolio_id=portfolio_id,
         user_id=current_user.id,
         krx_code=krx_code,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SPEC-STOCK-050: 거래 기반 홀딩스 동기화 엔드포인트
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/{portfolio_id}/holdings/sync/preview",
+    response_model=SyncPreviewResponse,
+    summary="홀딩스 동기화 프리뷰 (DB 변경 없음)",
+    tags=["portfolios", "holdings-sync"],
+)
+def get_holdings_sync_preview(
+    portfolio_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> SyncPreviewResponse:
+    """거래 원장 기반 홀딩스 변경 사항을 미리 확인한다 (SPEC-STOCK-050 REQ-SYNC-004~005).
+
+    DB를 변경하지 않으며, 적용 시 어떤 종목이 어떻게 변경될지 반환한다.
+
+    - action "upsert"    : 신규 생성 또는 수량/단가 변경 필요
+    - action "unchanged" : 이미 일치 — 변경 불필요
+    - 수동 홀딩 보존     : 원장에 거래 없는 종목은 결과에 나타나지 않음
+    - 비소유자 → 403
+    - SELL > BUY → 409
+    """
+    return sync_service.preview_sync(
+        db=db,
+        portfolio_id=portfolio_id,
+        user_id=current_user.id,
+    )
+
+
+@router.post(
+    "/{portfolio_id}/holdings/sync",
+    response_model=SyncApplyResponse,
+    summary="홀딩스 동기화 적용",
+    tags=["portfolios", "holdings-sync"],
+)
+def post_holdings_sync(
+    portfolio_id: int,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> SyncApplyResponse:
+    """거래 원장 기반 홀딩스 동기화를 실제로 적용한다 (SPEC-STOCK-050 REQ-SYNC-008~010).
+
+    - upsert: 원장 파생 수량/단가로 홀딩 생성 또는 갱신
+    - 수동 홀딩 보존: 원장에 거래 없는 종목은 변경하지 않음
+    - SyncConflictError → 전체 거부, 홀딩 불변
+    - 비소유자 → 403
+    - SELL > BUY → 409
+    """
+    return sync_service.apply_sync(
+        db=db,
+        portfolio_id=portfolio_id,
+        user_id=current_user.id,
     )

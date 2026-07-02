@@ -1112,3 +1112,49 @@ class RealizedPnlResponse(BaseModel):
 
     items: list[StockPnl]
     total_realized_pnl: Decimal
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SPEC-STOCK-050: 거래 기반 홀딩스 동기화 스키마
+# ──────────────────────────────────────────────────────────────────────────────
+
+class SyncPreviewItem(BaseModel):
+    """홀딩스 동기화 프리뷰 항목 (SPEC-STOCK-050 REQ-SYNC-005)
+
+    action:
+      - "upsert"    : 홀딩 신규 생성 또는 수량/단가 변경 필요
+      - "delete"    : 원장 거래가 사라져 홀딩 삭제 필요
+      - "unchanged" : 홀딩과 원장 일치 — 변경 불필요
+    """
+
+    krx_code: str
+    action: str  # "upsert" | "delete" | "unchanged"
+    current_qty: int
+    derived_qty: int
+    current_avg: Decimal | None = None
+    derived_avg: Decimal | None = None
+
+
+class SyncPreviewResponse(BaseModel):
+    """홀딩스 동기화 프리뷰 응답 (SPEC-STOCK-050 REQ-SYNC-005)"""
+
+    items: list[SyncPreviewItem]
+
+
+class SyncHoldingItem(BaseModel):
+    """동기화 후 홀딩 항목 (SyncApplyResponse 내부)"""
+
+    krx_code: str
+    quantity: int
+    avg_buy_price: Decimal
+
+
+class SyncApplyResponse(BaseModel):
+    """홀딩스 동기화 적용 응답 (SPEC-STOCK-050 REQ-SYNC-009)
+
+    synced: 실제 변경(upsert/delete)된 홀딩 수
+    holdings: 동기화 후 원장 기반 홀딩 목록
+    """
+
+    synced: int
+    holdings: list[SyncHoldingItem]

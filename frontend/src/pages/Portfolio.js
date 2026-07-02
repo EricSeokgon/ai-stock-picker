@@ -1,13 +1,19 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-// 포트폴리오 관리 페이지 (SPEC-STOCK-041 PortfolioGoalPanel 통합)
-import { useEffect, useState } from 'react';
+// 포트폴리오 관리 페이지
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { apiListPortfolios, apiCreatePortfolio, apiListHoldings, apiAddHolding, apiGetPerformance, apiOptimizePortfolio, } from '../api/portfolio';
+// SPEC-STOCK-039: 시장 상태 폴링 훅 & 배지 컴포넌트
+import { useMarketPolling } from '../hooks/useMarketPolling';
+import { MarketStatusBadge } from '../components/MarketStatusBadge';
 import PortfolioScoreCard from '../components/PortfolioScoreCard';
 import RebalancingTable from '../components/RebalancingTable';
 import NewStockSuggestions from '../components/NewStockSuggestions';
 import RiskAnalysisPanel from '../components/RiskAnalysisPanel';
+// @MX:NOTE: [AUTO] BacktestPanel — SPEC-STOCK-029 백테스팅 패널 통합
 import BacktestPanel from '../components/BacktestPanel';
+// @MX:NOTE: [AUTO] PerformanceSummaryPanel — SPEC-STOCK-030 기간별 성과 요약 패널
+import PerformanceSummaryPanel from '../components/PerformanceSummaryPanel';
 // @MX:NOTE: [AUTO] PortfolioAlertPanel — SPEC-STOCK-031 포트폴리오 알림 설정 패널
 import PortfolioAlertPanel from '../components/PortfolioAlertPanel';
 // SPEC-STOCK-033: 배당 수익률 분석 강화 컴포넌트
@@ -16,8 +22,12 @@ import DividendCalendarView from '../components/DividendCalendarView';
 import DRIPSimulator from '../components/DRIPSimulator';
 import BenchmarkComparisonPanel from '../components/BenchmarkComparisonPanel';
 import BenchmarkChartView from '../components/BenchmarkChartView';
-import PortfolioReportPanel from '../components/PortfolioReportPanel';
+// @MX:NOTE: [AUTO] AICommentaryPanel — SPEC-STOCK-040 AI 포트폴리오 코멘터리 패널
 import AICommentaryPanel from '../components/AICommentaryPanel';
+// @MX:NOTE: [AUTO] PortfolioGoalPanel — SPEC-STOCK-041 포트폴리오 목표 관리 패널
+import PortfolioGoalPanel from '../components/PortfolioGoalPanel';
+// @MX:NOTE: [AUTO] HoldingsSyncPanel — SPEC-STOCK-050 거래 기반 홀딩스 동기화 패널
+import HoldingsSyncPanel from '../components/HoldingsSyncPanel';
 import { getPortfolioDividends } from '../api/dividends';
 import { LivePriceBadge } from '../components/LivePriceBadge';
 import { PerformanceDonutChart } from '../components/PerformanceDonutChart';
@@ -280,6 +290,21 @@ function PortfolioDetail({ portfolioId, token }) {
         }
     }
     useEffect(() => { void load(); }, [portfolioId, token]);
+    // SPEC-STOCK-039: KRX 시장 상태 기반 자동 폴링 (REST 방식, 60초 간격)
+    const onPoll = useCallback(async () => {
+        try {
+            const p = await apiGetPerformance(token, portfolioId);
+            setPerformance(p);
+        }
+        catch {
+            // 폴링 오류는 무시 (다음 주기에 재시도)
+        }
+    }, [token, portfolioId]);
+    const { isPolling, isPaused, isMarketOpen, lastUpdated, toggle } = useMarketPolling({
+        portfolioId,
+        interval: 60,
+        onPoll,
+    });
     async function handleAddHolding(e) {
         e.preventDefault();
         setAddErr(null);
@@ -302,7 +327,15 @@ function PortfolioDetail({ portfolioId, token }) {
     const cellStyle = { padding: '0.4rem 0.6rem', fontSize: '0.875rem' };
     if (loadErr)
         return _jsxs("p", { style: { color: '#c62828', fontSize: '0.875rem' }, children: ["\uC624\uB958: ", loadErr] });
-    return (_jsxs("div", { style: { padding: '1rem', background: '#f8f9fa', borderRadius: '4px', marginTop: '0.5rem' }, children: [performance && (_jsxs("div", { className: "portfolio-summary-cards", style: { display: 'flex', gap: '1.5rem', marginBottom: '1rem', flexWrap: 'wrap' }, children: [_jsxs("div", { style: { minWidth: '80px' }, children: [_jsx("span", { style: { fontSize: '0.75rem', color: '#666' }, children: "\uCD1D \uD22C\uC790\uAE08" }), _jsx("br", {}), _jsxs("strong", { children: ["\u20A9", performance.total_invested.toLocaleString()] })] }), _jsxs("div", { style: { minWidth: '80px' }, children: [_jsx("span", { style: { fontSize: '0.75rem', color: '#666' }, children: "\uD604\uC7AC \uD3C9\uAC00\uAE08" }), _jsx("br", {}), _jsxs("strong", { children: ["\u20A9", performance.total_current.toLocaleString()] })] }), _jsxs("div", { style: { minWidth: '80px' }, children: [_jsx("span", { style: { fontSize: '0.75rem', color: '#666' }, children: "\uC218\uC775\uB960" }), _jsx("br", {}), _jsx("strong", { style: { color: returnColor(performance.total_return_pct) }, children: formatPct(performance.total_return_pct) })] }), _jsxs("div", { style: { minWidth: '80px' }, children: [_jsx("span", { style: { fontSize: '0.75rem', color: '#666' }, children: "\uC885\uBAA9 \uC218" }), _jsx("br", {}), _jsx("strong", { children: performance.holdings.length })] }), _jsx("style", { children: `
+    return (_jsxs("div", { style: { padding: '1rem', background: '#f8f9fa', borderRadius: '4px', marginTop: '0.5rem' }, children: [_jsxs("div", { style: { display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }, children: [isMarketOpen !== null && (_jsx(MarketStatusBadge, { isOpen: isMarketOpen, lastUpdated: lastUpdated })), _jsx("button", { onClick: toggle, style: {
+                            fontSize: '0.75rem',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            border: '1px solid #ccc',
+                            cursor: 'pointer',
+                            background: isPolling ? '#e3f2fd' : '#fafafa',
+                            color: isPolling ? '#1565c0' : '#666',
+                        }, children: isPolling ? (isPaused ? '일시 중지' : '폴링 중') : '폴링 시작' })] }), performance && (_jsxs("div", { className: "portfolio-summary-cards", style: { display: 'flex', gap: '1.5rem', marginBottom: '1rem', flexWrap: 'wrap' }, children: [_jsxs("div", { style: { minWidth: '80px' }, children: [_jsx("span", { style: { fontSize: '0.75rem', color: '#666' }, children: "\uCD1D \uD22C\uC790\uAE08" }), _jsx("br", {}), _jsxs("strong", { children: ["\u20A9", performance.total_invested.toLocaleString()] })] }), _jsxs("div", { style: { minWidth: '80px' }, children: [_jsx("span", { style: { fontSize: '0.75rem', color: '#666' }, children: "\uD604\uC7AC \uD3C9\uAC00\uAE08" }), _jsx("br", {}), _jsxs("strong", { children: ["\u20A9", performance.total_current.toLocaleString()] })] }), _jsxs("div", { style: { minWidth: '80px' }, children: [_jsx("span", { style: { fontSize: '0.75rem', color: '#666' }, children: "\uC218\uC775\uB960" }), _jsx("br", {}), _jsx("strong", { style: { color: returnColor(performance.total_return_pct) }, children: formatPct(performance.total_return_pct) })] }), _jsxs("div", { style: { minWidth: '80px' }, children: [_jsx("span", { style: { fontSize: '0.75rem', color: '#666' }, children: "\uC885\uBAA9 \uC218" }), _jsx("br", {}), _jsx("strong", { children: performance.holdings.length })] }), _jsx("style", { children: `
             @media (max-width: 767px) {
               .portfolio-summary-cards { flex-direction: column !important; gap: 0.75rem !important; }
             }
@@ -311,15 +344,20 @@ function PortfolioDetail({ portfolioId, token }) {
                                     const clsColors = { high: '#2e7d32', normal: '#1565c0', low: '#c62828' };
                                     const group = performance.classification_summary[cls];
                                     return (_jsxs("div", { style: { display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }, children: [_jsx("span", { style: { width: '10px', height: '10px', borderRadius: '50%', background: clsColors[cls], flexShrink: 0 } }), _jsx("span", { style: { color: '#555' }, children: clsLabels[cls] }), _jsxs("span", { style: { marginLeft: 'auto', fontWeight: 600 }, children: [group.count, "\uC885\uBAA9"] }), _jsxs("span", { style: { color: '#888' }, children: ["(", group.invested_pct.toFixed(1), "%)"] })] }, cls));
-                                }) })] }), _jsxs("div", { style: { flex: '1', minWidth: '200px' }, children: [_jsx("h5", { style: { margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#555' }, children: "\uC139\uD130\uBCC4 \uC131\uACFC" }), _jsx("div", { style: { display: 'flex', flexDirection: 'column', gap: '0.25rem' }, children: performance.sector_performance.map((sp) => (_jsxs("div", { style: { display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', borderBottom: '1px solid #eee', paddingBottom: '0.15rem' }, children: [_jsx("span", { style: { color: '#555' }, children: sp.sector }), _jsxs("span", { children: [_jsxs("span", { style: { color: '#888', marginRight: '0.5rem' }, children: [sp.holding_count, "\uC885\uBAA9"] }), _jsxs("span", { style: { fontWeight: 600, color: sp.return_pct >= 0 ? '#2e7d32' : '#c62828' }, children: [sp.return_pct >= 0 ? '+' : '', sp.return_pct.toFixed(2), "%"] })] })] }, sp.sector))) })] })] })), holdings.length > 0 ? (_jsx("div", { style: { overflowX: 'auto', marginBottom: '1rem', WebkitOverflowScrolling: 'touch' }, children: _jsxs("table", { style: { width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', minWidth: '360px' }, children: [_jsx("thead", { children: _jsxs("tr", { style: { background: '#e3f2fd' }, children: [_jsx("th", { style: cellStyle, children: "\uC885\uBAA9\uCF54\uB4DC" }), _jsx("th", { style: cellStyle, children: "\uC218\uB7C9" }), _jsx("th", { style: cellStyle, children: "\uD3C9\uADE0\uB2E8\uAC00" }), _jsx("th", { style: cellStyle, children: "\uD604\uC7AC \uC2DC\uC138" })] }) }), _jsx("tbody", { children: holdings.map((h) => (_jsxs("tr", { style: { borderBottom: '1px solid #eee' }, children: [_jsxs("td", { style: cellStyle, children: [h.krx_code, h.market && h.market !== 'KRX' && (_jsx("span", { style: {
-                                                    marginLeft: '0.3rem',
-                                                    padding: '0.1rem 0.3rem',
-                                                    background: '#e3f2fd',
-                                                    borderRadius: '3px',
-                                                    fontSize: '0.7rem',
-                                                    color: '#1565c0',
-                                                    fontWeight: 600,
-                                                }, children: h.market }))] }), _jsx("td", { style: cellStyle, children: h.quantity.toLocaleString() }), _jsxs("td", { style: cellStyle, children: [h.currency === 'USD' ? '$' : '₩', h.avg_buy_price.toLocaleString()] }), _jsx("td", { style: cellStyle, children: _jsx(LivePriceBadge, { krxCode: h.krx_code }) })] }, h.id))) })] }) })) : (_jsx("p", { style: { fontSize: '0.875rem', color: '#666', marginBottom: '1rem' }, children: "\uBCF4\uC720 \uC885\uBAA9\uC774 \uC5C6\uC2B5\uB2C8\uB2E4." })), _jsxs("div", { children: [_jsx("h4", { style: { margin: '0 0 0.5rem', fontSize: '0.875rem' }, children: "\uC885\uBAA9 \uCD94\uAC00" }), addErr && _jsx("p", { style: { color: '#c62828', fontSize: '0.8rem', margin: '0 0 0.5rem' }, children: addErr }), _jsxs("form", { onSubmit: (e) => void handleAddHolding(e), style: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }, children: [_jsxs("select", { value: market, onChange: (e) => setMarket(e.target.value), style: { flex: '0 0 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' }, children: [_jsx("option", { value: "KRX", children: "KRX (\uAD6D\uB0B4)" }), _jsx("option", { value: "NYSE", children: "NYSE (\uBBF8\uAD6D)" }), _jsx("option", { value: "NASDAQ", children: "NASDAQ (\uBBF8\uAD6D)" })] }), _jsx("input", { placeholder: market === 'KRX' ? '종목코드 (예: 005930)' : '티커 (예: AAPL)', value: krxCode, onChange: (e) => setKrxCode(e.target.value), required: true, style: { flex: '1 1 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' } }), _jsx("input", { placeholder: "\uC218\uB7C9", type: "number", min: "1", value: quantity, onChange: (e) => setQuantity(e.target.value), required: true, style: { flex: '1 1 80px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' } }), _jsx("input", { placeholder: currency === 'USD' ? '평균단가 (USD)' : '평균단가 (원)', type: "number", min: "1", value: avgBuyPrice, onChange: (e) => setAvgBuyPrice(e.target.value), required: true, style: { flex: '1 1 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' } }), _jsx("button", { type: "submit", disabled: addLoading, style: { padding: '0.35rem 0.75rem', background: '#388e3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.875rem' }, children: addLoading ? '추가 중...' : '추가' })] })] }), _jsx(DividendsSection, { portfolioId: portfolioId, token: token }), _jsx(AiAnalysisSection, { portfolioId: portfolioId, token: token }), _jsx(OptimizeSection, { portfolioId: portfolioId, token: token }), _jsx(RiskAnalysisPanel, { portfolioId: portfolioId }), _jsx(BacktestPanel, { token: token, portfolioId: portfolioId }), _jsx(PortfolioAlertPanel, { portfolioId: portfolioId }), _jsx(DividendSummaryPanel, { token: token, portfolioId: portfolioId }), _jsx(DividendCalendarView, { token: token, portfolioId: portfolioId }), _jsx(DRIPSimulator, { token: token, portfolioId: portfolioId }), _jsx(BenchmarkComparisonPanel, { token: token, portfolioId: portfolioId }), _jsx(BenchmarkChartView, { token: token, portfolioId: portfolioId }), _jsx(AICommentaryPanel, { portfolioId: portfolioId }), _jsx(AdviceSection, { token: token })] }));
+                                }) })] }), _jsxs("div", { style: { flex: '1', minWidth: '200px' }, children: [_jsx("h5", { style: { margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#555' }, children: "\uC139\uD130\uBCC4 \uC131\uACFC" }), _jsx("div", { style: { display: 'flex', flexDirection: 'column', gap: '0.25rem' }, children: performance.sector_performance.map((sp) => (_jsxs("div", { style: { display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', borderBottom: '1px solid #eee', paddingBottom: '0.15rem' }, children: [_jsx("span", { style: { color: '#555' }, children: sp.sector }), _jsxs("span", { children: [_jsxs("span", { style: { color: '#888', marginRight: '0.5rem' }, children: [sp.holding_count, "\uC885\uBAA9"] }), _jsxs("span", { style: { fontWeight: 600, color: sp.return_pct >= 0 ? '#2e7d32' : '#c62828' }, children: [sp.return_pct >= 0 ? '+' : '', sp.return_pct.toFixed(2), "%"] })] })] }, sp.sector))) })] })] })), holdings.length > 0 ? (_jsx("div", { style: { overflowX: 'auto', marginBottom: '1rem', WebkitOverflowScrolling: 'touch' }, children: _jsxs("table", { style: { width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', minWidth: '360px' }, children: [_jsx("thead", { children: _jsxs("tr", { style: { background: '#e3f2fd' }, children: [_jsx("th", { style: cellStyle, children: "\uC885\uBAA9\uCF54\uB4DC" }), _jsx("th", { style: cellStyle, children: "\uC218\uB7C9" }), _jsx("th", { style: cellStyle, children: "\uD3C9\uADE0\uB2E8\uAC00" }), _jsx("th", { style: cellStyle, children: "\uD604\uC7AC \uC2DC\uC138" })] }) }), _jsx("tbody", { children: holdings.map((h) => {
+                                // SPEC-STOCK-028: USD 종목의 성과 데이터 매칭 (환율 환산값 표시용)
+                                const perf = performance?.holdings.find((p) => p.krx_code === h.krx_code);
+                                const isUsd = h.currency === 'USD';
+                                return (_jsxs("tr", { style: { borderBottom: '1px solid #eee' }, children: [_jsxs("td", { style: cellStyle, children: [h.krx_code, h.market && h.market !== 'KRX' ? (_jsx("span", { style: {
+                                                        marginLeft: '0.3rem',
+                                                        padding: '0.1rem 0.3rem',
+                                                        background: '#fff3e0',
+                                                        borderRadius: '3px',
+                                                        fontSize: '0.7rem',
+                                                        color: '#e65100',
+                                                        fontWeight: 600,
+                                                    }, children: h.market })) : null] }), _jsx("td", { style: cellStyle, children: h.quantity.toLocaleString() }), _jsxs("td", { style: cellStyle, children: [isUsd ? '$' : '₩', h.avg_buy_price.toLocaleString()] }), _jsxs("td", { style: cellStyle, children: [_jsx(LivePriceBadge, { krxCode: h.krx_code }), isUsd && perf?.current_value_krw != null && (_jsxs("span", { style: { display: 'block', fontSize: '0.7rem', color: '#888', marginTop: '0.1rem' }, children: ["\u2248\u20A9", Math.round(perf.current_value_krw).toLocaleString(), perf.fx_rate_used != null && (_jsxs("span", { style: { marginLeft: '0.25rem' }, children: ["(@", perf.fx_rate_used.toFixed(0), ")"] }))] }))] })] }, h.id));
+                            }) })] }) })) : (_jsx("p", { style: { fontSize: '0.875rem', color: '#666', marginBottom: '1rem' }, children: "\uBCF4\uC720 \uC885\uBAA9\uC774 \uC5C6\uC2B5\uB2C8\uB2E4." })), _jsxs("div", { children: [_jsx("h4", { style: { margin: '0 0 0.5rem', fontSize: '0.875rem' }, children: "\uC885\uBAA9 \uCD94\uAC00" }), addErr && _jsx("p", { style: { color: '#c62828', fontSize: '0.8rem', margin: '0 0 0.5rem' }, children: addErr }), _jsxs("form", { onSubmit: (e) => void handleAddHolding(e), style: { display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }, children: [_jsxs("select", { value: market, onChange: (e) => setMarket(e.target.value), style: { flex: '0 0 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' }, children: [_jsx("option", { value: "KRX", children: "KRX (\uAD6D\uB0B4)" }), _jsx("option", { value: "NYSE", children: "NYSE (\uBBF8\uAD6D)" }), _jsx("option", { value: "NASDAQ", children: "NASDAQ (\uBBF8\uAD6D)" })] }), _jsx("input", { placeholder: market === 'KRX' ? '종목코드 (예: 005930)' : '티커 (예: AAPL)', value: krxCode, onChange: (e) => setKrxCode(e.target.value), required: true, style: { flex: '1 1 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' } }), _jsx("input", { placeholder: "\uC218\uB7C9", type: "number", min: "1", value: quantity, onChange: (e) => setQuantity(e.target.value), required: true, style: { flex: '1 1 80px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' } }), _jsx("input", { placeholder: currency === 'USD' ? '평균단가 (USD)' : '평균단가 (원)', type: "number", min: "1", value: avgBuyPrice, onChange: (e) => setAvgBuyPrice(e.target.value), required: true, style: { flex: '1 1 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' } }), _jsx("button", { type: "submit", disabled: addLoading, style: { padding: '0.35rem 0.75rem', background: '#388e3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.875rem' }, children: addLoading ? '추가 중...' : '추가' })] })] }), _jsx(HoldingsSyncPanel, { portfolioId: portfolioId, onSynced: () => void load() }), _jsx(DividendsSection, { portfolioId: portfolioId, token: token }), _jsx(AiAnalysisSection, { portfolioId: portfolioId, token: token }), _jsx(OptimizeSection, { portfolioId: portfolioId, token: token }), _jsx(PerformanceSummaryPanel, { token: token, portfolioId: portfolioId }), _jsx(RiskAnalysisPanel, { portfolioId: portfolioId }), _jsx(BacktestPanel, { token: token, portfolioId: portfolioId }), _jsx(PortfolioAlertPanel, { portfolioId: portfolioId }), _jsx(DividendSummaryPanel, { token: token, portfolioId: portfolioId }), _jsx(DividendCalendarView, { token: token, portfolioId: portfolioId }), _jsx(DRIPSimulator, { token: token, portfolioId: portfolioId }), _jsx(BenchmarkComparisonPanel, { token: token, portfolioId: portfolioId }), _jsx(BenchmarkChartView, { token: token, portfolioId: portfolioId }), _jsx(PortfolioGoalPanel, { portfolioId: portfolioId }), _jsx(AICommentaryPanel, { portfolioId: portfolioId }), _jsx(AdviceSection, { token: token })] }));
 }
 export default function Portfolio() {
     const { token } = useAuth();

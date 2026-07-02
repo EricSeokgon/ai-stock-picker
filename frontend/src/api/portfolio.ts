@@ -1033,3 +1033,59 @@ export async function getRealizedPnl(
   if (!res.ok) throw new Error(`실현손익 조회 실패: ${res.status}`);
   return res.json();
 }
+
+// ── SPEC-STOCK-050: 거래 기반 홀딩스 동기화 타입 및 API ─────────────────────
+
+/** 홀딩스 동기화 프리뷰 항목 (SPEC-STOCK-050 REQ-SYNC-008·009) */
+export interface SyncPreviewItem {
+  krx_code: string;
+  action: 'upsert' | 'delete' | 'unchanged';
+  current_qty: number;
+  derived_qty: number;
+  current_avg: number | null;
+  derived_avg: number | null;
+}
+
+/** 홀딩스 동기화 프리뷰 응답 (SPEC-STOCK-050 REQ-SYNC-007~010) */
+export interface SyncPreviewResponse {
+  items: SyncPreviewItem[];
+}
+
+/** 동기화 후 홀딩 항목 */
+export interface SyncHoldingItem {
+  krx_code: string;
+  quantity: number;
+  avg_buy_price: number;
+}
+
+/** 홀딩스 동기화 적용 응답 (SPEC-STOCK-050 REQ-SYNC-005) */
+export interface SyncApplyResponse {
+  synced: number;
+  holdings: SyncHoldingItem[];
+}
+
+/** 홀딩스 동기화 미리보기 — DB 변경 없음 (SPEC-STOCK-050 REQ-SYNC-007·014) */
+export async function previewHoldingsSync(
+  token: string,
+  portfolioId: number
+): Promise<SyncPreviewResponse> {
+  const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/holdings/sync/preview`, {
+    method: 'GET',
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error(`홀딩스 동기화 미리보기 실패: ${res.status}`);
+  return res.json() as Promise<SyncPreviewResponse>;
+}
+
+/** 홀딩스 동기화 적용 (SPEC-STOCK-050 REQ-SYNC-005·016) */
+export async function applyHoldingsSync(
+  token: string,
+  portfolioId: number
+): Promise<SyncApplyResponse> {
+  const res = await fetch(`${API_BASE}/portfolios/${portfolioId}/holdings/sync`, {
+    method: 'POST',
+    headers: authHeaders(token),
+  });
+  if (!res.ok) throw new Error(`홀딩스 동기화 적용 실패: ${res.status}`);
+  return res.json() as Promise<SyncApplyResponse>;
+}

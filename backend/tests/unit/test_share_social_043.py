@@ -7,7 +7,7 @@ AC 총 23개 (AC-043-001a ~ AC-043-014)
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
 
@@ -694,8 +694,7 @@ class TestViewStats:
         today = date.today()
         mock_stats = {
             "stats": [
-                {"date": (today.replace(day=today.day - i) if today.day > i
-                          else today).isoformat(),
+                {"date": (today - timedelta(days=i)).isoformat(),
                  "view_count": 3 if i == 0 else 0}
                 for i in range(6, -1, -1)
             ]

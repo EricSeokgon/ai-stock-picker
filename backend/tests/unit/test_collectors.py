@@ -108,13 +108,17 @@ class TestNaverCollectorHTTP:
 
     @pytest.mark.asyncio
     async def test_naver_collector_sends_get_request(self):
-        """네이버 RSS 엔드포인트로 HTTP GET 요청 전송 확인"""
+        """연합뉴스 RSS 엔드포인트로 HTTP GET 요청 전송 확인
+
+        NOTE: NaverCollector는 네이버 금융이 RSS를 지원하지 않아
+        연합뉴스(yna.co.kr) 경제 RSS로 대체되었다 (커밋 a7d732f).
+        """
         from stock_picker.collectors.naver import NaverCollector
 
         xml_content = (FIXTURES_DIR / "sample_rss.xml").read_bytes()
 
         with respx.mock:
-            route = respx.get("https://finance.naver.com/news/news_list.naver").mock(
+            route = respx.get("https://www.yna.co.kr/rss/economy.xml").mock(
                 return_value=httpx.Response(200, content=xml_content)
             )
             collector = NaverCollector()
@@ -132,7 +136,7 @@ class TestNaverCollectorHTTP:
         xml_content = (FIXTURES_DIR / "sample_rss.xml").read_bytes()
 
         with respx.mock:
-            route = respx.get("https://finance.naver.com/news/news_list.naver").mock(
+            route = respx.get("https://www.yna.co.kr/rss/economy.xml").mock(
                 return_value=httpx.Response(200, content=xml_content)
             )
             collector = NaverCollector()
@@ -145,20 +149,20 @@ class TestNaverCollectorHTTP:
 
     @pytest.mark.asyncio
     async def test_naver_collector_returns_articles(self):
-        """네이버 수집기가 기사 목록을 반환하는지 확인"""
+        """연합뉴스 대체 수집기가 기사 목록을 반환하는지 확인"""
         from stock_picker.collectors.naver import NaverCollector
 
         xml_content = (FIXTURES_DIR / "sample_rss.xml").read_bytes()
 
         with respx.mock:
-            respx.get("https://finance.naver.com/news/news_list.naver").mock(
+            respx.get("https://www.yna.co.kr/rss/economy.xml").mock(
                 return_value=httpx.Response(200, content=xml_content)
             )
             collector = NaverCollector()
             articles = await collector.collect()
 
             assert len(articles) == 2
-            assert articles[0].source == "naver"
+            assert articles[0].source == "yonhap"
 
     @pytest.mark.asyncio
     async def test_naver_collector_http_error_returns_empty(self):
@@ -166,7 +170,7 @@ class TestNaverCollectorHTTP:
         from stock_picker.collectors.naver import NaverCollector
 
         with respx.mock:
-            respx.get("https://finance.naver.com/news/news_list.naver").mock(
+            respx.get("https://www.yna.co.kr/rss/economy.xml").mock(
                 return_value=httpx.Response(500)
             )
             collector = NaverCollector()
@@ -180,14 +184,18 @@ class TestHankyungCollectorHTTP:
 
     @pytest.mark.asyncio
     async def test_hankyung_collector_sends_user_agent(self):
-        """REQ-NEWS-006: User-Agent 헤더 설정 확인"""
+        """REQ-NEWS-006: User-Agent 헤더 설정 확인
+
+        NOTE: RSS_URL이 rss.hankyung.com/feed/finance.xml (301 리다이렉트)에서
+        www.hankyung.com/feed/finance로 변경되었다 (커밋 a7d732f).
+        """
         from stock_picker.collectors.rss import HankyungCollector
         from stock_picker.collectors.base import BaseCollector
 
         xml_content = (FIXTURES_DIR / "sample_rss.xml").read_bytes()
 
         with respx.mock:
-            route = respx.get("https://rss.hankyung.com/feed/finance.xml").mock(
+            route = respx.get("https://www.hankyung.com/feed/finance").mock(
                 return_value=httpx.Response(200, content=xml_content)
             )
             collector = HankyungCollector()
@@ -205,7 +213,7 @@ class TestHankyungCollectorHTTP:
         xml_content = (FIXTURES_DIR / "sample_rss.xml").read_bytes()
 
         with respx.mock:
-            respx.get("https://rss.hankyung.com/feed/finance.xml").mock(
+            respx.get("https://www.hankyung.com/feed/finance").mock(
                 return_value=httpx.Response(200, content=xml_content)
             )
             collector = HankyungCollector()

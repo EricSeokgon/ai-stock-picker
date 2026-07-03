@@ -302,6 +302,7 @@ class BacktestResult(BaseModel):
     period_days: int  # 거래일 수
     excluded_tickers: list[str]  # FDR 조회 실패로 제외된 종목
     used_tickers: list[str]  # 실제 계산에 사용된 종목
+    disclaimer: str  # 면책 문구 (REQ-PBT-NFR-003)
 
 
 # ─── SPEC-STOCK-030: 기간별 성과 요약 스키마 ─────────────────────────────────────

@@ -1,5 +1,5 @@
 // 대시보드 API 호출 모듈 (SPEC-STOCK-038)
-const BASE_URL = process.env.REACT_APP_API_URL ?? '';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
 // 허용 기간 상수 (서버와 동일하게 유지)
 export const ALLOWED_DAYS = [7, 30, 90, 365] as const;

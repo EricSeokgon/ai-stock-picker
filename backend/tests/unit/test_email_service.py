@@ -3,7 +3,6 @@ import os
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from stock_picker.db.models import EmailSubscription
 from stock_picker.notifications import email_service
@@ -159,6 +158,8 @@ class TestSubscribeEmail:
         assert existing.email == "updated@example.com"
         assert existing.is_active is True
         db.commit.assert_called_once()
+        # 재활성화된 기존 구독 인스턴스가 그대로 반환되어야 한다
+        assert result is existing
 
 
 class TestUnsubscribeEmail:

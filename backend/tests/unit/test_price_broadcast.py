@@ -2,7 +2,7 @@
 # RED: price_broadcast 모듈이 없으므로 실패 예상
 import os
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 
 
 @pytest.fixture
@@ -115,7 +115,6 @@ class TestBroadcastOnce:
                 raise RuntimeError("조회 실패")
             return {"krx_code": sym, "price": 71000.0, "change_pct": 1.4, "timestamp": "2026-06-12T10:00:00"}
 
-        import asyncio
         async def async_side_effect(sym):
             return side_effect(sym)
 

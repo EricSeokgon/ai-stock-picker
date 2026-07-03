@@ -1,6 +1,6 @@
 # 종목 검색 서비스 단위 테스트 (SPEC-STOCK-007 TASK-008)
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 

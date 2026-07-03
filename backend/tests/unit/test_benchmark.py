@@ -1,7 +1,7 @@
 # 포트폴리오 벤치마크 비교 단위 테스트 (SPEC-STOCK-034)
 # TDD RED-GREEN-REFACTOR 사이클
 # asyncio_mode = "auto" — @pytest.mark.asyncio 불필요
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -139,7 +139,6 @@ class TestCalculateBeta:
 
     def test_beta_nan_in_inputs_returns_none(self):
         """입력에 NaN이 포함되면 None을 반환해야 한다"""
-        import math
         from stock_picker.portfolio.benchmark import calculate_beta
 
         port_returns = _make_daily_returns(25, 0.001)
@@ -741,7 +740,6 @@ class TestComputePortfolioDailyHistory:
         """유효한 보유 종목 데이터로 일별 가치 시계열을 반환해야 한다"""
         from stock_picker.portfolio.benchmark import _compute_portfolio_daily_history
         import pandas as pd
-        from datetime import datetime
 
         mock_portfolio = MagicMock()
         mock_holding = MagicMock()
@@ -790,7 +788,7 @@ class TestFetchBenchmarkSync:
     def test_fdr_empty_dataframe_returns_empty_list(self):
         """FDR가 빈 DataFrame을 반환하면 빈 리스트를 반환해야 한다"""
         from stock_picker.portfolio.benchmark import _fetch_benchmark_sync
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import patch
         import pandas as pd
 
         mock_df = pd.DataFrame()
@@ -812,7 +810,6 @@ class TestFetchBenchmarkSync:
         from stock_picker.portfolio.benchmark import _fetch_benchmark_sync
         from unittest.mock import patch
         import pandas as pd
-        from datetime import datetime
 
         idx = pd.DatetimeIndex([datetime(2025, 1, 2), datetime(2025, 1, 3)])
         mock_df = pd.DataFrame({"Close": [2500.0, 2510.0]}, index=idx)

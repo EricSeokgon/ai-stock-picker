@@ -1,7 +1,6 @@
 # 포트폴리오 리밸런싱 자동화 단위 테스트 (SPEC-STOCK-032)
 # TDD RED-GREEN-REFACTOR 사이클
 # asyncio_mode = "auto" — @pytest.mark.asyncio 불필요
-import json
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -18,7 +17,6 @@ class TestNoScipyInRebalancing:
 
     def test_no_scipy_in_rebalancing(self):
         """rebalancing.py는 scipy를 import하면 안 된다"""
-        import importlib
         import ast
         import os
 
@@ -378,7 +376,7 @@ class TestRebalancingAPIOwnership:
     @pytest.mark.asyncio
     async def test_calculate_returns_404_when_not_owned(self):
         """소유하지 않은 포트폴리오 리밸런싱 계산 시 404를 반환해야 한다"""
-        from fastapi import HTTPException, status
+        from fastapi import HTTPException
         from stock_picker.portfolio.rebalancing import calculate_rebalancing_plan
 
         with patch(
@@ -555,7 +553,6 @@ class TestCalculateRebalancingPlan:
     async def test_dry_run_returns_plan_without_db_write(self):
         """dry_run=True일 때 DB 저장 없이 계획을 반환해야 한다 (RBA-005)"""
         from stock_picker.portfolio.rebalancing import calculate_rebalancing_plan
-        from stock_picker.portfolio.schemas import TargetWeightItem
 
         db_mock = MagicMock()
         redis_mock = AsyncMock()
@@ -721,6 +718,10 @@ class TestCalculateRebalancingPlan:
         # dry_run=False이면 db.add()가 호출되어야 한다
         db_mock.add.assert_called_once()
         db_mock.commit.assert_called_once()
+        # RBA-005 핵심 검증: DB 저장된 created_at이 반환 plan에 반영되어야 한다
+        assert plan.created_at == db_plan_mock.created_at
+        assert plan.portfolio_id == 1
+        assert plan.budget == 700_000.0
 
     @pytest.mark.asyncio
     async def test_optimize_result_without_target_weights(self):

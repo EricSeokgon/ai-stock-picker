@@ -1,6 +1,6 @@
 # add_holding 서비스 — market/currency 파라미터 및 409 충돌 처리 테스트 (SPEC-STOCK-028 T-005)
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy.exc

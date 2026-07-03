@@ -128,7 +128,6 @@ class TestAIAdviceConstraints:
     def test_foreign_key_to_users(self):
         """user_id 컬럼이 users.id를 참조하는 FK가 있어야 한다"""
         from stock_picker.db.models import AIAdvice
-        from sqlalchemy import ForeignKeyConstraint
         fk_targets = set()
         for col in AIAdvice.__table__.columns:
             for fk in col.foreign_keys:

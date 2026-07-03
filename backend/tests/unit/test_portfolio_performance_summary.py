@@ -2,7 +2,6 @@
 # TDD RED-GREEN-REFACTOR 사이클
 # asyncio_mode = "auto" — @pytest.mark.asyncio 불필요
 import json
-import math
 from datetime import date, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -535,7 +534,7 @@ class TestCalculatePerformanceSummary:
     async def test_redis_cache_hit_skips_calculation(self):
         """Redis 캐시 히트 시 FDR을 호출하지 않고 캐시 데이터를 반환해야 한다"""
         from stock_picker.portfolio.performance_summary import calculate_performance_summary
-        from stock_picker.portfolio.schemas import PerformanceSummaryResponse, PeriodPerformance
+        from stock_picker.portfolio.schemas import PeriodPerformance
 
         cached_periods = [
             PeriodPerformance(
@@ -740,7 +739,6 @@ class TestNonScipyImplementation:
 
     def test_no_scipy_import_in_performance_summary(self):
         """performance_summary.py에 scipy import가 없어야 한다"""
-        import ast
         import os
 
         filepath = os.path.join(

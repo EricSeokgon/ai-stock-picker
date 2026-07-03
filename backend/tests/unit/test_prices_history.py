@@ -1,6 +1,6 @@
 # 주가 히스토리 함수 단위 테스트 (SPEC-STOCK-007 TASK-009)
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pandas as pd
 import pytest
@@ -8,7 +8,7 @@ import pytest
 
 def _make_sample_df(n: int = 5) -> pd.DataFrame:
     """테스트용 주가 DataFrame 생성 (최근 n일)"""
-    from datetime import datetime, timedelta
+    from datetime import datetime
 
     dates = pd.date_range(end=datetime.now(), periods=n, freq="D")
     df = pd.DataFrame(

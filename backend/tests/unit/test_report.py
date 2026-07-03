@@ -6,7 +6,7 @@ import csv
 import io
 import os
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -246,8 +246,6 @@ class TestGenerateCsvContent:
         """CSV 직렬화는 io.StringIO + csv 표준 라이브러리만 사용"""
         import stock_picker.portfolio.report as report_module
         # 모듈에서 csv와 io가 임포트 되어 있어야 한다
-        import csv as csv_stdlib
-        import io as io_stdlib
         # generate_csv_content 함수 소스에 csv.writer가 사용되는지 확인
         import inspect
         source = inspect.getsource(report_module.generate_csv_content)
@@ -449,7 +447,7 @@ class TestSnapshotUpsert:
     def test_create_snapshot_returns_monthly_snapshot(self):
         """스냅샷 생성 → MonthlySnapshot 반환"""
         from stock_picker.portfolio.report import upsert_monthly_snapshot
-        from stock_picker.portfolio.schemas import MonthlySnapshot
+        from stock_picker.db.models import PortfolioMonthlySnapshot
 
         # DB 모의
         db = MagicMock()
@@ -467,6 +465,13 @@ class TestSnapshotUpsert:
         # DB add + commit + refresh 호출 확인
         db.add.assert_called_once()
         db.commit.assert_called()
+        # 신규 레코드가 MonthlySnapshot 인스턴스로 반환되어야 한다
+        assert isinstance(result, PortfolioMonthlySnapshot)
+        assert result.portfolio_id == 1
+        assert result.month == "2026-05"
+        assert result.total_value_krw == 1000000.0
+        assert result.total_return_pct == 5.0
+        assert result.holding_count == 3
 
     def test_same_month_update_not_duplicate(self):
         """동일 월 재요청 — 기존 레코드 업데이트 (INSERT 아님)"""

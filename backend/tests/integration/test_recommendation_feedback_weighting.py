@@ -1,6 +1,6 @@
 # 추천 피드백 가중치 통합 테스트 (SPEC-STOCK-009 TASK-009)
 from datetime import date, datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient

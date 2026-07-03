@@ -293,10 +293,10 @@ class TestGoalRouterCreate:
 
     def test_T001_create_with_amount_only_returns_goal(self) -> None:
         """T-001: target_amount만 설정 → Goal 객체 반환."""
+        from stock_picker.db.models import PortfolioGoal
         from stock_picker.portfolio.goals import create_goal
 
         portfolio = _make_portfolio(id=10, user_id=1)
-        new_goal = _make_goal(id=1, portfolio_id=10)
 
         db = MagicMock()
 
@@ -323,9 +323,15 @@ class TestGoalRouterCreate:
         # add, commit, refresh 호출 확인
         assert db.add.called
         assert db.commit.called
+        # T-001 핵심 검증: 반환된 Goal 객체에 target_amount가 설정되어 있어야 한다
+        assert isinstance(result, PortfolioGoal)
+        assert result.portfolio_id == 10
+        assert result.target_amount == Decimal("10000000")
+        assert result.target_return_rate is None
 
     def test_T002_create_with_return_rate_only_returns_goal(self) -> None:
         """T-002: target_return_rate만 설정 → Goal 객체 반환."""
+        from stock_picker.db.models import PortfolioGoal
         from stock_picker.portfolio.goals import create_goal
 
         portfolio = _make_portfolio(id=10, user_id=1)
@@ -354,6 +360,11 @@ class TestGoalRouterCreate:
         result = create_goal(db, portfolio_id=10, user_id=1, target_return_rate=Decimal("15.0"))
         assert db.add.called
         assert db.commit.called
+        # T-002 핵심 검증: 반환된 Goal 객체에 target_return_rate가 설정되어 있어야 한다
+        assert isinstance(result, PortfolioGoal)
+        assert result.portfolio_id == 10
+        assert result.target_return_rate == Decimal("15.0")
+        assert result.target_amount is None
 
 
 class TestGoalRouterGet:
@@ -496,7 +507,6 @@ class TestCheckPortfolioGoals:
             target_amount=5_000_000.0,
             goal_reached_notified=False,
         )
-        portfolio = _make_portfolio(id=10, user_id=1)
 
         mock_session = MagicMock()
 

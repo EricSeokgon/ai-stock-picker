@@ -3,7 +3,6 @@
 # asyncio_mode = "auto" — @pytest.mark.asyncio 불필요
 import json
 import math
-from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import numpy as np
@@ -281,6 +280,8 @@ class TestRiskAnalysisOrchestration:
             )
 
         assert mock_fdr.call_count == 2
+        # refresh=True로 재계산된 결과여야 한다 (캐시된 결과가 아님)
+        assert result.period_days == 90
 
     async def test_risk_analysis_redis_unavailable_graceful(self):
         """Redis 장애 시 캐시 없이 계산을 수행해야 한다"""

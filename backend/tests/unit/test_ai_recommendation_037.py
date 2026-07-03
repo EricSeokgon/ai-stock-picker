@@ -444,7 +444,6 @@ class TestPreferenceSelectThenWrite:
     def test_save_preference_inserts_when_none_exists(self):
         """기존 선호 없으면 INSERT 수행 (ON CONFLICT 사용 안 함)"""
         from stock_picker.portfolio.ai_recommendation import save_preference_select_then_write
-        from stock_picker.db.models import UserRecommendationPreference
 
         mock_db = MagicMock()
         # SELECT 결과: 없음

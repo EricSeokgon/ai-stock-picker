@@ -4,7 +4,6 @@ TDD RED 단계: 구현 전 먼저 작성하여 실패 확인 후 GREEN으로 구
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -501,7 +500,6 @@ class TestNoScipyImport:
 
     def test_no_scipy_in_portfolio_alerts(self) -> None:
         """portfolio_alerts.py 소스 코드에 'scipy' 문자열 없어야 한다."""
-        import importlib.util
         import pathlib
 
         src_path = pathlib.Path(__file__).parent.parent.parent / "src" / "stock_picker" / "portfolio" / "portfolio_alerts.py"

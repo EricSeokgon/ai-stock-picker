@@ -3,7 +3,6 @@
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -171,7 +170,6 @@ class TestCommentaryCache:
     def setup_method(self):
         """각 테스트 전 캐시 초기화"""
         # 테스트 격리를 위해 캐시 모듈을 새로 임포트
-        import importlib
         import stock_picker.portfolio.commentary_cache as cache_mod
         cache_mod._CACHE.clear()
 

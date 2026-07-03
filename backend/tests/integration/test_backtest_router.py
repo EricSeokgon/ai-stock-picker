@@ -1,5 +1,4 @@
 # 백테스트 라우터 통합 테스트 — TestClient + 공유 인메모리 SQLite
-from datetime import date
 
 import pytest
 from fastapi.testclient import TestClient

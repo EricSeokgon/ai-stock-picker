@@ -11,7 +11,6 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -82,7 +81,7 @@ class TestAddBuyTransaction:
 
         client = TestClient(app)
         mock_user = _make_mock_user(user_id=1)
-        mock_txn = _make_mock_transaction(
+        _make_mock_transaction(
             txn_id=1,
             portfolio_id=1,
             krx_code="005930",

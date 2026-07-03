@@ -7,7 +7,7 @@ T-046-001 ~ T-046-015 (백엔드 15개)
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -474,10 +474,14 @@ class TestCommentNotification:
         )
         # 서비스가 작동했음을 검증 (결과 반환)
         assert result is not None
+        # T-046-014 핵심 검증: 비소유자 댓글 작성 시 portfolio_comment 알림이 생성되어야 한다
+        assert notification_added, "비소유자 댓글 작성 시 알림(Notification)이 생성되지 않았습니다"
+        assert any(
+            getattr(obj, "type", None) == "portfolio_comment" for obj in added_notifications
+        ), "생성된 알림의 type이 'portfolio_comment'가 아닙니다"
 
     def test_t046_015_owner_self_comment_no_notification(self):
         """T-046-015: 소유자 자기댓글 → 알림 미생성 + 동일일 중복 억제"""
-        from sqlalchemy.exc import IntegrityError
         from stock_picker.portfolio import sharing
 
         mock_db = MagicMock()

@@ -1,6 +1,6 @@
 # SPEC-STOCK-021: 뉴스피드·AI 시장 템포 단위 테스트
 # REQ-NEWS-SENT-*, REQ-NEWS-FEED-*, REQ-NEWS-FETCH-*, REQ-NEWS-CACHE-*
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 import json
 import pytest

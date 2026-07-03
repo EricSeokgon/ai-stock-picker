@@ -1,5 +1,4 @@
 # 포트폴리오 라우터 통합 테스트 — TestClient + 공유 인메모리 SQLite
-from decimal import Decimal
 from unittest.mock import patch
 
 import pytest

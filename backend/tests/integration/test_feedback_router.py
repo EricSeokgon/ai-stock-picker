@@ -1,7 +1,6 @@
 # 추천 피드백 라우터 통합 테스트 (SPEC-STOCK-007 TASK-010)
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
-import pytest
 from fastapi.testclient import TestClient
 
 from stock_picker.db.models import RecommendationFeedback
@@ -24,7 +23,6 @@ def _make_app_with_mock_feedback(
     """피드백 서비스를 mock으로 대체한 앱 반환"""
     from stock_picker.api.main import create_app
     from stock_picker.db.session import get_session
-    from unittest.mock import patch
 
     app = create_app()
     mock_session = AsyncMock()

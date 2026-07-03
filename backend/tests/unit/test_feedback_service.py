@@ -1,5 +1,5 @@
 # 피드백 서비스 단위 테스트 (SPEC-STOCK-007 TASK-010)
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -44,6 +44,9 @@ class TestSaveFeedback:
         db.add.assert_called_once()
         db.commit.assert_awaited_once()
         db.refresh.assert_awaited_once()
+        assert isinstance(result, RecommendationFeedback)
+        assert result.vote == "up"
+        assert result.krx_code == "005930"
 
     @pytest.mark.asyncio
     async def test_save_down_vote(self):
@@ -55,6 +58,9 @@ class TestSaveFeedback:
 
         db.add.assert_called_once()
         db.commit.assert_awaited_once()
+        assert isinstance(result, RecommendationFeedback)
+        assert result.vote == "down"
+        assert result.krx_code == "005930"
 
     @pytest.mark.asyncio
     async def test_invalid_vote_raises_value_error(self):

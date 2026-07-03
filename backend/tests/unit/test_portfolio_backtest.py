@@ -1,9 +1,8 @@
 # 포트폴리오 백테스팅 단위 테스트 (SPEC-STOCK-029)
 # TDD RED-GREEN-REFACTOR 사이클
 # asyncio_mode = "auto" — @pytest.mark.asyncio 불필요
-import asyncio
 from datetime import date
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
@@ -19,7 +18,6 @@ class TestBacktestRequest:
 
     def test_valid_dates_pass(self):
         """유효한 날짜 범위(시작 < 종료)는 ValidationError 없이 생성된다"""
-        from pydantic import ValidationError
 
         from stock_picker.portfolio.schemas import BacktestRequest
 
@@ -320,7 +318,6 @@ class TestFetchPriceSeriesSync:
 
     def test_nan_rows_excluded(self):
         """NaN 종가는 제외된다"""
-        import numpy as np
 
         mock_df = pd.DataFrame(
             {"Close": [100.0, float("nan"), 103.0]},

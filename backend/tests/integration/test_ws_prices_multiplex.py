@@ -1,9 +1,8 @@
 # 멀티플렉스 WebSocket /ws/prices 통합 테스트 (SPEC-STOCK-016 M3)
 # RED: ws_router에 /ws/prices 엔드포인트가 없으므로 실패 예상
-import json
 import os
 import pytest
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -34,7 +33,7 @@ class TestMultiplexWSConnect:
 
     def test_ws_prices_endpoint_accepts_connection(self, client):
         """ws /ws/prices 엔드포인트가 연결을 수락해야 한다."""
-        with client.websocket_connect("/ws/prices") as ws:
+        with client.websocket_connect("/ws/prices"):
             # 연결이 되면 성공 — 연결 자체가 수락됨을 확인
             pass
 

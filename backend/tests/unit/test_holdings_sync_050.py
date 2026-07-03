@@ -1,14 +1,14 @@
-from __future__ import annotations
 """
 SPEC-STOCK-050: 거래 기반 홀딩스 동기화 — 백엔드 단위 테스트 (10개)
 T-050-001 ~ T-050-010
 
 RED phase: holdings_sync 모듈 미구현 → ImportError 또는 404로 실패 예정
 """
+from __future__ import annotations
+
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 
 # ---- 헬퍼 팩토리 -------------------------------------------------------

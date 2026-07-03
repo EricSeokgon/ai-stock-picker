@@ -1,7 +1,6 @@
 # FX rate 서비스 유닛 테스트 (SPEC-STOCK-028 T-003)
 # Redis 캐시 hit/miss/fallback 및 KST 날짜 키 형식 검증
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 

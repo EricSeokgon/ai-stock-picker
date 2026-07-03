@@ -1,6 +1,5 @@
 # 포트폴리오 AI 분석 유닛 테스트
 # asyncio_mode = "auto" — @pytest.mark.asyncio 데코레이터 불필요
-import inspect
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -193,7 +192,7 @@ class TestBuildPortfolioDataForeignAsset:
     def test_build_portfolio_data_weight_uses_krw_converted_value(self):
         """USD 종목 비중 계산 시 KRW 환산 금액을 사용한다"""
         from stock_picker.portfolio.ai_analysis import _build_portfolio_data
-        from unittest.mock import patch, AsyncMock
+        from unittest.mock import patch
 
         # KRX: 10주 × 100,000원 = 1,000,000원
         h_krx = _make_holding_with_market("005930", 10, Decimal("100000.00"), "KRX", "KRW")

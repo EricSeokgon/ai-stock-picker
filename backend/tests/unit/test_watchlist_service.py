@@ -1,6 +1,6 @@
 # 관심종목 서비스 유닛 테스트 — mock DB
 from datetime import datetime
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import HTTPException

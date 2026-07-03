@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from stock_picker.portfolio import service
-from stock_picker.portfolio.utils import get_sector
 from stock_picker.db.models import Portfolio, PortfolioHolding
 
 

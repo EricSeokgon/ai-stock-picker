@@ -54,7 +54,6 @@ class TestCalculateCagr:
     def test_known_value(self):
         """알려진 값으로 CAGR 검증 — 1년 50% 수익 → CAGR ≈ 50%"""
         # 단순화: 1년 후 누적 수익률 50% (매일 복리 적용)
-        import math
         daily_r = (1.5 ** (1 / 252)) - 1  # 1년 후 1.5배
         daily_returns = [daily_r] * 252
         start = date(2023, 1, 1)
@@ -139,7 +138,6 @@ class TestCalculateSharpeRatio:
 
     def test_annualization_factor(self):
         """연환산 계수 √252 적용 확인"""
-        import math
         # 단순 계산으로 연환산 검증
         daily_returns = [0.001, -0.001, 0.002, -0.002, 0.001]
         sharpe = calculate_sharpe_ratio(daily_returns, risk_free_rate=0.0)

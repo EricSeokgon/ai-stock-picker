@@ -2,12 +2,9 @@
 # asyncio_mode = "auto" — @pytest.mark.asyncio 데코레이터 불필요
 import inspect
 import json
-from datetime import date
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-from fastapi import HTTPException
 
 from stock_picker.db.models import Portfolio, PortfolioHolding
 from stock_picker.portfolio.schemas import OptimizeResult
@@ -201,7 +198,6 @@ class TestOptimizeNewStocksNotInPortfolio:
     async def test_optimize_new_stocks_not_in_portfolio(self):
         """포트폴리오 보유 종목은 new_stocks에서 제외 검증"""
         from stock_picker.portfolio import service
-        from stock_picker.db.models import Recommendation
 
         db = MagicMock()
         redis = AsyncMock()
@@ -279,7 +275,6 @@ class TestOptimizeRedisCacheHit:
                 portfolio_id=1, user_id=1, db=db, redis=redis
             )
             assert mock_claude.called, "첫 번째 호출 시 Claude가 호출되어야 함"
-            call_count_after_first = mock_claude.call_count
 
             # 두 번째 호출: 캐시 히트 (JSON 직렬화된 결과 반환)
             redis.get = AsyncMock(return_value=result1.model_dump_json())
@@ -299,7 +294,6 @@ class TestOptimizeAsyncClient:
 
     async def test_optimize_async_client(self):
         """optimize_portfolio_with_claude가 AsyncAnthropic을 사용하는지 검증"""
-        import anthropic
         from stock_picker.portfolio.ai_analysis import optimize_portfolio_with_claude
 
         # 함수 자체가 async인지 확인

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date, timedelta
-from typing import Any
 
 # 허용 기간 상수 (서버 측 검증에 사용)
 ALLOWED_DAYS: frozenset[int] = frozenset({7, 30, 90, 365})

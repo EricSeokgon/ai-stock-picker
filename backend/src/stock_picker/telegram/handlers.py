@@ -1,6 +1,5 @@
 # 텔레그램 봇 커맨드 핸들러 — /start, /stop, /status, /recommend, /help
 import logging
-from typing import Any
 
 from telegram import Update
 from telegram.ext import ContextTypes

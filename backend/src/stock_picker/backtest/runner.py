@@ -6,11 +6,6 @@ from datetime import date, datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from stock_picker.backtest.metrics import (
-    calculate_cagr,
-    calculate_max_drawdown,
-    calculate_sharpe_ratio,
-)
 
 logger = logging.getLogger(__name__)
 

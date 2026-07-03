@@ -2,7 +2,7 @@
 import asyncio
 import logging
 import threading
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from telegram.ext import Application, CommandHandler
 
@@ -15,7 +15,7 @@ from stock_picker.telegram.handlers import (
 )
 
 if TYPE_CHECKING:
-    from fastapi import FastAPI
+    pass
 
 logger = logging.getLogger(__name__)
 

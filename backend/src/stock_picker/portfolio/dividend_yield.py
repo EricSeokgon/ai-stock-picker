@@ -359,7 +359,6 @@ async def get_drip_projection(
 
     for h in portfolio.holdings:
         div = await get_dividend_info(h.krx_code, redis)
-        dps = div.get("dps") or 0.0
         div_yield = div.get("dividend_yield") or 0.0
 
         holding_value = float(h.avg_buy_price) * float(h.quantity)

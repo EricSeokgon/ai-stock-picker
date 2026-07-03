@@ -11,7 +11,6 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
-import numpy as np
 
 from stock_picker.backtest.metrics import calculate_max_drawdown
 from stock_picker.portfolio.fx_rate import _today_kst, get_usd_krw_rate

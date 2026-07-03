@@ -4,12 +4,10 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from stock_picker.db.models import Portfolio, PortfolioTransaction

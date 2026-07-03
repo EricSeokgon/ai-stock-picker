@@ -10,7 +10,6 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from stock_picker.db.models import Portfolio, PortfolioHolding
-from stock_picker.portfolio import fx_rate as fx_rate_module
 from stock_picker.portfolio.utils import (
     get_sector as _get_sector,
 )  # SPEC-STOCK-017: 공유 utils로 통합

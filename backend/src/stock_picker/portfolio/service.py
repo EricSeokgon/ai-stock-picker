@@ -1,6 +1,5 @@
 # 포트폴리오 서비스 레이어 — CRUD + 성과 계산 + AI 최적화 (SPEC-STOCK-017·026·028 확장)
 import asyncio
-import json
 import logging
 from collections import defaultdict
 from datetime import date

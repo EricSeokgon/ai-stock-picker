@@ -241,10 +241,19 @@ class Portfolio(Base):
     holdings: Mapped[list["PortfolioHolding"]] = relationship(
         "PortfolioHolding", back_populates="portfolio", cascade="all, delete-orphan"
     )
+    # SPEC-STOCK-049: 거래 원장 관계
+    transactions: Mapped[list["PortfolioTransaction"]] = relationship(
+        "PortfolioTransaction", back_populates="portfolio", cascade="all, delete-orphan", lazy="noload"
+    )
 
 
 class PortfolioHolding(Base):
-    """포트폴리오 보유 종목 테이블"""
+    """포트폴리오 보유 종목 테이블 (SPEC-STOCK-028: 해외 자산 지원)
+
+    # @MX:ANCHOR: [AUTO] 보유 종목 핵심 엔티티 — 해외 자산(NYSE/NASDAQ) 포함
+    # @MX:REASON: service.py, router.py, dividends.py, risk_analysis.py 등 4개 이상 모듈에서 참조
+    # @MX:SPEC: SPEC-STOCK-028 REQ-FA-001
+    """
 
     __tablename__ = "portfolio_holdings"
 
@@ -252,9 +261,14 @@ class PortfolioHolding(Base):
     portfolio_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
     )
+    # krx_code: KRX 종목코드 또는 해외 티커 식별자 (컬럼명 유지 — 하위 호환)
     krx_code: Mapped[str] = mapped_column(String(10), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     avg_buy_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    # market: 상장 거래소 — KRX(기본), NYSE, NASDAQ
+    market: Mapped[str] = mapped_column(String(10), nullable=False, server_default="KRX")
+    # currency: 결제 통화 — KRW(기본), USD
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="KRW")
     added_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -263,6 +277,49 @@ class PortfolioHolding(Base):
 
     # 연관 관계
     portfolio: Mapped["Portfolio"] = relationship("Portfolio", back_populates="holdings")
+
+    __table_args__ = (
+        # (portfolio_id, krx_code, market) 복합 UNIQUE — 동일 시장 내 종목 중복 방지
+        UniqueConstraint(
+            "portfolio_id", "krx_code", "market",
+            name="uq_holding_portfolio_ticker_market",
+        ),
+    )
+
+
+# ── SPEC-STOCK-049: 거래 원장 ──────────────────────────────────────────────────
+
+
+class PortfolioTransaction(Base):
+    """포트폴리오 거래 원장 테이블 — 개별 매수/매도 수동 기록 (SPEC-STOCK-049)
+
+    # @MX:ANCHOR: [AUTO] 거래 원장 핵심 엔티티 — transactions.py 서비스·router.py 엔드포인트에서 참조
+    # @MX:REASON: add_transaction, list_transactions, get_realized_pnl 등 3개 이상 함수에서 사용
+    # @MX:SPEC: SPEC-STOCK-049 REQ-TXN-001
+    """
+
+    __tablename__ = "portfolio_transactions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    portfolio_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
+    )
+    # krx_code: KRX 종목코드 또는 해외 티커 (홀딩스 컬럼명 규약 재사용)
+    krx_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    # txn_type: 'BUY' 또는 'SELL'
+    txn_type: Mapped[str] = mapped_column(String(4), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    price: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    txn_date: Mapped[date] = mapped_column(Date, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    # 연관 관계
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", back_populates="transactions", lazy="noload")
 
 
 # ── Phase E: 관심종목 위시리스트 ───────────────────────────────────────────────
@@ -629,6 +686,59 @@ class Alert(Base):
     user: Mapped["User"] = relationship("User", lazy="noload")
 
 
+# ── Phase J-2: 포트폴리오 알림 (SPEC-STOCK-031) ───────────────────────────────
+
+
+class PortfolioAlert(Base):
+    """포트폴리오 목표 수익률·MDD 임계값 알림 설정 (SPEC-STOCK-031).
+
+    # @MX:ANCHOR: [AUTO] 포트폴리오 알림 핵심 엔티티 — router, portfolio_alerts 서비스, 스케줄러에서 참조
+    # @MX:REASON: portfolio/router.py CRUD 엔드포인트, portfolio_alerts.py 오케스트레이션, scheduler/jobs.py 3곳 이상
+    # @MX:SPEC: SPEC-STOCK-031 REQ-PAL-001
+    """
+
+    __tablename__ = "portfolio_alerts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    portfolio_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
+    )
+    # 알림 유형: portfolio_target_return | portfolio_mdd_breach | portfolio_value_below | holding_return
+    alert_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    # 목표 수익률(%) 또는 MDD 임계값(%) 또는 평가액(KRW) — 음수 가능 (-15.0 등)
+    condition_value: Mapped[float] = mapped_column(Float, nullable=False)
+    # @MX:NOTE: [AUTO] target_krx_code: 종목 알림 대상 종목코드, NULL=비종목형 알림 (SPEC-036)
+    target_krx_code: Mapped[str | None] = mapped_column(String, nullable=True)
+    # @MX:NOTE: [AUTO] condition_direction: 방향 조건 "above"/"below", NULL=above 기본값 (SPEC-036)
+    condition_direction: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_triggered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    triggered_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMPTZ(timezone=True), nullable=True
+    )
+    triggered_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        # 동일 (user_id, portfolio_id, alert_type) 중복 방지 (REQ-PAL-008)
+        UniqueConstraint(
+            "user_id", "portfolio_id", "alert_type",
+            name="uq_portfolio_alert_user_pf_type",
+        ),
+        # 활성 알림 조회 최적화
+        Index("ix_portfolio_alerts_user_active", "user_id", "is_active"),
+    )
+
+    user: Mapped["User"] = relationship("User", lazy="noload")
+
+
 # ── Phase K: 알림 채널·유형별 수신 설정 (SPEC-STOCK-025) ──────────────────────
 
 
@@ -669,3 +779,383 @@ class NotificationPreference(Base):
     )
 
     user: Mapped["User"] = relationship("User", lazy="noload")
+
+
+# ── Phase L: 리밸런싱 계획 저장 (SPEC-STOCK-032) ─────────────────────────────
+
+
+class RebalancingPlan(Base):
+    """포트폴리오 리밸런싱 계획서 저장 테이블 (SPEC-STOCK-032 RBA-005).
+
+    dry_run=False 요청 시 생성된 주문 계획을 영구 보관한다.
+    orders_json: RebalancingOrder 리스트를 JSON 직렬화한 Text (SQLite 호환)
+    """
+
+    __tablename__ = "rebalancing_plans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    portfolio_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    budget: Mapped[float] = mapped_column(Float, nullable=False)
+    total_buy_amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    total_sell_amount: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    total_commission: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    # RebalancingOrder 목록 JSON 직렬화 (SQLite JSONB 미지원으로 Text 사용)
+    orders_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", lazy="noload")
+    user: Mapped["User"] = relationship("User", lazy="noload")
+
+
+# ── Phase L-2: 포트폴리오 월별 스냅샷 (SPEC-STOCK-035) ──────────────────────────
+
+
+class PortfolioMonthlySnapshot(Base):
+    """포트폴리오 월별 평가액·수익률 스냅샷 (SPEC-STOCK-035 REQ-RPT-004).
+
+    월말 또는 사용자 요청 시점에 기록되는 포트폴리오 집계 데이터.
+    (portfolio_id, month) 조합이 UNIQUE — 동일 월 upsert는 SELECT-then-write로 처리.
+    """
+
+    __tablename__ = "portfolio_monthly_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    portfolio_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # 월 키: "YYYY-MM" 7자 문자열 (예: "2026-05")
+    month: Mapped[str] = mapped_column(String(7), nullable=False)
+    # 포트폴리오 총 평가액 (KRW)
+    total_value_krw: Mapped[float] = mapped_column(Float, nullable=False)
+    # 기간 수익률 (%) — 기간 비교 불가 시 NULL
+    total_return_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # 보유 종목 수 (스냅샷 시점)
+    holding_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    # (portfolio_id, month) 복합 UNIQUE — SELECT-then-write upsert 보장
+    __table_args__ = (
+        UniqueConstraint("portfolio_id", "month", name="uq_snapshot_portfolio_month"),
+    )
+
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", lazy="noload")
+
+
+# ── Phase M: AI 개인화 추천 (SPEC-STOCK-037) ────────────────────────────────────
+
+
+class UserRecommendationPreference(Base):
+    """사용자별 종목 선호(좋아요/싫어요) 테이블 (SPEC-STOCK-037 REQ-AIEX-PREF).
+
+    SELECT-then-write(NFR-005)로 upsert — ON CONFLICT 미사용.
+    UNIQUE(user_id, portfolio_id, krx_code): 포트폴리오·종목당 선호 1개.
+    """
+
+    __tablename__ = "recommendation_preferences"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    portfolio_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
+    )
+    # 종목 코드 (KRX 또는 해외 티커)
+    krx_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    # 섹터 — 선호 적용 시 유사 섹터 판단에 사용 (nullable)
+    sector: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # 선호 값: "liked" 또는 "disliked"
+    preference: Mapped[str] = mapped_column(String(8), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        onupdate=func.now(),
+    )
+
+    __table_args__ = (
+        # (user_id, portfolio_id, krx_code) 복합 UNIQUE — 중복 선호 방지
+        UniqueConstraint(
+            "user_id", "portfolio_id", "krx_code",
+            name="uq_rec_preference_user_pf_code",
+        ),
+    )
+
+    user: Mapped["User"] = relationship("User", lazy="noload")
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", lazy="noload")
+
+
+class RecommendationHistory(Base):
+    """개인화 추천 히스토리 스냅샷 테이블 (SPEC-STOCK-037 REQ-AIEX-HIST).
+
+    개인화 추천 산출 시 결과를 JSON으로 영속화. 사용자별 과거 추천 조회에 사용.
+    """
+
+    __tablename__ = "recommendation_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    portfolio_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
+    )
+    # 추천 항목 목록 JSON 직렬화 (SQLite 호환 Text)
+    recommendations: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        # (user_id, portfolio_id, created_at) 최신순 조회 최적화
+        Index("ix_rec_history_user_pf_created", "user_id", "portfolio_id", "created_at"),
+    )
+
+    user: Mapped["User"] = relationship("User", lazy="noload")
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", lazy="noload")
+
+
+# ── SPEC-STOCK-041: 포트폴리오 목표 관리 ────────────────────────────────────────
+
+class PortfolioShare(Base):
+    """포트폴리오 공유 링크 테이블 (SPEC-STOCK-042).
+
+    # @MX:ANCHOR: [AUTO] 포트폴리오 공유 핵심 엔티티
+    # @MX:REASON: sharing.py 서비스, portfolio router, 공개 피드 엔드포인트에서 참조
+    # @MX:SPEC: SPEC-STOCK-042 REQ-SHARE-001~005
+
+    share_token: secrets.token_urlsafe(16) 생성 (22자, VARCHAR(32)).
+    is_public=False는 소프트 삭제 (token/counts 보존).
+    포트폴리오당 공유 레코드 1개 (portfolio_id UNIQUE).
+    view_count: 원자적 UPDATE SET view_count = view_count + 1.
+    """
+
+    __tablename__ = "portfolio_shares"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    portfolio_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
+    )
+    # share_token: 고유 공유 토큰 (22자, VARCHAR(32))
+    share_token: Mapped[str] = mapped_column(String(32), nullable=False)
+    # share_url: 상대 경로 공유 URL (/shared/{token})
+    share_url: Mapped[str] = mapped_column(String(128), nullable=False)
+    # is_public: 공개 여부 (소프트 삭제 시 False, token/counts 보존)
+    is_public: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    # view_count: 조회수 (원자적 증가)
+    view_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    # 연관 관계
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", lazy="noload")
+    likes: Mapped[list["PortfolioLike"]] = relationship(
+        "PortfolioLike", back_populates="share", lazy="noload", cascade="all, delete-orphan"
+    )
+    comments: Mapped[list["PortfolioComment"]] = relationship(
+        "PortfolioComment", back_populates="share", lazy="noload", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        Index("ix_portfolio_shares_portfolio_id", "portfolio_id"),
+        Index("ix_portfolio_shares_is_public", "is_public"),
+        UniqueConstraint("share_token", name="uq_portfolio_shares_token"),
+        UniqueConstraint("portfolio_id", name="uq_portfolio_shares_portfolio_id"),
+    )
+
+
+class PortfolioLike(Base):
+    """포트폴리오 좋아요 테이블 (SPEC-STOCK-042).
+
+    (share_id, user_id) 복합 유니크 — 중복 좋아요 DB 레벨 방지.
+    소유자 좋아요 금지는 앱 레벨에서 강제 (403).
+    like_count는 COUNT(*) 쿼리로 파생 (비정규화 카운터 없음).
+    """
+
+    __tablename__ = "portfolio_likes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    share_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolio_shares.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # 연관 관계
+    share: Mapped["PortfolioShare"] = relationship("PortfolioShare", back_populates="likes", lazy="noload")
+
+    __table_args__ = (
+        Index("ix_portfolio_likes_share_id", "share_id"),
+        Index("ix_portfolio_likes_user_id", "user_id"),
+        UniqueConstraint("share_id", "user_id", name="uq_portfolio_likes_share_user"),
+    )
+
+
+class ShareViewStat(Base):
+    """포트폴리오 공유 일별 조회수 통계 테이블 (SPEC-STOCK-043).
+
+    # @MX:NOTE: [AUTO] 날짜별 조회수 집계 — portfolio_shares.view_count(누적)와 별개 테이블
+    # @MX:SPEC: SPEC-STOCK-043 REQ-STAT-001
+
+    upsert 패턴: INSERT ... ON CONFLICT (share_id, stat_date) DO UPDATE SET view_count = view_count + 1
+    stat_date: KST(Asia/Seoul) 기준 날짜
+    """
+
+    __tablename__ = "share_view_stats"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    share_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolio_shares.id", ondelete="CASCADE"), nullable=False
+    )
+    stat_date: Mapped[date] = mapped_column(Date, nullable=False)
+    view_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("share_id", "stat_date", name="uq_share_view_stats_share_date"),
+        Index("ix_share_view_stats_share_id_date", "share_id", "stat_date"),
+    )
+
+
+class PortfolioGoal(Base):
+    """포트폴리오 투자 목표 테이블 (SPEC-STOCK-041).
+
+    # @MX:ANCHOR: [AUTO] 포트폴리오 목표 핵심 엔티티
+    # @MX:REASON: goals.py 서비스, router.py 엔드포인트, scheduler/jobs.py 스케줄러에서 참조
+    # @MX:SPEC: SPEC-STOCK-041 REQ-GOAL-001~007
+
+    포트폴리오당 활성 목표 1개 제한 (is_active=True 기준).
+    소프트 삭제: DELETE 시 is_active=False, 이력 보존.
+    """
+
+    __tablename__ = "portfolio_goals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    portfolio_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
+    )
+    # target_amount: 목표 평가액 (KRW), target_return_rate: 목표 수익률(%)
+    # 둘 중 하나 이상은 반드시 설정해야 함 (Pydantic 스키마에서 검증)
+    target_amount: Mapped[Decimal | None] = mapped_column(Numeric(15, 2), nullable=True)
+    target_return_rate: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)
+    # deadline: 목표 달성 기한 (설정 선택사항)
+    deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # is_active: 활성 목표 여부 (소프트 삭제 시 False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    # goal_reached_notified: 목표 달성 알림 발송 여부 (멱등성 보장)
+    goal_reached_notified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    # 연관 관계
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", lazy="noload")
+
+    __table_args__ = (
+        Index("ix_portfolio_goals_portfolio_id", "portfolio_id"),
+    )
+
+
+class PortfolioComment(Base):
+    """포트폴리오 공유 댓글 테이블 (SPEC-STOCK-046, SPEC-STOCK-048).
+
+    # @MX:ANCHOR: [AUTO] 포트폴리오 댓글 핵심 엔티티
+    # @MX:REASON: sharing.py 서비스, public_router.py 엔드포인트에서 참조
+    # @MX:SPEC: SPEC-STOCK-046 REQ-CMT-001~010, SPEC-STOCK-048 REQ-REPLY-001~015
+
+    share_id: portfolio_shares.id FK (포트폴리오 공유 레코드 참조)
+    user_id: users.id FK (작성자)
+    content: 최대 500자 댓글 본문
+    parent_comment_id: 대댓글 대상 댓글 ID (NULL=최상위, 단일 레벨만 허용)
+    created_at: 생성 시각 (KST 변환은 서비스 레이어)
+    """
+
+    __tablename__ = "portfolio_comments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    share_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("portfolio_shares.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    # 댓글 본문 (최대 500자)
+    content: Mapped[str] = mapped_column(String(500), nullable=False)
+    # 대댓글 부모 ID: NULL이면 최상위 댓글, 값이 있으면 단일 레벨 대댓글 (SPEC-STOCK-048 REQ-REPLY-001)
+    parent_comment_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("portfolio_comments.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMPTZ(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    # 연관 관계
+    share: Mapped["PortfolioShare"] = relationship("PortfolioShare", back_populates="comments", lazy="noload")
+    author: Mapped["User"] = relationship("User", lazy="noload")
+    # 대댓글 목록 (서비스 레이어에서 배치 로딩, lazy="noload")
+    replies: Mapped[list["PortfolioComment"]] = relationship(
+        "PortfolioComment",
+        foreign_keys="PortfolioComment.parent_comment_id",
+        back_populates="parent",
+        lazy="noload",
+    )
+    parent: Mapped["PortfolioComment | None"] = relationship(
+        "PortfolioComment",
+        foreign_keys="PortfolioComment.parent_comment_id",
+        back_populates="replies",
+        remote_side="PortfolioComment.id",
+        lazy="noload",
+    )
+
+    __table_args__ = (
+        # (share_id, created_at) 인덱스: 최신순 조회 최적화
+        Index("ix_portfolio_comments_share_created", "share_id", "created_at"),
+        Index("ix_portfolio_comments_user_id", "user_id"),
+        # parent_comment_id 인덱스: 배치 대댓글 조회 최적화 (migration 0029)
+        Index("ix_portfolio_comments_parent_id", "parent_comment_id"),
+    )

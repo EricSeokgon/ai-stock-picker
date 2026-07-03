@@ -1,6 +1,6 @@
 # 섹터 트렌드 집계 서비스 단위 테스트 (SPEC-STOCK-008 TASK-007)
 import math
-from datetime import date, datetime, timezone
+from datetime import date
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

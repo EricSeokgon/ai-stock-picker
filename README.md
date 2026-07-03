@@ -4,6 +4,221 @@
 
 ## 핵심 기능
 
+### Phase 50: 거래 기반 홀딩스 동기화 (v0.50.0) — SPEC-STOCK-050
+- **거래 원장 기반 홀딩스 동기화**: 포트폴리오 거래 원장을 진실 소스로 삼아 이동평균 원가법으로 홀딩스를 재계산·동기화
+- **미리보기 API**: GET `/portfolios/{id}/holdings/sync/preview` (인증 필수) — 원장 파생 홀딩스 비교, added/updated/removed 분류, DB 미변경
+- **적용 API**: POST `/portfolios/{id}/holdings/sync` (인증 필수) — 원장 파생 값으로 홀딩스 upsert/remove
+- **이동평균 원가 계산**: 원장 리플레이, BUY·SELL 거래 처리, 원장 불일치 거부(409)
+- **프론트엔드 UI**: HoldingsSyncPanel — 미리보기 버튼, 차이 표시, 적용 버튼(리로드 없음)
+- **신규 테이블·마이그레이션 없음**: 기존 테이블 재사용
+- **단위 테스트 12개** (TDD): 백엔드 10 + 프론트엔드 2
+
+### Phase 49: 포트폴리오 거래 내역 & 실현손익 (v0.49.0) — SPEC-STOCK-049
+- **거래 기록 API**: POST `/portfolios/{id}/transactions` (인증 필수) — 매수/매도 거래 기록
+- **거래 내역 조회**: GET `/portfolios/{id}/transactions` (인증 필수) — 종목 필터, 페이지네이션
+- **실현손익 조회**: GET `/portfolios/{id}/transactions/pnl` (인증 필수) — 이동평균 원가법 실현손익 산출
+- **거래 삭제**: DELETE `/portfolios/{id}/transactions/{transaction_id}` (인증 필수)
+- **수치 앵커**: BUY 10@1000 · BUY 10@2000 · SELL 5@3000 → 실현손익 7,500원 ✓
+- **DB 마이그레이션 0030**: `portfolio_transactions` 테이블 신규
+- **단위 테스트 12개** (TDD): 백엔드 9 + 프론트엔드 3
+
+### Phase 48: 공유 포트폴리오 댓글 대댓글 (v0.48.0) — SPEC-STOCK-048
+- **댓글 대댓글 작성**: POST `/shared/{token}/comments` (parent_comment_id 선택) — 최상위 댓글에만 답글 허용
+- **중첩 조회**: GET `/shared/{token}/comments` — 최상위 댓글 페이지네이션 + 각 항목의 `replies` 배열(오래된순)
+- **대댓글 알림**: 부모 댓글 작성자에게 `portfolio_comment` 타입 알림, SPEC-047 딥링크 자동 적용
+- **1단계 스레딩**: 답글에 대한 답글 거부(HTTP 400/409)
+- **프론트엔드 UI**: 각 최상위 댓글에 답글 액션 제공, 새 답글 리로드 없이 표시
+- **DB 마이그레이션 0029**: `portfolio_comments.parent_comment_id` nullable self-FK 추가
+- **단위 테스트 12개** (TDD): 백엔드 9 + 프론트엔드 3
+
+### Phase 47: 공유 포트폴리오 알림 딥링크 (v0.47.0) — SPEC-STOCK-047
+- **알림 딥링크**: 좋아요/댓글 알림 클릭 시 해당 공유 포트폴리오로 즉시 이동
+- **백엔드 링크 산출**: 알림 응답에 nullable `link` 필드 추가, N+1 회피 배치 쿼리
+- **프론트엔드 UI**: 클릭 가능 알림, 읽음 처리 후 이동
+- **신규 테이블·마이그레이션 없음**: 기존 인프라 조인만 사용
+- **단위 테스트 14개** (TDD): 백엔드 10 + 프론트엔드 4
+
+### Phase 46: 공유 포트폴리오 댓글 (v0.46.0) — SPEC-STOCK-046
+- **공유 포트폴리오 댓글 작성**: POST `/shared/{token}/comments` (인증 필수) — 공유 포트폴리오에 댓글 작성, 소유자 자동 알림
+- **공유 포트폴리오 댓글 조회**: GET `/shared/{token}/comments` (무인증) — 댓글 목록 조회, 페이지네이션
+- **공유 포트폴리오 댓글 삭제**: DELETE `/shared/{token}/comments/{comment_id}` (인증 필수) — 작성자/소유자만 삭제 가능
+- **소프트 삭제**: `deleted_at` 타임스탬프로 논리 삭제 지원
+- **댓글 알림**: 댓글 작성 시 `portfolio_comment` 타입 알림 자동 생성
+- **알림 페이지 배지**: Notifications.tsx — `portfolio_comment` 타입 알림에 "댓글" 배지
+- **DB 마이그레이션 0028**: `portfolio_comments` 테이블 신규
+- **단위 테스트 25개** (TDD): 백엔드 19 + 프론트엔드 6 (CRUD, 소유권 검증, 알림)
+
+### Phase 45: 피드 디스커버리 강화 (v0.45.0) — SPEC-STOCK-045
+- **피드 트렌딩 정렬**: GET `/feed?sort=trending` — 최근 7일 조회수 기준 정렬
+- **피드 키워드 검색**: GET `/feed?q=keyword` — 포트폴리오명 부분 일치 검색
+- **복합 필터링**: 트렌딩 정렬과 검색 동시 지원
+- **프론트엔드 피드 강화**: 트렌딩 탭, 검색 입력폼
+- **단위 테스트 38개** (TDD): 백엔드 10 + 프론트엔드 4 + 회귀 24
+
+### Phase 44: 소셜 프론트엔드 완성 (v0.44.0) — SPEC-STOCK-044
+- **포트폴리오 좋아요 토글**: POST/DELETE `/shared/{share_token}/like` — optimistic UI 반영
+- **공유 통계 패널**: GET `/portfolios/{portfolio_id}/share/stats` — 지난 7일 일별 추이
+- **알림 배지 업데이트**: `portfolio_like` 타입 알림 배지 추가
+- **단위 테스트 15개**: 좋아요 토글·취소, 통계 조회 검증
+
+### Phase 43: 포트폴리오 공유 통계 & 좋아요 알림 (v0.43.0) — SPEC-STOCK-043
+- **공개 포트폴리오 좋아요 API**: POST `/shared/{share_token}/like` (인증 필수, 멱등)
+- **포트폴리오 좋아요 취소 API**: DELETE `/shared/{share_token}/like` (인증 필수)
+- **포트폴리오 공유 통계 조회**: GET `/portfolios/{portfolio_id}/share/stats` — 지난 7일 통계
+- **좋아요 알림 자동 생성**: `portfolio_like` 타입 알림
+- **DB 마이그레이션 0027**: `share_view_stats` 테이블 신규
+- **단위 테스트 24개**: 좋아요 멱등성, 통계 조회 검증
+
+### Phase 42: 포트폴리오 공유 & 소셜 (v0.42.0) — SPEC-STOCK-042
+- **공유 토큰 발급 API (멱등)**: POST `/portfolios/{id}/share` — 소유자 전용, 재호출 시 기존 토큰 재사용
+- **공유 비활성화 API**: DELETE `/portfolios/{id}/share` — is_public=False 설정, 토큰·통계 보존
+- **소유자 공유 상태 조회**: GET `/portfolios/{id}/share` — 현재 공유 상태·share_url·조회수·좋아요수 반환
+- **공개 읽기 전용 뷰**: GET `/shared/{share_token}` (무인증) — 보유 종목·수익률·조회수 노출, 원자적 view_count 증가
+- **좋아요 API**: POST `/shared/{share_token}/like` (인증 필수, 멱등) — 포트폴리오당 1회, 소유자 자기좋아요 403, 비인증 401
+- **디스커버리 피드**: GET `/feed` (무인증) — 공개 포트폴리오 목록, 좋아요순·최신순 정렬, 페이지네이션
+- **프라이버시 제어**: 비공개 공유 URL = 404 반환
+- **DB 마이그레이션 0026**: `portfolio_shares`(공유 토큰·공개 여부·조회수) + `portfolio_likes`(포트폴리오·유저 복합 UNIQUE) 신규
+- **프론트엔드 SharePanel**: 공유 링크 생성·복사·비활성화 UI
+- **프론트엔드 /feed 페이지**: 공개 포트폴리오 피드, 정렬 토글, 페이지네이션
+- **프론트엔드 /shared/:shareToken 페이지**: 읽기 전용 공유 포트폴리오 뷰, 좋아요 버튼
+- **단위 테스트 16개** (TDD, 16/16 통과): 공유 토큰 멱등성, 원자적 조회수, 좋아요 멱등성, 피드 정렬·페이지네이션 검증
+
+### Phase 41: 포트폴리오 목표 관리 (v0.41.0) — SPEC-STOCK-041
+- **포트폴리오 목표 관리 API**: POST/GET/DELETE `/portfolios/{id}/goals` — JWT 인증·소유권 검증 포함
+- **목표 달성률 자동 계산**: MIN(수량진전률, 수익률진전률) 방식, 음수는 0.0으로 클램프
+- **목표 달성 알림 스케줄러**: 60분 주기 check_portfolio_goals() — goal_reached_notified 플래그로 멱등성 보장
+- **소프트 삭제**: DELETE 시 is_active=False (물리삭제 없음)
+- **GET 응답 규칙**: 활성 목표 없을 시 HTTP 204 No Content (404나 빈 배열 아님)
+- **중복 방지**: 포트폴리오당 활성 목표 1개만 허용, 중복 시 409 Conflict
+- **DB 마이그레이션 0025**: portfolio_goals 테이블 신규 (target_amount, current_amount, target_return_pct, current_return_pct, goal_reached_notified)
+- **프론트엔드**: `PortfolioGoalPanel` 컴포넌트 — 목표 조회·생성·달성률 시각화·삭제 기능
+- **API 함수**: `api/portfolio.ts` getPortfolioGoals(), createGoal(), deleteGoal() 추가
+- **단위 테스트 25개** (TDD, 25/25 통과): CRUD, 달성률 계산, 소프트 삭제, 멱등성, 204 응답, 409 충돌 검증
+
+### Phase 40: AI 포트폴리오 코멘터리 (v0.40.0) — SPEC-STOCK-040
+- **AI 포트폴리오 코멘터리**: Claude API(claude-haiku-4-5)를 활용해 포트폴리오 현황·성과·리스크·섹터를 한국어 자연어 코멘터리로 요약
+- **인메모리 TTL 캐시**: 동일 포트폴리오 재호출 시 Claude 과호출 방지 (300초 TTL, Redis 미사용)
+- **대체 응답 지원**: Claude API 실패·타임아웃 시 사전 정의 코멘터리 반환, is_fallback 플래그 제공
+- **신규 엔드포인트**: `GET /portfolios/{id}/ai-commentary` — 인증 필요, 소유권 검증 포함
+- **신규 DB 테이블 없음**: 마이그레이션 0024 유지, 인메모리 캐시만 사용
+- **scipy 미사용**: 신규 수치 계산 의존성 없음
+- **프론트엔드**: `AICommentaryPanel` 자체 데이터 조회 컴포넌트 — 코멘터리·캐시 배지·대체 응답 배지·생성 시각 표시
+- **단위 테스트 15개** (TDD, 15/15 통과): 캐시 적중/만료, 소유권 검증, AI 실패 대체 응답, 면책 문구 포함 검증
+
+### Phase 39: 실시간 가격 폴링 & 자동 갱신 (v0.39.0)
+- KRX 장중(평일 09:00–15:30 KST)에만 REST 폴링으로 보유 종목 현재가 자동 갱신
+- 폴링 간격 30초/60초/120초 선택, 일시 중지/재개, 화면 이탈 시 자동 정리
+- 시장 상태 배지(장 중/장 마감) + 마지막 갱신 시각 표시
+- WebSocket 없음, scipy 없음, 신규 마이그레이션 없음
+
+### Phase 38: 시장 시각화 대시보드 (v0.38.0) — SPEC-STOCK-038
+- **포트폴리오 가치 추이·섹터 분포·자산 구성·시장 대비 성과를 통합 대시보드로 시각화**
+- **기간 선택 탭** (7일/30일/90일/365일), 각 차트 독립 로딩/빈 상태
+- **신규 DB 테이블 없음** — SPEC-034·035 기존 데이터 재사용
+- **Recharts 기반 반응형 그리드** (데스크탑 2×2, 모바일 1×4)
+- **차트 4종**: 가치 시계열 LineChart, 섹터 히트맵 BarChart, 자산유형 배분 PieChart, 벤치마크 비교 멀티라인
+- **백엔드 API 3종**: `/dashboard/value-series`, `/dashboard/sector-summary`, `/dashboard/asset-allocation`
+- **순수 함수 집계**: `filter_snapshots_by_range`, `aggregate_by_sector`, `aggregate_by_asset_type` (@MX:ANCHOR)
+- **테스트**: 22개 신규 단위 테스트
+
+### Phase 37: AI 종목 추천 고도화 (v0.37.0) — SPEC-STOCK-037
+- **포트폴리오 맥락 인식 개인화 추천**: 사용자 보유 종목·섹터·수익률 등 포트폴리오 상태를 Claude API 프롬프트에 통합하여 더 관련성 높은 종목 추천
+- **추천 근거 구조화** (reason/risk_factors/fit_score): 추천 종목이 왜 추천되었는지 명확하게 전달. fit_score 0.0~1.0으로 포트폴리오 적합도 수치화
+- **좋아요·싫어요 선호 저장 및 반영**: SELECT-then-write 모델로 사용자가 이전 추천을 거절하거나 선택한 내역을 저장했다가, 다음 추천 시 자동 반영
+- **섹터 과집중(50% 초과) 자동 필터링**: 포트폴리오 내 한 섹터 비중이 50% 초과면 해당 섹터 종목 추천 제외
+- **추천 이력 조회 API**: `GET /portfolios/{id}/recommendations/history` — 사용자가 선택·거절한 종목의 전체 이력 조회 및 분석
+- **DB 마이그레이션 0024**: user_recommendation_preferences, recommendation_history 신규 테이블
+- **순수 함수 기반 로직**: apply_preference_filter, rank_by_portfolio_context, build_portfolio_context_prompt
+- 24개 단위 테스트
+
+### Phase 36: 포트폴리오 알림 확장 (v0.36.0) — SPEC-STOCK-036
+- **평가액 임계 알림** (`portfolio_value_below`): 포트폴리오 총 평가액이 KRW 임계값 이하로 내려갈 때 알림
+- **개별 종목 수익률 임계 알림** (`holding_return`): 보유 중인 개별 종목의 수익률이 조건(상향/하향)을 만족할 때 알림
+- **즉시 평가 엔드포인트**: `POST /portfolios/{id}/alerts/evaluate` — 알림 규칙을 즉시 평가, 발화 테스트
+- **이력 조회 엔드포인트**: `GET /portfolios/{id}/alerts/history` — 알림 발화 이력 조회
+- SPEC-031 인프라 재사용: 신규 테이블 없이 nullable 컬럼 2개만 추가
+- 26개 단위 테스트 (TDD)
+
+### Phase 35: 포트폴리오 성과 리포트 자동 생성 (v0.35.0)
+- **CSV 보유 손익표 다운로드**: 종목별 평균단가·현재가·평가손익·수익률·비중 (8열, stdlib csv 전용)
+- **JSON 통합 요약**: 기간 수익률·배당·벤치마크 집계 (선택적 포함)
+- **월별 스냅샷 영속화**: upsert로 중복 방지, migration 0022
+- **커스텀 날짜 범위 리포트**: "custom:{시작일}~{종료일}" 형식 기간 식별자
+
+### Phase 34: 포트폴리오 벤치마크 비교 (v0.34.0)
+- **벤치마크 비교 API**: 4종 시장 지수 대비 포트폴리오 성과 분석 (KOSPI·KOSDAQ·S&P500·NASDAQ)
+- **성과 지표**: 알파(연환산 초과수익률) 및 베타(포트폴리오·벤치마크 공분산 / 벤치마크 분산) 산출
+- **차트 데이터**: 100 기준 재기준화 포트폴리오·벤치마크 동시 인덱싱 (기간 내 가격 변동 비교 가능)
+- **소유권 검증**: 포트폴리오 없거나 타 사용자 소유 시 HTTP 404
+- **Graceful degradation**: 벤치마크 데이터 미제공 시 None으로 반환, 전체 에러 없음
+- **순수 함수**: scipy 금지, numpy + math 전용 (`calculate_beta`, `calculate_benchmark_comparison`, `calculate_benchmark_chart`)
+- **프론트엔드**: BenchmarkComparisonPanel(요약 지표) + BenchmarkChartView(100 기준 재기준화 차트) 신규 컴포넌트
+- **테스트**: 49개 단위 테스트 (96% 커버리지)
+
+### Phase 33: 배당 수익률 분석 강화 (v0.33.0)
+- **배당 분석 강화**: 가중 배당 수익률, 날짜 정밀 캘린더, DRIP 재투자 복리 시뮬레이션 (SPEC-033)
+- **배당 요약 API**: `GET /portfolios/{id}/dividend/summary` — 포트폴리오 가중 평균 배당 수익률·연간 배당 수입
+- **배당 캘린더 API**: `GET /portfolios/{id}/dividend/calendar` — 월별 배당 지급 예상액
+- **DRIP 시뮬레이터 API**: `GET /portfolios/{id}/dividend/drip` — N년 투영, 재투자 비율(0~100%) 설정
+- **순수 함수**: scipy 미사용, numpy + math only, DB 테이블 없음
+- **SPEC-019 재사용**: 기존 `get_dividend_info` 및 Redis 캐시 재활용
+- **프론트엔드**: DividendSummaryPanel(요약), DividendCalendarView(캘린더), DRIPSimulator(시뮬레이터)
+- **테스트**: 35개 단위 테스트 (98% 커버리지)
+
+### Phase 32: 포트폴리오 리밸런싱 자동화 (v0.32.0)
+- **리밸런싱 자동화**: AI 목표 비중 → 실행 가능한 매수/매도 주수 계획서 산출 (예산·수수료 반영)
+- **주문 계획서 API**: `POST /portfolios/{id}/rebalance/calculate` 미리보기 + `GET /portfolios/{id}/rebalance/orders` 저장된 계획 조회
+- **수수료 반영**: 국내 0.015%, 해외 0.25% 자동 계산
+- **정수 주수 처리**: 소수점 이상 제거로 실행 가능한 주문만 제시
+- **매수 우선 전략**: 언더웨이트 종목 매수 → 오버웨이트 종목 매도 → 홀드 순서 정렬
+- **Dry-run 모드**: 계획 미리보기 후 명시적 저장
+- **프론트엔드**: RebalancingOrderPanel 컴포넌트 — 주문 목록 + 매수/매도 규모 시각화
+
+### Phase 31: 포트폴리오 알림 강화 (v0.31.0)
+- **포트폴리오 알림**: 목표 수익률 도달 / MDD 임계값 초과 시 자동 알림 (이메일·텔레그램·인박스)
+- **알림 CRUD API**: `/portfolios/{id}/alerts` 엔드포인트로 알림 설정·조회·수정·삭제
+- **스케줄러 통합**: 10분 주기 점검으로 조건 도달 시 자동 발송
+- **YTD 기간 기준**: SPEC-030 성과 요약 데이터 재사용
+
+### Phase 30: 포트폴리오 기간별 성과 요약 (v0.30.0)
+- **성과 요약 엔드포인트**: `GET /portfolios/{id}/performance-summary?refresh={bool}` — YTD·1M·3M·6M·1Y 5개 표준 기간의 총수익률·연환산수익률·MDD를 한 번의 요청으로 일괄 반환
+- **연환산수익률**: `((종료가치/시작가치)^(252/거래일수) - 1) × 100` — 252 거래일 기준 연환산, 기간 길이에 무관하게 비교 가능한 수익률
+- **최대낙폭(MDD)**: `min((가치[t] - 이전최고가치) / 이전최고가치) × 100` — `calculate_max_drawdown` 재사용(backtest/metrics.py)
+- **KRX + 해외 자산**: NYSE/NASDAQ 종목은 USD 종가를 `get_usd_krw_rate(redis)`로 원화 환산 후 통합 계산, 환율 조회 실패 시 1350.0 fallback
+- **부분 결과 허용**: 유효 거래일 2일 미만 기간은 `has_data=false`로 표시, 전체 에러 없이 나머지 기간 정상 반환
+- **Redis 캐시**: 키=`portfolio_perf_summary:{id}:{YYYY-MM-DD}`, TTL=3600s, `?refresh=true` 강제 갱신
+- **numpy 전용 계산**: scipy 미추가(NFR-001), SPEC-027·028·029 패턴과 일관성 유지
+- **53개 단위 테스트**: 커버리지 91.62%(목표 85% 초과) — 기간 산출·수익률 계산·캐시 경로·소유권·부분 결과 전체 검증
+- **프론트엔드**: `PerformanceSummaryPanel` — 5개 기간 카드 그리드, 양수 녹색·음수 적색, `has_data=false` 시 "데이터 없음" 표시
+
+### Phase 29: 포트폴리오 백테스팅 (v0.29.0)
+- **백테스팅 엔드포인트**: `POST /portfolios/{id}/backtest` — 보유 포트폴리오를 지정 기간 그대로 보유했다고 가정한 buy-and-hold 수익률 시뮬레이션, FDR 실제 시세 기반
+- **일별·누적 수익률**: 기간 내 매 거래일의 포트폴리오 가치 변화를 일별 수익률(`daily_return_pct`)·누적 수익률(`cumulative_return_pct`)로 산출
+- **주요 지표**: MDD(최대 낙폭, `calculate_max_drawdown` 재사용)·샤프 비율(무위험수익률 3.5%, `calculate_sharpe_ratio` 재사용)·총 수익률(`calculate_total_return` 재사용)
+- **KRX + 해외 자산**: NYSE/NASDAQ 종목은 USD 종가를 `get_usd_krw_rate(redis)`로 원화 환산 후 통합 계산, 환율 조회 실패 시 1350.0 fallback
+- **거래일 내부 조인**: `_align_close_series()` — KRX·NYSE/NASDAQ 거래일 불일치를 공통 거래일 교집합으로 정규화
+- **부분 결과 허용**: FDR 조회 실패 종목은 `excluded_tickers`로 분리, 유효 종목만으로 시뮬레이션 계속 진행 (전 종목 실패 시만 422)
+- **비차단 FDR 조회**: `asyncio.gather` + `run_in_executor` 병렬 패치, 이벤트 루프 블로킹 없음
+- **투자 고지 면책 조항**: 모든 응답에 `disclaimer` 필드 포함 — '투자 권유가 아니며 정보 제공 목적' 문구 법적 요건 준수
+- **numpy 전용 계산**: scipy 미추가, 기존 `backtest/metrics.py` 순수 함수 재사용 (`portfolio/backtest.py` 독립 모듈)
+- **프론트엔드**: `BacktestPanel`(기간 입력·요약 카드) + `BacktestChart`(Recharts 일별/누적 수익률 라인 차트) 신규 컴포넌트
+
+### Phase 28: 해외 자산(NYSE/NASDAQ) 지원 (v0.28.0)
+- **해외 자산 DB 확장**: `portfolio_holdings` 테이블에 `market` (KRX/NYSE/NASDAQ) · `currency` (KRW/USD) 컬럼 추가 — Alembic 마이그레이션 0019, 기존 KRX 데이터 하위호환 보존
+- **USD/KRW 환율 서비스** (`fx_rate.py` 신규): FinanceDataReader 기반 실시간 환율 조회, Redis TTL=3600s 캐시, 취득 실패 시 fallback 1350.0
+- **KRW 통합 계산**: 모든 포트폴리오 계산(성과·리스크·AI 최적화)에서 USD 포지션을 `avg_buy_price × quantity × fx_rate`로 원화 환산 후 통합 처리
+- **스키마 확장**: `HoldingCreate`·`HoldingResponse`에 `market`·`currency` 필드 추가. `HoldingPerformance.current_value_krw` — USD 포지션의 원화 환산 현재가
+- **마켓 검증**: KRX→KRW, NYSE/NASDAQ→USD 조합만 허용. 불일치 시 400 거부
+- **프론트엔드 UI**: 종목 추가 시 마켓 선택(KRX/NYSE/NASDAQ) + 통화 자동 설정, NYSE·NASDAQ 포지션에 주황색 배지 표시, `≈₩XXX,XXX (@환율)` 원화 환산 현재가 표시
+- **유니크 제약**: `(portfolio_id, krx_code, market)` 복합 유니크 — 동일 티커를 마켓별로 구분 보유 가능
+
+### Phase 27: 리스크 분석 및 상관관계 매트릭스 (v0.27.0)
+- **리스크 분석 엔드포인트**: `GET /portfolios/{id}/risk-analysis?period={30|60|90|180|252}&refresh={bool}` — 상관관계 매트릭스·종목별 연환산 변동성·포트폴리오 변동성·분산투자 효익 반환, Redis TTL=3600s 캐시
+- **numpy 전용 계산**: scipy 미추가, `np.corrcoef`(상관계수)·`np.cov`(공분산)·`np.std × √252 × 100`(연환산 변동성)·`sqrt(wᵀ·Σ·w) × √252`(포트폴리오 변동성) 사용
+- **분산투자 효익**: `max(0, (1 - port_vol / weighted_avg_vol) × 100)` — 포트폴리오가 개별 종목 평균 변동성 대비 얼마나 위험을 줄였는지 표시
+- **상관관계 히트맵 UI**: `RiskAnalysisPanel` — CSS 기반 blue(-1)→white(0)→red(+1) 히트맵 + 종목별 변동성 테이블 + 기간 선택기(30/60/90/180/252일)
+- **Redis 캐시**: 키=`portfolio_risk:{id}:{period}:{date}`, TTL=3600s, `?refresh=true` 강제 갱신
+
 ### Phase 26: 포트폴리오 AI 최적화 (v0.26.0)
 - **AI 최적화 엔드포인트**: `POST /portfolios/{id}/optimize?refresh={bool}` — 포트폴리오 종합 점수(0-100)·리밸런싱 액션·신규 추천 종목 반환, Redis TTL=3600s 캐시
 - **처방형 분석**: `OptimizeResult` — 종합 점수 + `ScoreBreakdown`(분산도·리스크균형·모멘텀 각 0-100) + 목표비중(`TargetWeightItem`) + 신규 추천(`NewStockItem` 최대 5종목)
@@ -284,7 +499,9 @@ docker pull ghcr.io/{owner}/ai-stock-picker-backend:sha-abc123
 | **테스트** | pytest 7.x, Playwright, @testing-library/react |
 | **배포** | Docker, docker-compose |
 
-## 주요 업데이트 (최신: Phase 24 - 알림 채널 연결)
+## 주요 업데이트 (최신: Phase 33 - 배당 수익률 분석 강화)
+
+**[0.33.0] - 2026-06-24** (SPEC-STOCK-033): 배당 수익률 분석 강화 — 가중 배당 수익률·DRIP 복리 시뮬레이션·날짜 정밀 캘린더 3개 API 신규
 
 **[0.24.0] - 2026-06-16** (SPEC-STOCK-024): 알림 채널 연결 — 이메일·텔레그램을 alerts·rec_change 경로에 배선, 텔레그램 Bot API 실제 발송 구현
 
@@ -453,6 +670,16 @@ curl -X POST http://localhost:8000/health
 | `DELETE` | `/portfolios/{id}/holdings/{holding_id}` | 종목 제거 |
 | `GET` | `/portfolios/{id}/performance` | 포트폴리오 성과 분석 |
 | `POST` | `/portfolios/{id}/ai-analysis` | 포트폴리오 AI 분석 (claude-haiku-4-5) (Phase 4 신규) |
+
+### 공개 포트폴리오 공유 (Public Portfolio Sharing) — Phase 42·43 신규 (SPEC-STOCK-042·043)
+
+| 메서드 | 경로 | 설명 | 응답 |
+|--------|------|------|------|
+| `GET` | `/shared/{share_token}` | 공개 포트폴리오 읽기 전용 뷰 (무인증) | `{ portfolio_id, name, holdings, view_count, like_count, ... }` |
+| `POST` | `/shared/{share_token}/like` | 공개 포트폴리오 좋아요 (인증 필수) | `{ status: "liked"/"already_liked", like_count }` |
+| `DELETE` | `/shared/{share_token}/like` | 공개 포트폴리오 좋아요 취소 (인증 필수) | `{ status: "unliked", like_count }` |
+| `GET` | `/portfolios/{portfolio_id}/share/stats` | 포트폴리오 공유 통계 조회 — 지난 7일 (인증·소유권 필수) | `{ portfolio_id, stats: [ { date, view_count, like_count } ] }` |
+| `GET` | `/feed` | 공개 포트폴리오 디스커버리 피드 (무인증, `sort=trending|recent`, `q=keyword` 검색 지원) | `{ portfolios: [ { portfolio_id, owner_name, view_count, like_count, ... } ], page }` |
 
 ### 백테스팅 (Backtesting) — Phase 13 완성 (SPEC-STOCK-012)
 

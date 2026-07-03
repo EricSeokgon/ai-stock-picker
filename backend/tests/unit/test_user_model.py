@@ -1,6 +1,5 @@
 # User ORM 모델 단위 테스트 (RED 단계)
-import pytest
-from sqlalchemy import inspect, UniqueConstraint
+from sqlalchemy import inspect
 
 from stock_picker.db.models import User
 

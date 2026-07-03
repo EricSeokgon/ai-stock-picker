@@ -161,8 +161,9 @@ class TestGetPreferences:
         from stock_picker.notifications.preferences import get_preferences, SUPPORTED_ALERT_TYPES
         result = asyncio.run(get_preferences(session, 1))
 
-        assert len(result) == 7
-        # 7개 유형 모두 포함 확인
+        # SUPPORTED_ALERT_TYPES 개수와 일치 (SPEC-031에서 2개 추가되어 9개)
+        assert len(result) == len(SUPPORTED_ALERT_TYPES)
+        # 모든 유형 포함 확인
         result_types = {item["alert_type"] for item in result}
         assert result_types == set(SUPPORTED_ALERT_TYPES)
 
@@ -177,13 +178,16 @@ class TestGetPreferences:
         assert volume["telegram_enabled"] is True
 
     def test_설정없으면_전부기본값(self):
-        """설정 행 전혀 없을 때 7개 모두 기본값 True."""
+        """설정 행 전혀 없을 때 SUPPORTED_ALERT_TYPES 개수만큼 기본값 True."""
         session = _make_async_session(multi_results=[])
 
-        from stock_picker.notifications.preferences import get_preferences
+        from stock_picker.notifications.preferences import (
+            SUPPORTED_ALERT_TYPES,
+            get_preferences,
+        )
         result = asyncio.run(get_preferences(session, 1))
 
-        assert len(result) == 7
+        assert len(result) == len(SUPPORTED_ALERT_TYPES)
         assert all(item["email_enabled"] is True for item in result)
         assert all(item["telegram_enabled"] is True for item in result)
 

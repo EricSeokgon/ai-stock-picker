@@ -1,9 +1,9 @@
 ---
 id: SPEC-STOCK-027
 version: 0.1.0
-status: draft
+status: completed
 created: 2026-06-17
-updated: 2026-06-17
+updated: 2026-06-18
 author: ircp
 priority: High
 issue_number: null

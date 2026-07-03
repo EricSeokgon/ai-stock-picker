@@ -217,8 +217,8 @@ export default function Screener() {
   }
 
   const sortedResults = [...results].sort((a, b) => {
-    const av = (a as Record<string, unknown>)[sortBy] as number | null;
-    const bv = (b as Record<string, unknown>)[sortBy] as number | null;
+    const av = (a as unknown as Record<string, unknown>)[sortBy] as number | null;
+    const bv = (b as unknown as Record<string, unknown>)[sortBy] as number | null;
     if (av == null && bv == null) return 0;
     if (av == null) return 1;
     if (bv == null) return -1;

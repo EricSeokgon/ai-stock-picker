@@ -1,6 +1,6 @@
 # 가격 알림 서비스 유닛 테스트 — mock DB 사용
 from datetime import datetime
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -39,8 +39,6 @@ class TestCreateAlert:
         db = MagicMock()
         data = WatchlistAlertCreate(krx_code="005930", target_price=80000.0, direction="above")
 
-        # db.refresh가 alert 객체를 그대로 반환하도록 설정
-        created_alert = _make_alert()
         db.refresh.side_effect = lambda x: None
 
         # add → commit → refresh 순서
@@ -49,6 +47,14 @@ class TestCreateAlert:
         db.add.assert_called_once()
         db.commit.assert_called_once()
         db.refresh.assert_called_once()
+
+        # 반환값이 요청 데이터로 채워진 WatchlistAlert여야 한다
+        assert isinstance(result, WatchlistAlert)
+        assert result.user_id == 1
+        assert result.krx_code == "005930"
+        assert result.target_price == 80000.0
+        assert result.direction == "above"
+        assert result.is_active is True
 
     def test_sets_correct_fields(self):
         """생성된 알림의 필드값 검증"""

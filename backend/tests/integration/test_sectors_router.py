@@ -1,8 +1,7 @@
 # 섹터 랭킹/상세 API 통합 테스트 (SPEC-STOCK-008 TASK-007)
 from datetime import date, datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from fastapi.testclient import TestClient
 
 

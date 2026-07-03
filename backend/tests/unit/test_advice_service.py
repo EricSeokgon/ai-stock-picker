@@ -1,10 +1,7 @@
 # advice 서비스 단위 테스트 — SPEC-STOCK-014 M2-M5
 # RED 단계: 리밸런싱·리스크·브리핑·이력·피드백 서비스 로직 검증
-import json
-from datetime import date, datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
-import pytest
 
 
 class TestBuildHoldingsSummary:

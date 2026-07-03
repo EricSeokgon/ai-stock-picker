@@ -22,11 +22,9 @@ vi.mock('../api/watchlist', () => ({
   deleteAlert: vi.fn(),
 }));
 
-// LivePriceBadge 모킹 (WebSocket 방지)
-vi.mock('../components/LivePriceBadge', () => ({
-  LivePriceBadge: ({ krxCode }: { krxCode: string }) => (
-    <span data-testid={`live-price-${krxCode}`}>시세 조회 중...</span>
-  ),
+// useLivePrices 모킹 (WebSocket 방지, SPEC-STOCK-016 M5 멀티플렉스 훅으로 전환됨)
+vi.mock('../hooks/useLivePrices', () => ({
+  useLivePrices: () => ({}),
 }));
 
 // Navigate 모킹
@@ -93,7 +91,7 @@ describe('Watchlist', () => {
     });
   });
 
-  it('각 종목에 LivePriceBadge가 렌더링된다', async () => {
+  it('각 종목에 실시간 시세 영역이 렌더링된다', async () => {
     mockGetWatchlist.mockResolvedValue([
       { id: 1, krx_code: '005930', created_at: '2024-01-01' },
     ]);
@@ -105,7 +103,9 @@ describe('Watchlist', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('live-price-005930')).toBeDefined();
+      expect(screen.getByText('005930')).toBeDefined();
+      // useLivePrices가 빈 맵을 반환하므로 아직 시세를 못 받은 상태 표시를 확인
+      expect(screen.getByText('로딩 중...')).toBeDefined();
     });
   });
 });

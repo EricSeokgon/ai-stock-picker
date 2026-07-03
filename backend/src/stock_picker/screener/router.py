@@ -1,7 +1,7 @@
 # 스크리너 라우터 — SPEC-STOCK-018 REQ-SCR-API-001~005
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 
 from stock_picker.auth.dependencies import get_current_user, get_db_session

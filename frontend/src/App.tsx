@@ -30,6 +30,8 @@ import NotificationsPage from './pages/Notifications';
 import AdviceHistory from './pages/AdviceHistory';
 import Screener from './pages/Screener';
 import AlertsPage from './pages/Alerts';
+import Feed from './pages/Feed';
+import SharedPortfolio from './pages/SharedPortfolio';
 import { fetchUnreadCount } from './api/notifications';
 
 const API_BASE_DASHBOARD = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
@@ -146,6 +148,7 @@ function NavBar() {
         <Link to="/portfolio" style={linkStyle} onClick={handleLinkClick}>포트폴리오</Link>
         <Link to="/backtest" style={linkStyle} onClick={handleLinkClick}>백테스트</Link>
         <Link to="/screener" style={linkStyle} onClick={handleLinkClick}>스크리너</Link>
+        <Link to="/feed" style={linkStyle} onClick={handleLinkClick}>피드</Link>
         {isAuthenticated && <Link to="/watchlist" style={linkStyle} onClick={handleLinkClick}>관심 목록</Link>}
         {isAuthenticated && <Link to="/settings" style={linkStyle} onClick={handleLinkClick}>설정</Link>}
         {isAuthenticated && <Link to="/advice/history" style={linkStyle} onClick={handleLinkClick}>AI 조언</Link>}
@@ -502,6 +505,8 @@ export default function App() {
         <Route path="/alerts" element={
           <ProtectedRoute><AlertsPage /></ProtectedRoute>
         } />
+        <Route path="/feed" element={<Feed />} />
+        <Route path="/shared/:shareToken" element={<SharedPortfolio />} />
       </Routes>
     </div>
   );

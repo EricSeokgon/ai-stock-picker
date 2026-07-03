@@ -12,15 +12,12 @@ from datetime import datetime, timezone
 # ---- 모델/스키마 임포트 (아직 존재 안 함 → RED) ----
 from stock_picker.notifications.general_alert_service import (
     AlertCreate,
-    AlertUpdate,
     AlertSchema,
     check_target_price,
     check_surge_drop,
     build_notification_payload,
     create_alert,
     get_user_alerts,
-    get_alert,
-    update_alert,
     delete_alert,
     check_and_trigger_all_alerts,
 )

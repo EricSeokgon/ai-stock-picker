@@ -1,9 +1,7 @@
 # 백테스트 runner 유닛 테스트 — 벤치마크 실패 처리, 상태 전환 (T-022)
-import asyncio
 from datetime import date
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -61,7 +59,6 @@ class TestRunnerStatusTransitions:
         with patch("stock_picker.backtest.runner._fetch_price_data", return_value={}), \
              patch("stock_picker.backtest.runner._fetch_benchmark_data", return_value=None):
 
-            db_url = "sqlite://"
             # run_backtest는 async이므로 asyncio.run으로 실행
             # DB URL을 실제 엔진과 연결하기 위해 직접 Session 사용
             from stock_picker.backtest.runner import _update_status, _save_results

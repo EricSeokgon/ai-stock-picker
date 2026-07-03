@@ -1,14 +1,10 @@
 # 추천 변동 감지 유닛 테스트 (SPEC-STOCK-013 REQ-RC-001~007)
 from datetime import date
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
-import pytest
 
 from stock_picker.notifications.rec_change import (
     _get_latest_two_trade_dates,
-    _get_rec_codes_for_date,
-    _get_users_watching,
-    _insert_notification_safe,
     check_rec_changes,
 )
 

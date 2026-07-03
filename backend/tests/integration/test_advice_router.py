@@ -3,7 +3,6 @@
 from datetime import date, datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 
@@ -57,8 +56,6 @@ class TestRebalanceEndpoint:
 
     def test_returns_200_with_actions(self):
         """리밸런싱 제안이 actions 포함 200을 반환해야 한다"""
-        import json as json_mod
-
         session = AsyncMock()
         # ai_advice 존재 여부 조회 → None (신규 생성)
         mock_result_none = MagicMock()
@@ -74,13 +71,6 @@ class TestRebalanceEndpoint:
         mock_holdings_result.scalars.return_value.all.return_value = [
             MagicMock(krx_code="005930", quantity=10, avg_buy_price=70000.0)
         ]
-        # ai_advice insert → mock object
-        mock_advice = _make_advice_mock(
-            aid=1,
-            advice_type="rebalance",
-            payload=json_mod.dumps({"actions": [{"krx_code": "005930", "action": "hold", "reason": "안정"}]}),
-        )
-
         call_count = [0]
         async def side_effect_execute(stmt, *args, **kwargs):
             c = call_count[0]

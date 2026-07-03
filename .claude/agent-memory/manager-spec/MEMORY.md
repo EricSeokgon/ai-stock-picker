@@ -1,1 +1,13 @@
 - [Stock Picker SPEC Conventions](stock-picker-spec-conventions.md) — SPEC-STOCK-NNN numbering, Korean spec body, permanent auto-trading exclusion
+- [Project SPEC-STOCK-036](project_stock_036.md) — 포트폴리오 알림 확장: SPEC-031 인프라 재사용, 값/종목 임계 2종 신규(신규 테이블 없음)
+- [Project SPEC-STOCK-037](project_stock_037.md) — AI 추천 고도화: 포트폴리오 인식·구조화 근거·사용자 선호 학습, 신규 마이그 0024(2종 테이블), ai_analysis.py 확장
+- [Project SPEC-STOCK-041](project_stock_041.md) — 포트폴리오 목표 관리: 목표 CRUD·달성률·달성 알림, 신규 마이그 0025(테이블 1개), 작업지시 경로 오류 2건 정정
+- [Project SPEC-STOCK-042](project_stock_042.md) — 포트폴리오 공유 & 소셜: 공유링크·조회/좋아요·디스커버리 피드, 신규 마이그 0026(테이블 2개), share_token=secrets.token_urlsafe
+- [Project SPEC-STOCK-043](project_stock_043.md) — 공유 알림&소셜 확장(042 후속): unlike·좋아요 인앱알림·조회수 일별통계, 마이그 0027(테이블 1개), 알림 krx_code=f"P{id}" UNIQUE충돌 회피
+- [Project SPEC-STOCK-044](project_stock_044.md) — 소셜 프론트엔드 완성(043 후속): unlike 토글·7일 조회통계 패널·portfolio_like 뱃지, 프론트 전용(신규 마이그 0), 좋아요=세션로컬 옵티미스틱(공개뷰 무인증→liked_by_me 없음)
+- [Project SPEC-STOCK-045](project_stock_045.md) — 피드 디스커버리 강화: /feed 트렌딩 정렬(7일 조회합계)·이름 검색(q ILIKE), share_view_stats(0027) 재사용 신규 마이그 0, REQ-FEED-002~010
+- [Project SPEC-STOCK-046](project_stock_046.md) — 공유 포트폴리오 댓글(소셜아크 042~045 후속): 작성/목록/삭제+소유자 알림, 신규 테이블 portfolio_comments(마이그 0028, share_id FK), 알림 일별멱등, REQ-COMMENT-001~021
+- [Project SPEC-STOCK-047](project_stock_047.md) — 알림 딥링크(046 §2.2 이연): 좋아요/댓글 알림에 link `/shared/{token}` 동적산출, 신규 마이그 0(조회조인만), inbox_router는 async(sync sharing 재사용 금지), REQ-NLINK-001~011
+- [Project SPEC-STOCK-048](project_stock_048.md) — 댓글 대댓글(046 확장, 소셜아크 완결): 1단계 스레드, portfolio_comments에 self-FK parent_comment_id 컬럼1개(마이그 0029), 알림 규약재사용→047 딥링크 자동, 댓글서비스 sync유지, REQ-REPLY-001~015
+- [Project SPEC-STOCK-049](project_stock_049.md) — 거래 원장 & 실현손익(신규 도메인, 소셜아크 후): 신규 테이블 portfolio_transactions(마이그 0030), 이동평균 원가법, sync 서비스, 독립원장(홀딩스 자동동기화X), REQ-TXN-001~016
+- [Project SPEC-STOCK-050](project_stock_050.md) — 거래 기반 홀딩스 동기화(049 첫 이연항목): 원장→홀딩스 이동평균 재계산, 미리보기 diff+적용, 신규 테이블 0(txn 0030+holdings 028 재사용), 명시적 동기화만(049 트리거X), REQ-SYNC-001~016. ※049 실제모델=txn_type/price(18,2)/txn_date/no fee·market, 소유권 403

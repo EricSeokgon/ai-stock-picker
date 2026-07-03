@@ -1,6 +1,6 @@
 # RecommendationCache 단위 테스트 (파생 캐시 메서드 포함)
 import json
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 

@@ -76,7 +76,6 @@ def test_fetch_dividend_info_returns_unavailable_when_no_row():
 
 def test_fetch_dividend_info_returns_unavailable_when_dps_nan():
     """FDR 결과에서 DPS가 NaN이면 dividend_available=False를 반환한다."""
-    import math
 
     import pandas as pd
 

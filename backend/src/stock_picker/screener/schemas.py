@@ -1,5 +1,4 @@
 # 스크리너 Pydantic 스키마 — SPEC-STOCK-018
-import json
 from typing import Any
 
 from pydantic import BaseModel, Field, model_validator

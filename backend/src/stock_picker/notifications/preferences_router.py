@@ -12,7 +12,6 @@ from stock_picker.auth.dependencies import get_current_user
 from stock_picker.db.models import User
 from stock_picker.db.session import get_session
 from stock_picker.notifications.preferences import (
-    SUPPORTED_ALERT_TYPES,
     get_preferences,
     upsert_preferences,
 )

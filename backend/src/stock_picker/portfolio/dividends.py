@@ -125,6 +125,7 @@ def _extract_ex_month(row: Any) -> int | None:
             continue
         try:
             import pandas as pd
+
             ts = pd.Timestamp(val)
             if pd.isna(ts):
                 continue
@@ -235,17 +236,19 @@ async def calculate_portfolio_dividends(
         annual_income = (dps * float(h.quantity)) if dps is not None else 0.0
         invested = float(h.avg_buy_price) * float(h.quantity)
 
-        holding_results.append(HoldingDividend(
-            krx_code=h.krx_code,
-            name=div.get("name"),
-            quantity=int(h.quantity),
-            dps=dps,
-            dividend_yield=div_yield,
-            ex_dividend_month=ex_month,
-            annual_income=annual_income,
-            yoy_dps_change_pct=div.get("yoy_dps_change_pct"),
-            dividend_available=available,
-        ))
+        holding_results.append(
+            HoldingDividend(
+                krx_code=h.krx_code,
+                name=div.get("name"),
+                quantity=int(h.quantity),
+                dps=dps,
+                dividend_yield=div_yield,
+                ex_dividend_month=ex_month,
+                annual_income=annual_income,
+                yoy_dps_change_pct=div.get("yoy_dps_change_pct"),
+                dividend_available=available,
+            )
+        )
 
         total_income += annual_income
 
@@ -263,9 +266,7 @@ async def calculate_portfolio_dividends(
             calendar_map[ex_month]["total_income"] += annual_income
 
     weighted_avg_yield = (
-        weighted_yield_sum / total_invested_for_yield
-        if total_invested_for_yield > 0
-        else 0.0
+        weighted_yield_sum / total_invested_for_yield if total_invested_for_yield > 0 else 0.0
     )
 
     # 캘린더 정렬 (월 순서)

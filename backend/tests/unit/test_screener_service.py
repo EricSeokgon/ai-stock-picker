@@ -1,7 +1,7 @@
 # 스크리너 서비스 유닛 테스트 — TDD RED 단계
 # REQ-SCR-001~007, REQ-SCR-PRESET-001~006
 from datetime import date
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 

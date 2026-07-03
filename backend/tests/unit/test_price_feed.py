@@ -1,8 +1,7 @@
 # price_feed 유닛 테스트 — FinanceDataReader mock
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pandas as pd
-import pytest
 
 
 class TestGetCurrentPrice:
@@ -78,3 +77,6 @@ class TestGetCurrentPrice:
 
         assert "035420" in price_feed._price_cache
         assert price_feed._price_cache["035420"]["price"] == 11000.0
+        # 반환값도 캐시에 저장된 내용과 일치해야 한다
+        assert result is not None
+        assert result["price"] == 11000.0

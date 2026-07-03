@@ -43,10 +43,9 @@ async def get_optional_user(
         return None
     try:
         from stock_picker.auth.service import decode_token
-        payload = decode_token(credentials.credentials)
-        # payload에서 user_id 또는 sub 추출
-        # decode_token이 TokenPayload를 반환한다고 가정 (sub=username)
-        # 실제 user_id는 DB 조회 없이는 알 수 없으므로 None 반환 (익명 취급)
+        # 토큰 유효성만 검증 (서명·만료) — 실제 user_id는 DB 조회 없이는
+        # 알 수 없으므로 payload 값과 무관하게 None 반환 (익명 취급)
+        decode_token(credentials.credentials)
         return None
     except Exception:
         return None

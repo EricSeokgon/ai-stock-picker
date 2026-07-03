@@ -33,6 +33,9 @@ SUPPORTED_ALERT_TYPES: tuple[str, ...] = (
     "rec_new",
     "rec_dropped",
     "rec_score_change",
+    # SPEC-STOCK-031: 포트폴리오 알림 유형 추가
+    "portfolio_target_return",
+    "portfolio_mdd_breach",
 )
 
 

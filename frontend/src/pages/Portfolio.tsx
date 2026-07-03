@@ -1,5 +1,5 @@
 // 포트폴리오 관리 페이지
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import {
   apiListPortfolios,
@@ -12,10 +12,35 @@ import {
   type Holding,
   type PortfolioPerformance,
   type OptimizeResult,
+  type Market,
+  type Currency,
 } from '../api/portfolio';
+// SPEC-STOCK-039: 시장 상태 폴링 훅 & 배지 컴포넌트
+import { useMarketPolling } from '../hooks/useMarketPolling';
+import { MarketStatusBadge } from '../components/MarketStatusBadge';
 import PortfolioScoreCard from '../components/PortfolioScoreCard';
 import RebalancingTable from '../components/RebalancingTable';
 import NewStockSuggestions from '../components/NewStockSuggestions';
+import RiskAnalysisPanel from '../components/RiskAnalysisPanel';
+// @MX:NOTE: [AUTO] BacktestPanel — SPEC-STOCK-029 백테스팅 패널 통합
+import BacktestPanel from '../components/BacktestPanel';
+// @MX:NOTE: [AUTO] PerformanceSummaryPanel — SPEC-STOCK-030 기간별 성과 요약 패널
+import PerformanceSummaryPanel from '../components/PerformanceSummaryPanel';
+// @MX:NOTE: [AUTO] PortfolioAlertPanel — SPEC-STOCK-031 포트폴리오 알림 설정 패널
+import PortfolioAlertPanel from '../components/PortfolioAlertPanel';
+// SPEC-STOCK-033: 배당 수익률 분석 강화 컴포넌트
+import DividendSummaryPanel from '../components/DividendSummaryPanel';
+import DividendCalendarView from '../components/DividendCalendarView';
+import DRIPSimulator from '../components/DRIPSimulator';
+import BenchmarkComparisonPanel from '../components/BenchmarkComparisonPanel';
+import BenchmarkChartView from '../components/BenchmarkChartView';
+import PortfolioReportPanel from '../components/PortfolioReportPanel';
+// @MX:NOTE: [AUTO] AICommentaryPanel — SPEC-STOCK-040 AI 포트폴리오 코멘터리 패널
+import AICommentaryPanel from '../components/AICommentaryPanel';
+// @MX:NOTE: [AUTO] PortfolioGoalPanel — SPEC-STOCK-041 포트폴리오 목표 관리 패널
+import PortfolioGoalPanel from '../components/PortfolioGoalPanel';
+// @MX:NOTE: [AUTO] HoldingsSyncPanel — SPEC-STOCK-050 거래 기반 홀딩스 동기화 패널
+import HoldingsSyncPanel from '../components/HoldingsSyncPanel';
 import { getPortfolioDividends, type PortfolioDividends } from '../api/dividends';
 import { LivePriceBadge } from '../components/LivePriceBadge';
 import { PerformanceDonutChart } from '../components/PerformanceDonutChart';
@@ -630,12 +655,16 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
   const [performance, setPerformance] = useState<PortfolioPerformance | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
-  // 종목 추가 폼 상태
+  // 종목 추가 폼 상태 (SPEC-STOCK-028: market/currency 추가)
   const [krxCode, setKrxCode] = useState('');
   const [quantity, setQuantity] = useState('');
   const [avgBuyPrice, setAvgBuyPrice] = useState('');
+  const [market, setMarket] = useState<Market>('KRX');
   const [addErr, setAddErr] = useState<string | null>(null);
   const [addLoading, setAddLoading] = useState(false);
+
+  // market 변경 시 currency 자동 설정
+  const currency: Currency = market === 'KRX' ? 'KRW' : 'USD';
 
   async function load() {
     try {
@@ -652,15 +681,32 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
 
   useEffect(() => { void load(); }, [portfolioId, token]);
 
+  // SPEC-STOCK-039: KRX 시장 상태 기반 자동 폴링 (REST 방식, 60초 간격)
+  const onPoll = useCallback(async () => {
+    try {
+      const p = await apiGetPerformance(token, portfolioId);
+      setPerformance(p);
+    } catch {
+      // 폴링 오류는 무시 (다음 주기에 재시도)
+    }
+  }, [token, portfolioId]);
+
+  const { isPolling, isPaused, isMarketOpen, lastUpdated, toggle } = useMarketPolling({
+    portfolioId,
+    interval: 60,
+    onPoll,
+  });
+
   async function handleAddHolding(e: React.FormEvent) {
     e.preventDefault();
     setAddErr(null);
     setAddLoading(true);
     try {
-      await apiAddHolding(token, portfolioId, krxCode, Number(quantity), Number(avgBuyPrice));
+      await apiAddHolding(token, portfolioId, krxCode, Number(quantity), Number(avgBuyPrice), market, currency);
       setKrxCode('');
       setQuantity('');
       setAvgBuyPrice('');
+      setMarket('KRX');
       await load();
     } catch (err) {
       setAddErr(err instanceof Error ? err.message : '추가 실패');
@@ -675,6 +721,26 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
 
   return (
     <div style={{ padding: '1rem', background: '#f8f9fa', borderRadius: '4px', marginTop: '0.5rem' }}>
+      {/* SPEC-STOCK-039: 시장 상태 배지 + 폴링 토글 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+        {isMarketOpen !== null && (
+          <MarketStatusBadge isOpen={isMarketOpen} lastUpdated={lastUpdated} />
+        )}
+        <button
+          onClick={toggle}
+          style={{
+            fontSize: '0.75rem',
+            padding: '3px 8px',
+            borderRadius: '4px',
+            border: '1px solid #ccc',
+            cursor: 'pointer',
+            background: isPolling ? '#e3f2fd' : '#fafafa',
+            color: isPolling ? '#1565c0' : '#666',
+          }}
+        >
+          {isPolling ? (isPaused ? '일시 중지' : '폴링 중') : '폴링 시작'}
+        </button>
+      </div>
       {/* 성과 요약 카드 — 모바일에서 세로 스택 */}
       {performance && (
         <div
@@ -768,14 +834,47 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
               </tr>
             </thead>
             <tbody>
-              {holdings.map((h) => (
-                <tr key={h.id} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={cellStyle}>{h.krx_code}</td>
-                  <td style={cellStyle}>{h.quantity.toLocaleString()}</td>
-                  <td style={cellStyle}>₩{h.avg_buy_price.toLocaleString()}</td>
-                  <td style={cellStyle}><LivePriceBadge krxCode={h.krx_code} /></td>
-                </tr>
-              ))}
+              {holdings.map((h) => {
+                // SPEC-STOCK-028: USD 종목의 성과 데이터 매칭 (환율 환산값 표시용)
+                const perf = performance?.holdings.find((p) => p.krx_code === h.krx_code);
+                const isUsd = h.currency === 'USD';
+                return (
+                  <tr key={h.id} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={cellStyle}>
+                      {h.krx_code}
+                      {h.market && h.market !== 'KRX' ? (
+                        <span style={{
+                          marginLeft: '0.3rem',
+                          padding: '0.1rem 0.3rem',
+                          background: '#fff3e0',
+                          borderRadius: '3px',
+                          fontSize: '0.7rem',
+                          color: '#e65100',
+                          fontWeight: 600,
+                        }}>
+                          {h.market}
+                        </span>
+                      ) : null}
+                    </td>
+                    <td style={cellStyle}>{h.quantity.toLocaleString()}</td>
+                    <td style={cellStyle}>
+                      {isUsd ? '$' : '₩'}{h.avg_buy_price.toLocaleString()}
+                    </td>
+                    <td style={cellStyle}>
+                      <LivePriceBadge krxCode={h.krx_code} />
+                      {/* SPEC-STOCK-028: USD 종목 KRW 환산값 표시 */}
+                      {isUsd && perf?.current_value_krw != null && (
+                        <span style={{ display: 'block', fontSize: '0.7rem', color: '#888', marginTop: '0.1rem' }}>
+                          ≈₩{Math.round(perf.current_value_krw).toLocaleString()}
+                          {perf.fx_rate_used != null && (
+                            <span style={{ marginLeft: '0.25rem' }}>(@{perf.fx_rate_used.toFixed(0)})</span>
+                          )}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -788,18 +887,43 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
         <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.875rem' }}>종목 추가</h4>
         {addErr && <p style={{ color: '#c62828', fontSize: '0.8rem', margin: '0 0 0.5rem' }}>{addErr}</p>}
         <form onSubmit={(e) => void handleAddHolding(e)} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <input placeholder="KRX 코드 (예: 005930)" value={krxCode} onChange={(e) => setKrxCode(e.target.value)} required
-            style={{ flex: '1 1 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' }} />
+          {/* SPEC-STOCK-028: 시장 선택 드롭다운 */}
+          <select
+            value={market}
+            onChange={(e) => setMarket(e.target.value as Market)}
+            style={{ flex: '0 0 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' }}
+          >
+            <option value="KRX">KRX (국내)</option>
+            <option value="NYSE">NYSE (미국)</option>
+            <option value="NASDAQ">NASDAQ (미국)</option>
+          </select>
+          <input
+            placeholder={market === 'KRX' ? '종목코드 (예: 005930)' : '티커 (예: AAPL)'}
+            value={krxCode}
+            onChange={(e) => setKrxCode(e.target.value)}
+            required
+            style={{ flex: '1 1 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' }}
+          />
           <input placeholder="수량" type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} required
             style={{ flex: '1 1 80px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' }} />
-          <input placeholder="평균단가 (원)" type="number" min="1" value={avgBuyPrice} onChange={(e) => setAvgBuyPrice(e.target.value)} required
-            style={{ flex: '1 1 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' }} />
+          <input
+            placeholder={currency === 'USD' ? '평균단가 (USD)' : '평균단가 (원)'}
+            type="number"
+            min="1"
+            value={avgBuyPrice}
+            onChange={(e) => setAvgBuyPrice(e.target.value)}
+            required
+            style={{ flex: '1 1 100px', padding: '0.35rem 0.5rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.875rem' }}
+          />
           <button type="submit" disabled={addLoading}
             style={{ padding: '0.35rem 0.75rem', background: '#388e3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.875rem' }}>
             {addLoading ? '추가 중...' : '추가'}
           </button>
         </form>
       </div>
+
+      {/* 거래 기반 홀딩스 동기화 (SPEC-STOCK-050) */}
+      <HoldingsSyncPanel portfolioId={portfolioId} onSynced={() => void load()} />
 
       {/* 배당 분석 섹션 (SPEC-STOCK-019) */}
       <DividendsSection portfolioId={portfolioId} token={token} />
@@ -810,8 +934,275 @@ function PortfolioDetail({ portfolioId, token }: { portfolioId: number; token: s
       {/* AI 최적화 분석 섹션 (SPEC-STOCK-026) */}
       <OptimizeSection portfolioId={portfolioId} token={token} />
 
+      {/* 기간별 성과 요약 (SPEC-STOCK-030) */}
+      <PerformanceSummaryPanel token={token} portfolioId={portfolioId} />
+
+      {/* 포트폴리오 리스크 분석 (SPEC-STOCK-027) */}
+      <RiskAnalysisPanel portfolioId={portfolioId} />
+
+      {/* 포트폴리오 백테스팅 (SPEC-STOCK-029) */}
+      <BacktestPanel token={token} portfolioId={portfolioId} />
+
+      {/* 포트폴리오 알림 설정 (SPEC-STOCK-031) */}
+      <PortfolioAlertPanel portfolioId={portfolioId} />
+
+      {/* 배당 수익률 분석 (SPEC-STOCK-033) */}
+      <DividendSummaryPanel token={token} portfolioId={portfolioId} />
+      <DividendCalendarView token={token} portfolioId={portfolioId} />
+      <DRIPSimulator token={token} portfolioId={portfolioId} />
+
+      {/* 벤치마크 비교 (SPEC-STOCK-034) */}
+      <BenchmarkComparisonPanel token={token} portfolioId={portfolioId} />
+      <BenchmarkChartView token={token} portfolioId={portfolioId} />
+
+      {/* 포트폴리오 목표 관리 (SPEC-STOCK-041) */}
+      <PortfolioGoalPanel portfolioId={portfolioId} />
+
+      {/* AI 포트폴리오 코멘터리 (SPEC-STOCK-040) */}
+      <AICommentaryPanel portfolioId={portfolioId} />
+
       {/* AI 투자 조언 섹션 (SPEC-STOCK-014) */}
       <AdviceSection token={token} />
+    </div>
+  );
+}
+
+// ── SPEC-STOCK-049: 거래 내역 탭 컴포넌트 ─────────────────────────────────────
+// @MX:NOTE: [AUTO] TransactionTab — 매수/매도 수동 기록·거래 목록·실현손익 UI
+// @MX:SPEC: SPEC-STOCK-049 REQ-TXN-001~013
+
+import {
+  addTransaction,
+  listTransactions,
+  getRealizedPnl,
+  type TransactionItem,
+  type TransactionListResponse,
+  type RealizedPnlResponse,
+} from '../api/portfolio';
+
+/** 거래 내역 탭 Props */
+interface TransactionTabProps {
+  portfolioId: number;
+}
+
+/** 거래 내역 & 실현손익 탭 컴포넌트 (SPEC-STOCK-049) */
+export function TransactionTab({ portfolioId }: TransactionTabProps) {
+  const { token } = useAuth();
+
+  // 거래 목록 상태
+  const [txns, setTxns] = useState<TransactionItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+
+  // 실현손익 상태
+  const [pnlData, setPnlData] = useState<RealizedPnlResponse>({
+    items: [],
+    total_realized_pnl: '0',
+  });
+
+  // 폼 상태
+  const [krxCode, setKrxCode] = useState('');
+  const [txnType, setTxnType] = useState<'BUY' | 'SELL'>('BUY');
+  const [quantity, setQuantity] = useState('');
+  const [price, setPrice] = useState('');
+  const [txnDate, setTxnDate] = useState(new Date().toISOString().slice(0, 10));
+  const [note, setNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 거래 목록 & 실현손익 로드
+  const loadData = useCallback(async () => {
+    if (!token) return;
+    try {
+      const [txnRes, pnlRes] = await Promise.all([
+        listTransactions(token, portfolioId, { page, page_size: pageSize }),
+        getRealizedPnl(token, portfolioId),
+      ]);
+      setTxns(txnRes.transactions);
+      setTotal(txnRes.total);
+      setPnlData(pnlRes);
+    } catch (e) {
+      // 데이터 로드 오류 — 무시하고 빈 상태 유지
+    }
+  }, [token, portfolioId, page]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // 거래 추가 제출
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await addTransaction(token, portfolioId, {
+        krx_code: krxCode,
+        txn_type: txnType,
+        quantity: parseInt(quantity, 10),
+        price: parseFloat(price),
+        txn_date: txnDate,
+        note: note || null,
+      });
+      setKrxCode('');
+      setQuantity('');
+      setPrice('');
+      setNote('');
+      await loadData();
+    } catch (e) {
+      setError('거래 추가에 실패했습니다');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div data-testid="transaction-tab">
+      {/* 거래 추가 폼 */}
+      <form onSubmit={handleSubmit} style={{ marginBottom: 16 }}>
+        <h4>거래 추가</h4>
+        {error && <p style={{ color: 'red' }}>{error}</p>}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            data-testid="txn-krx-code-input"
+            type="text"
+            placeholder="종목코드 (예: 005930)"
+            value={krxCode}
+            onChange={(e) => setKrxCode(e.target.value)}
+            required
+          />
+          <select
+            data-testid="txn-type-select"
+            value={txnType}
+            onChange={(e) => setTxnType(e.target.value as 'BUY' | 'SELL')}
+          >
+            <option value="BUY">매수</option>
+            <option value="SELL">매도</option>
+          </select>
+          <input
+            data-testid="txn-quantity-input"
+            type="number"
+            placeholder="수량"
+            min={1}
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            required
+          />
+          <input
+            data-testid="txn-price-input"
+            type="number"
+            placeholder="가격"
+            min={0.01}
+            step="0.01"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            required
+          />
+          <input
+            data-testid="txn-date-input"
+            type="date"
+            value={txnDate}
+            onChange={(e) => setTxnDate(e.target.value)}
+            required
+          />
+          <input
+            data-testid="txn-note-input"
+            type="text"
+            placeholder="메모 (선택)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+          <button data-testid="txn-submit-btn" type="submit" disabled={submitting}>
+            {submitting ? '추가 중...' : '거래 추가'}
+          </button>
+        </div>
+      </form>
+
+      {/* 실현손익 요약 */}
+      <div data-testid="pnl-section" style={{ marginBottom: 16 }}>
+        <h4>실현손익 (이동평균 원가법)</h4>
+        <p>
+          총 실현손익:{' '}
+          <strong data-testid="pnl-total">{pnlData.total_realized_pnl}</strong>
+        </p>
+        {pnlData.items.length > 0 && (
+          <table>
+            <thead>
+              <tr>
+                <th>종목코드</th>
+                <th>실현손익</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pnlData.items.map((item) => (
+                <tr key={item.krx_code} data-testid={`pnl-row-${item.krx_code}`}>
+                  <td>{item.krx_code}</td>
+                  <td>{item.realized_pnl}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* 거래 목록 */}
+      <div data-testid="txn-list">
+        <h4>거래 내역 ({total}건)</h4>
+        {txns.length === 0 ? (
+          <p>거래 내역이 없습니다.</p>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th>날짜</th>
+                <th>종목</th>
+                <th>유형</th>
+                <th>수량</th>
+                <th>가격</th>
+                <th>메모</th>
+              </tr>
+            </thead>
+            <tbody>
+              {txns.map((txn) => (
+                <tr key={txn.id} data-testid={`txn-row-${txn.id}`}>
+                  <td>{txn.txn_date}</td>
+                  <td>{txn.krx_code}</td>
+                  <td style={{ color: txn.txn_type === 'BUY' ? '#2563eb' : '#dc2626' }}>
+                    {txn.txn_type}
+                  </td>
+                  <td>{txn.quantity}</td>
+                  <td>{txn.price}</td>
+                  <td>{txn.note ?? '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {/* 페이지네이션 */}
+        {total > pageSize && (
+          <div style={{ marginTop: 8 }}>
+            <button
+              data-testid="txn-prev-btn"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              이전
+            </button>
+            <span style={{ margin: '0 8px' }}>
+              {page} / {Math.ceil(total / pageSize)}
+            </span>
+            <button
+              data-testid="txn-next-btn"
+              disabled={page >= Math.ceil(total / pageSize)}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              다음
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

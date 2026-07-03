@@ -1,18 +1,68 @@
-# 포트폴리오 서비스 레이어 — CRUD + 성과 계산 + AI 최적화 (SPEC-STOCK-017·026 확장)
+# 포트폴리오 서비스 레이어 — CRUD + 성과 계산 + AI 최적화 (SPEC-STOCK-017·026·028 확장)
+import asyncio
 import logging
 from collections import defaultdict
 from datetime import date
 from decimal import Decimal
 from typing import Any
 
+import FinanceDataReader as fdr  # noqa: N813
 import redis.asyncio as aioredis
 from sqlalchemy.orm import Session
 
 from stock_picker.db.models import Portfolio, PortfolioHolding
+from stock_picker.portfolio import fx_rate as fx_rate_module
 from stock_picker.portfolio.utils import get_sector
 from stock_picker.realtime.price_feed import get_current_price
 
 logger = logging.getLogger(__name__)
+
+# 해외 주가 캐시 TTL: 1일 (당일 마감가 기준)
+_FOREIGN_PRICE_TTL = 86400
+
+
+def _fetch_foreign_price_sync(ticker: str) -> float | None:
+    """동기 FDR 해외 주가 조회 (스레드 풀에서 실행).
+
+    # @MX:NOTE: [AUTO] 동기 FDR 호출 — run_in_executor에서만 호출할 것
+    """
+    try:
+        df = fdr.DataReader(ticker)
+        if df is None or df.empty:
+            return None
+        close_col = "Close" if "Close" in df.columns else df.select_dtypes("number").columns[0]
+        return float(df[close_col].iloc[-1])
+    except Exception as e:
+        logger.warning("FDR 해외 주가 조회 실패 — ticker=%s: %s", ticker, e)
+        return None
+
+
+async def _fetch_foreign_price(ticker: str, redis: Any | None = None) -> float | None:
+    """해외 종목 USD 현재가 조회 — Redis 캐시 + FDR (SPEC-STOCK-028).
+
+    # @MX:NOTE: [AUTO] 해외 주가 조회 — Redis TTL=86400s
+    캐시 키: foreign_price:{ticker}
+    """
+    cache_key = f"foreign_price:{ticker}"
+
+    if redis is not None:
+        try:
+            cached = await redis.get(cache_key)
+            if cached is not None:
+                return float(cached)
+        except Exception as e:
+            logger.warning("Redis 해외 주가 캐시 조회 실패 — ticker=%s: %s", ticker, e)
+
+    loop = asyncio.get_event_loop()
+    price = await loop.run_in_executor(None, _fetch_foreign_price_sync, ticker)
+
+    if price is not None and redis is not None:
+        try:
+            await redis.setex(cache_key, _FOREIGN_PRICE_TTL, str(price))
+        except Exception as e:
+            logger.warning("Redis 해외 주가 캐시 저장 실패 — ticker=%s: %s", ticker, e)
+
+    return price
 
 
 def create_portfolio(db: Session, user_id: int, name: str) -> Portfolio:
@@ -33,9 +83,7 @@ def list_portfolios(db: Session, user_id: int) -> list[Portfolio]:
     return db.query(Portfolio).filter(Portfolio.user_id == user_id).all()
 
 
-def get_portfolio_with_holdings(
-    db: Session, portfolio_id: int, user_id: int
-) -> Portfolio | None:
+def get_portfolio_with_holdings(db: Session, portfolio_id: int, user_id: int) -> Portfolio | None:
     """포트폴리오와 보유 종목 함께 조회 (소유권 확인 포함)"""
     portfolio = (
         db.query(Portfolio)
@@ -46,9 +94,7 @@ def get_portfolio_with_holdings(
         return None
     # holdings 명시적 로드 (lazy="noload"이므로 직접 쿼리)
     portfolio.holdings = (
-        db.query(PortfolioHolding)
-        .filter(PortfolioHolding.portfolio_id == portfolio_id)
-        .all()
+        db.query(PortfolioHolding).filter(PortfolioHolding.portfolio_id == portfolio_id).all()
     )
     return portfolio
 
@@ -59,13 +105,17 @@ def add_holding(
     krx_code: str,
     quantity: int,
     avg_buy_price: Decimal,
+    market: str = "KRX",
+    currency: str = "KRW",
 ) -> PortfolioHolding:
-    """포트폴리오에 보유 종목 추가"""
+    """포트폴리오에 보유 종목 추가 (SPEC-STOCK-028: market/currency 파라미터 추가)"""
     holding = PortfolioHolding(
         portfolio_id=portfolio_id,
         krx_code=krx_code,
         quantity=quantity,
         avg_buy_price=avg_buy_price,
+        market=market,
+        currency=currency,
     )
     db.add(holding)
     db.commit()
@@ -93,13 +143,19 @@ def _classify(return_pct: float) -> str:
     return "normal"
 
 
-def calculate_performance(
-    db: Session, portfolio_id: int, user_id: int
+async def calculate_performance(
+    db: Session,
+    portfolio_id: int,
+    user_id: int,
+    redis: Any | None = None,
 ) -> dict[str, Any]:
-    """포트폴리오 성과 계산 — Redis 캐시 현재가 기반 (SPEC-STOCK-017).
+    """포트폴리오 성과 계산 — KRX/해외 자산 모두 지원 (SPEC-STOCK-017·028).
 
     # @MX:ANCHOR: [AUTO] calculate_performance — router, tests 3곳 이상에서 참조
-    # @MX:REASON: [AUTO] 성과 API의 단일 계산 진입점 (SPEC-STOCK-017 REQ-PERF-001~009)
+    # @MX:REASON: [AUTO] 성과 API의 단일 계산 진입점 (SPEC-STOCK-017·028 REQ-PERF-001~009, REQ-FA-005)
+
+    KRX 종목: get_current_price (기존 경로, 하위 호환).
+    해외(NYSE/NASDAQ): _fetch_foreign_price(USD) × USD/KRW 환율 → KRW 환산.
 
     Returns:
         {
@@ -137,53 +193,99 @@ def calculate_performance(
     )
 
     for h in portfolio.holdings:
-        buy_price = float(h.avg_buy_price)
-        invested = buy_price * h.quantity
+        market = getattr(h, "market", "KRX") or "KRX"
+        currency = getattr(h, "currency", "KRW") or "KRW"
+        buy_price_orig = float(h.avg_buy_price)  # 원래 통화 단위
 
-        # Redis 캐시 지원 현재가 조회 (get_current_price: dict | None)
-        price_result = get_current_price(h.krx_code)
-        price_unavailable = price_result is None
+        fx_rate_used: float | None = None
 
-        if price_unavailable:
-            # 현재가 미수신 시 매수가로 대체, 수익률 0
-            current_price = buy_price
-            current_val = invested
-            return_pct = 0.0
-            logger.warning("현재가 조회 실패 — krx_code=%s, 매수가로 대체", h.krx_code)
+        if market in ("NYSE", "NASDAQ"):
+            # 해외 자산: USD 현재가 조회 후 KRW 환산
+            usd_price = await _fetch_foreign_price(h.krx_code, redis)
+            price_unavailable = usd_price is None
+
+            if not price_unavailable and redis is not None:
+                fx_rate_used = await fx_rate_module.get_usd_krw_rate(redis)
+            elif not price_unavailable:
+                fx_rate_used = fx_rate_module._FALLBACK_RATE
+
+            if price_unavailable or fx_rate_used is None:
+                # 현재가 미수신: 매수가(KRW 환산) 기준, 수익률 0
+                buy_price_krw = buy_price_orig * (fx_rate_used or fx_rate_module._FALLBACK_RATE)
+                current_price_krw = buy_price_krw
+                current_val = current_price_krw * h.quantity
+                invested_krw = buy_price_krw * h.quantity
+                return_pct = 0.0
+                price_unavailable = True
+                logger.warning("해외 현재가 조회 실패 — ticker=%s, 매수가로 대체", h.krx_code)
+            else:
+                buy_price_krw = buy_price_orig * fx_rate_used
+                current_price_krw = float(usd_price) * fx_rate_used  # type: ignore[arg-type]
+                invested_krw = buy_price_krw * h.quantity
+                current_val = current_price_krw * h.quantity
+                return_pct = (
+                    ((current_price_krw - buy_price_krw) / buy_price_krw * 100)
+                    if buy_price_krw > 0
+                    else 0.0
+                )
+
+            # 해외 종목 섹터: KRX 매핑 없으므로 빈 문자열
+            sector = ""
+            invested = invested_krw
+            current_price = current_price_krw
+
         else:
-            current_price = float(price_result["price"])  # type: ignore[index]
-            current_val = current_price * h.quantity
-            # 매입가 0 → 0 나눗셈 방지
-            return_pct = (
-                ((current_price - buy_price) / buy_price * 100) if buy_price > 0 else 0.0
-            )
+            # KRX 종목: 기존 경로 (하위 호환)
+            buy_price = buy_price_orig
+            invested = buy_price * h.quantity
+
+            price_result = get_current_price(h.krx_code)
+            price_unavailable = price_result is None
+
+            if price_unavailable:
+                current_price = buy_price
+                current_val = invested
+                return_pct = 0.0
+                logger.warning("현재가 조회 실패 — krx_code=%s, 매수가로 대체", h.krx_code)
+            else:
+                current_price = float(price_result["price"])  # type: ignore[index]
+                current_val = current_price * h.quantity
+                return_pct = (
+                    ((current_price - buy_price) / buy_price * 100) if buy_price > 0 else 0.0
+                )
+
+            sector = get_sector(h.krx_code)
+            fx_rate_used = None
 
         classification = _classify(return_pct)
-        sector = get_sector(h.krx_code)
 
-        holdings_perf.append({
-            "krx_code": h.krx_code,
-            "quantity": h.quantity,
-            "avg_buy_price": buy_price,
-            "current_price": current_price,
-            "return_pct": round(return_pct, 2),
-            "classification": classification,
-            "sector": sector,
-            "price_unavailable": price_unavailable,
-        })
+        holdings_perf.append(
+            {
+                "krx_code": h.krx_code,
+                "quantity": h.quantity,
+                "avg_buy_price": buy_price_orig,
+                "current_price": current_price,
+                "return_pct": round(return_pct, 2),
+                "classification": classification,
+                "sector": sector,
+                "price_unavailable": price_unavailable,
+                "market": market,
+                "currency": currency,
+                "fx_rate_used": fx_rate_used,
+            }
+        )
 
         total_invested += invested
         total_current += current_val
 
         # 섹터 집계
-        sector_map[sector]["invested"] += invested
-        sector_map[sector]["current"] += current_val
-        sector_map[sector]["count"] += 1
+        sector_key = sector if sector else "해외"
+        sector_map[sector_key]["invested"] += invested
+        sector_map[sector_key]["current"] += current_val
+        sector_map[sector_key]["count"] += 1
 
     total_return_pct = (
-        ((total_current - total_invested) / total_invested * 100)
-        if total_invested > 0
-        else 0.0
+        ((total_current - total_invested) / total_invested * 100) if total_invested > 0 else 0.0
     )
 
     # classification_summary 계산
@@ -194,30 +296,29 @@ def calculate_performance(
     }
     for hp in holdings_perf:
         cls = hp["classification"]
+        # invested 는 이미 KRW 기준으로 계산됨
         invested_val = hp["avg_buy_price"] * hp["quantity"]
         summary[cls]["count"] += 1
         summary[cls]["invested"] += invested_val
 
     if total_invested > 0:
         for cls in summary:
-            summary[cls]["invested_pct"] = round(
-                summary[cls]["invested"] / total_invested * 100, 2
-            )
+            summary[cls]["invested_pct"] = round(summary[cls]["invested"] / total_invested * 100, 2)
 
     # sector_performance 계산 (투자금 내림차순 정렬)
     sector_perf = []
     for sector_name, data in sector_map.items():
         s_invested = data["invested"]
         s_current = data["current"]
-        s_return_pct = (
-            ((s_current - s_invested) / s_invested * 100) if s_invested > 0 else 0.0
+        s_return_pct = ((s_current - s_invested) / s_invested * 100) if s_invested > 0 else 0.0
+        sector_perf.append(
+            {
+                "sector": sector_name,
+                "holding_count": data["count"],
+                "invested": round(s_invested, 2),
+                "return_pct": round(s_return_pct, 2),
+            }
         )
-        sector_perf.append({
-            "sector": sector_name,
-            "holding_count": data["count"],
-            "invested": round(s_invested, 2),
-            "return_pct": round(s_return_pct, 2),
-        })
     sector_perf.sort(key=lambda x: x["invested"], reverse=True)
 
     return {
@@ -267,6 +368,7 @@ async def optimize_portfolio(
     )
     if portfolio is None:
         from fastapi import HTTPException, status
+
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="포트폴리오에 접근할 수 없습니다",
@@ -283,9 +385,7 @@ async def optimize_portfolio(
 
     # 보유 종목 조회
     holdings = (
-        db.query(PortfolioHolding)
-        .filter(PortfolioHolding.portfolio_id == portfolio_id)
-        .all()
+        db.query(PortfolioHolding).filter(PortfolioHolding.portfolio_id == portfolio_id).all()
     )
 
     if not holdings:
@@ -299,14 +399,20 @@ async def optimize_portfolio(
     for h in holdings:
         invested = float(h.avg_buy_price) * h.quantity
         weight_pct = round((invested / total_value * 100), 2) if total_value > 0 else 0.0
-        holdings_data.append({
-            "krx_code": h.krx_code,
-            "quantity": h.quantity,
-            "avg_buy_price": float(h.avg_buy_price),
-            "invested_amount": round(invested, 2),
-            "weight_pct": weight_pct,
-            "sector": get_sector(h.krx_code),
-        })
+        market = getattr(h, "market", "KRX") or "KRX"
+        currency = getattr(h, "currency", "KRW") or "KRW"
+        holdings_data.append(
+            {
+                "krx_code": h.krx_code,
+                "quantity": h.quantity,
+                "avg_buy_price": float(h.avg_buy_price),
+                "invested_amount": round(invested, 2),
+                "weight_pct": weight_pct,
+                "sector": get_sector(h.krx_code),
+                "market": market,
+                "currency": currency,
+            }
+        )
 
     # Claude AI 최적화 분석 호출
     raw = await optimize_portfolio_with_claude(holdings_data, portfolio_codes, db)
@@ -347,24 +453,28 @@ async def optimize_portfolio(
         else:
             delta_shares = 0
 
-        target_weight_items.append(TargetWeightItem(
-            krx_code=krx_code,
-            current_pct=current_pct,
-            target_pct=target_pct,
-            action=action,
-            delta_shares=delta_shares,
-        ))
+        target_weight_items.append(
+            TargetWeightItem(
+                krx_code=krx_code,
+                current_pct=current_pct,
+                target_pct=target_pct,
+                action=action,
+                delta_shares=delta_shares,
+            )
+        )
 
     # new_stocks — 포트폴리오 보유 종목 제외, 최대 5개
     new_stock_items = []
     for ns in raw.get("new_stocks", [])[:5]:
         if ns["krx_code"] not in portfolio_codes:
-            new_stock_items.append(NewStockItem(
-                krx_code=ns["krx_code"],
-                name=ns.get("name", ""),
-                sector=ns.get("sector", "기타"),
-                reason=ns.get("reason", ""),
-            ))
+            new_stock_items.append(
+                NewStockItem(
+                    krx_code=ns["krx_code"],
+                    name=ns.get("name", ""),
+                    sector=ns.get("sector", "기타"),
+                    reason=ns.get("reason", ""),
+                )
+            )
 
     result = OptimizeResult(
         score=score,

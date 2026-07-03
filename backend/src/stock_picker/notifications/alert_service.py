@@ -1,6 +1,5 @@
 # 가격 알림 서비스 — CRUD 및 알림 조건 평가
 import logging
-from typing import Literal
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session

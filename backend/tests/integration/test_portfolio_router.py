@@ -1,5 +1,4 @@
 # 포트폴리오 라우터 통합 테스트 — TestClient + 공유 인메모리 SQLite
-from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
@@ -252,3 +251,128 @@ class TestGetPerformance:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert resp.status_code == 404
+
+
+# ──────────────────────────────────────────────────────────────
+# SPEC-STOCK-027 리스크 분석 통합 테스트 (T3-1)
+# ──────────────────────────────────────────────────────────────
+
+def _make_mock_risk_result():
+    """테스트용 결정론적 리스크 분석 결과"""
+    from datetime import datetime
+
+    from stock_picker.portfolio.schemas import HoldingVolatility, RiskAnalysisResult
+
+    return RiskAnalysisResult(
+        correlation_matrix={
+            "005930": {"005930": 1.0, "000660": 0.45},
+            "000660": {"005930": 0.45, "000660": 1.0},
+        },
+        holdings_volatility=[
+            HoldingVolatility(
+                krx_code="005930",
+                name="삼성전자",
+                annualized_volatility_pct=28.5,
+                price_data_days=85,
+            ),
+            HoldingVolatility(
+                krx_code="000660",
+                name="SK하이닉스",
+                annualized_volatility_pct=35.2,
+                price_data_days=85,
+            ),
+        ],
+        portfolio_volatility_pct=22.3,
+        diversification_benefit_pct=8.7,
+        period_days=90,
+        calculated_at=datetime(2026, 6, 18, 0, 0, 0),
+    )
+
+
+class TestRiskAnalysis:
+    """GET /portfolios/{id}/risk-analysis 통합 테스트 (SPEC-STOCK-027)"""
+
+    def test_risk_analysis_success(self, client):
+        """2개 이상 보유 종목으로 리스크 분석 성공 시 200과 필수 키 반환"""
+        token = _register_and_login(client)
+        portfolio_resp = client.post(
+            "/portfolios",
+            json={"name": "리스크 분석 테스트"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        portfolio_id = portfolio_resp.json()["id"]
+
+        # 2개 보유 종목 추가
+        for krx_code, price in [("005930", "70000.00"), ("000660", "120000.00")]:
+            client.post(
+                f"/portfolios/{portfolio_id}/holdings",
+                json={"krx_code": krx_code, "quantity": 10, "avg_buy_price": price},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        mock_result = _make_mock_risk_result()
+
+        with patch(
+            "stock_picker.portfolio.router.calculate_risk_analysis",
+            return_value=mock_result,
+        ):
+            resp = client.get(
+                f"/portfolios/{portfolio_id}/risk-analysis?period=90",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "correlation_matrix" in body
+        assert "holdings_volatility" in body
+        assert "portfolio_volatility_pct" in body
+        assert "diversification_benefit_pct" in body
+        assert "period_days" in body
+        assert "calculated_at" in body
+        assert body["period_days"] == 90
+
+    def test_risk_analysis_invalid_period_422(self, client):
+        """허용되지 않은 period 값(45)은 422를 반환해야 한다"""
+        token = _register_and_login(client)
+        portfolio_resp = client.post(
+            "/portfolios",
+            json={"name": "422 테스트"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        portfolio_id = portfolio_resp.json()["id"]
+
+        resp = client.get(
+            f"/portfolios/{portfolio_id}/risk-analysis?period=45",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 422
+
+    def test_risk_analysis_fewer_than_two_holdings_400(self, client):
+        """보유 종목 1개(FDR 실패 포함)는 400을 반환해야 한다"""
+        from fastapi import HTTPException
+
+        token = _register_and_login(client)
+        portfolio_resp = client.post(
+            "/portfolios",
+            json={"name": "400 테스트"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        portfolio_id = portfolio_resp.json()["id"]
+
+        # 1개만 추가
+        client.post(
+            f"/portfolios/{portfolio_id}/holdings",
+            json={"krx_code": "005930", "quantity": 5, "avg_buy_price": "70000.00"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        with patch(
+            "stock_picker.portfolio.router.calculate_risk_analysis",
+            side_effect=HTTPException(status_code=400, detail="유효 보유 종목 부족"),
+        ):
+            resp = client.get(
+                f"/portfolios/{portfolio_id}/risk-analysis",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        assert resp.status_code == 400

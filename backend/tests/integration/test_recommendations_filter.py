@@ -1,9 +1,7 @@
 # 추천 필터/정렬 API 통합 테스트 (SPEC-STOCK-005 TASK-005~007)
 # TestClient + Redis mock 사용
-import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
-import pytest
 from fastapi.testclient import TestClient
 
 

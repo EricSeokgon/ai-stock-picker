@@ -11,7 +11,6 @@ from stock_picker.screener.schemas import (
     FilterRange,
     ScreenerCriteria,
     ScreenerPresetCreate,
-    ScreenerPresetResponse,
     ScreenerResult,
 )
 

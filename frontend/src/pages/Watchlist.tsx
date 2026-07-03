@@ -47,11 +47,6 @@ export default function Watchlist() {
   const [alertForm, setAlertForm] = useState<AlertFormState>(initialAlertForm);
   const [alertSubmitting, setAlertSubmitting] = useState(false);
 
-  // 미인증 시 로그인 페이지로 이동
-  if (!isAuthenticated || !token) {
-    return <Navigate to="/login" replace />;
-  }
-
   async function loadData() {
     if (!token) return;
     setLoading(true);
@@ -70,9 +65,15 @@ export default function Watchlist() {
     }
   }
 
+  // useEffect는 Rules of Hooks 준수를 위해 아래 조기 반환보다 앞서 호출되어야 함
   useEffect(() => {
     void loadData();
   }, [token]);
+
+  // 미인증 시 로그인 페이지로 이동 (모든 훅 호출 이후)
+  if (!isAuthenticated || !token) {
+    return <Navigate to="/login" replace />;
+  }
 
   async function handleRemove(krxCode: string) {
     if (!token) return;

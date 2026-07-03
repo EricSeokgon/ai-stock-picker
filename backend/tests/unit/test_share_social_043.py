@@ -8,7 +8,7 @@ AC 총 23개 (AC-043-001a ~ AC-043-014)
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 
 # ─────────────────────────────────────────────────────────────────────────────
